@@ -7,23 +7,38 @@ import {
   getDashboard,
   getDsaProblemTemplate,
   getDsaProblems,
-  getLearningItems
+  getLearningItems,
+  getSystemDesignProblemTemplate,
+  getSystemDesignProblems
 } from "./api";
-import type { BasicExercise, Dashboard, DsaProblem, DsaProblemTemplate, LearningItem } from "./types";
+import type {
+  BasicExercise,
+  Dashboard,
+  DsaProblem,
+  DsaProblemTemplate,
+  LearningItem,
+  SystemDesignProblem,
+  SystemDesignProblemTemplate
+} from "./types";
 
 vi.mock("./api", () => ({
   createDsaProblem: vi.fn(),
   createDsaSolution: vi.fn(),
   createLearningItem: vi.fn(),
   createPracticeSession: vi.fn(),
+  createSystemDesignProblem: vi.fn(),
   deleteDsaProblem: vi.fn(),
+  deleteSystemDesignProblem: vi.fn(),
   executeBasicExercise: vi.fn(),
   getBasicExercises: vi.fn(),
   getDashboard: vi.fn(),
   getDsaProblemTemplate: vi.fn(),
   getDsaProblems: vi.fn(),
   getLearningItems: vi.fn(),
-  updateDsaProblem: vi.fn()
+  getSystemDesignProblemTemplate: vi.fn(),
+  getSystemDesignProblems: vi.fn(),
+  updateDsaProblem: vi.fn(),
+  updateSystemDesignProblem: vi.fn()
 }));
 
 /**
@@ -139,6 +154,70 @@ const dsaTemplate: DsaProblemTemplate = {
 };
 
 /**
+ * Mocked System Design problem response used by component tests.
+ */
+const systemDesignProblems: SystemDesignProblem[] = [
+  {
+    id: "system-1",
+    title: "Design a Rate Limiter",
+    description: "Token bucket and distributed counters.",
+    status: "InProgress",
+    difficulty: "Medium",
+    confidence: 3,
+    lastPracticedAt: null,
+    nextReviewAt: null,
+    totalAttempts: 1,
+    successfulAttempts: 1,
+    source: "Personal",
+    externalUrl: null,
+    tags: ["rate-limiting", "redis"],
+    promptMarkdown: "## Scenario\nLimit API requests per user.",
+    functionalRequirementsMarkdown: "- Allow requests under limit",
+    nonFunctionalRequirementsMarkdown: "- Low latency",
+    constraintsMarkdown: "- Distributed clients",
+    capacityEstimatesMarkdown: "1000 QPS",
+    apiDesignMarkdown: "POST /requests/check",
+    dataModelMarkdown: "key: user window",
+    architectureMarkdown: "API -> Redis -> workers",
+    scalingStrategyMarkdown: "Shard counters",
+    tradeoffsMarkdown: "Accuracy vs latency",
+    reflectionMarkdown: "## Gaps\nExplain burst handling better.",
+    whatHelped: "Drawing the data flow.",
+    whatWasDifficult: "Choosing consistency model.",
+    improveNext: "Practice global limits.",
+    practiceSessions: [
+      {
+        id: "attempt-1",
+        learningItemId: "system-1",
+        learningItemTitle: "Design a Rate Limiter",
+        startedAt: "2026-08-30T12:00:00Z",
+        completedAt: "2026-08-30T12:45:00Z",
+        durationMs: 2700000,
+        outcome: "Completed",
+        confidence: 3,
+        notes: "Covered core flow.",
+        sourceCode: null,
+        whatHelped: "Drawing the data flow.",
+        whatWasDifficult: "Choosing consistency model.",
+        improveNext: "Practice global limits.",
+        createdAt: "2026-08-30T12:45:00Z"
+      }
+    ]
+  }
+];
+
+/**
+ * Mocked System Design template response used by component tests.
+ */
+const systemDesignTemplate: SystemDesignProblemTemplate = {
+  promptMarkdown: "## Scenario\nDesign ...",
+  functionalRequirementsMarkdown: "- Users can ...",
+  nonFunctionalRequirementsMarkdown: "- Availability:",
+  constraintsMarkdown: "- Traffic assumptions:",
+  reflectionMarkdown: "## What went well"
+};
+
+/**
  * Configures default API mocks before each component test.
  */
 beforeEach(() => {
@@ -147,6 +226,8 @@ beforeEach(() => {
   vi.mocked(getLearningItems).mockResolvedValue(learningItems);
   vi.mocked(getDsaProblems).mockResolvedValue(dsaProblems);
   vi.mocked(getDsaProblemTemplate).mockResolvedValue(dsaTemplate);
+  vi.mocked(getSystemDesignProblems).mockResolvedValue(systemDesignProblems);
+  vi.mocked(getSystemDesignProblemTemplate).mockResolvedValue(systemDesignTemplate);
   vi.mocked(executeBasicExercise).mockResolvedValue({
     compiled: true,
     timedOut: false,
@@ -184,8 +265,37 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "System Design" }));
 
-    expect(await screen.findByRole("heading", { name: "Topics" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add topic" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Problems" })).toBeInTheDocument();
+    expect(await screen.findByText("Design a Rate Limiter")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add problem" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that the System Design add flow opens one large markdown document editor.
+   */
+  it("opens the System Design add problem page", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "System Design" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add problem" }));
+
+    expect(await screen.findByRole("heading", { name: "Add problem" })).toBeInTheDocument();
+    expect(screen.getByText("Design document")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Markdown preview")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that the System Design detail page includes practice reflection and previous attempts.
+   */
+  it("opens System Design detail with reflection and previous attempts", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "System Design" }));
+    fireEvent.click(await screen.findByText("Design a Rate Limiter"));
+
+    expect(await screen.findByRole("heading", { name: "Attempt design" })).toBeInTheDocument();
+    expect(screen.getByText("Previous attempts")).toBeInTheDocument();
+    expect(screen.getByText("Covered core flow.")).toBeInTheDocument();
   });
 
   /**

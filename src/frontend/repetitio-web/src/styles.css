@@ -464,6 +464,13 @@ textarea {
   align-items: start;
 }
 
+.system-design-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .leetcode-layout {
   display: grid;
   grid-template-columns: minmax(420px, 0.95fr) minmax(460px, 1.05fr);
@@ -880,6 +887,26 @@ textarea {
   font-size: 0.8rem;
 }
 
+.markdown-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.system-design-document-textarea {
+  width: 100%;
+  min-height: 680px;
+  color: #24313a;
+  background: #fbfcfe;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.system-design-document-textarea:focus {
+  min-height: 680px;
+}
+
 @media (max-width: 900px) {
   .metric-grid,
   .workspace-grid,
@@ -923,6 +950,7 @@ textarea {
   .reflection-grid,
   .two-columns,
   .coding-layout,
+  .system-design-layout,
   .leetcode-layout,
   .attempt-stats {
     grid-template-columns: 1fr;

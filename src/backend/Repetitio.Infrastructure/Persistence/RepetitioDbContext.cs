@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Repetitio.Domain.Dsa;
 using Repetitio.Domain.LearningItems;
 using Repetitio.Domain.Practice;
+using Repetitio.Domain.SystemDesign;
 using Repetitio.Domain.Tags;
 
 namespace Repetitio.Infrastructure.Persistence;
@@ -49,6 +50,11 @@ public sealed class RepetitioDbContext : DbContext
     /// Gets the DSA solutions table.
     /// </summary>
     public DbSet<DsaSolution> DsaSolutions => Set<DsaSolution>();
+
+    /// <summary>
+    /// Gets the System Design problems table.
+    /// </summary>
+    public DbSet<SystemDesignProblem> SystemDesignProblems => Set<SystemDesignProblem>();
 
     /// <summary>
     /// Configures the database model.
@@ -152,6 +158,33 @@ public sealed class RepetitioDbContext : DbContext
             entity.HasOne(solution => solution.Problem)
                 .WithMany(problem => problem.Solutions)
                 .HasForeignKey(solution => solution.LearningItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SystemDesignProblem>(entity =>
+        {
+            entity.HasKey(problem => problem.LearningItemId);
+            entity.Property(problem => problem.Source).HasMaxLength(120);
+            entity.Property(problem => problem.ExternalUrl).HasMaxLength(1000);
+            entity.Property(problem => problem.PromptMarkdown).HasMaxLength(12000);
+            entity.Property(problem => problem.FunctionalRequirementsMarkdown).HasMaxLength(8000);
+            entity.Property(problem => problem.NonFunctionalRequirementsMarkdown).HasMaxLength(8000);
+            entity.Property(problem => problem.ConstraintsMarkdown).HasMaxLength(8000);
+            entity.Property(problem => problem.CapacityEstimatesMarkdown).HasMaxLength(8000);
+            entity.Property(problem => problem.ApiDesignMarkdown).HasMaxLength(12000);
+            entity.Property(problem => problem.DataModelMarkdown).HasMaxLength(12000);
+            entity.Property(problem => problem.ArchitectureMarkdown).HasMaxLength(16000);
+            entity.Property(problem => problem.ScalingStrategyMarkdown).HasMaxLength(12000);
+            entity.Property(problem => problem.TradeoffsMarkdown).HasMaxLength(12000);
+            entity.Property(problem => problem.ReflectionMarkdown).HasMaxLength(12000);
+            entity.Property(problem => problem.WhatHelped).HasMaxLength(4000);
+            entity.Property(problem => problem.WhatWasDifficult).HasMaxLength(4000);
+            entity.Property(problem => problem.ImproveNext).HasMaxLength(4000);
+            entity.Property(problem => problem.CreatedAt).IsRequired();
+            entity.Property(problem => problem.UpdatedAt).IsRequired();
+            entity.HasOne(problem => problem.LearningItem)
+                .WithOne()
+                .HasForeignKey<SystemDesignProblem>(problem => problem.LearningItemId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

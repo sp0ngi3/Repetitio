@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Repetitio.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using Repetitio.Infrastructure.Persistence;
 namespace Repetitio.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RepetitioDbContext))]
-    partial class RepetitioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260830193638_AddSystemDesignTracker")]
+    partial class AddSystemDesignTracker
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");

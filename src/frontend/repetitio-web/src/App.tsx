@@ -97,9 +97,7 @@ export function App() {
 
       {activePage === "dsa" ? <DsaPage onChanged={refreshData} /> : null}
 
-      {activePage === "system-design" ? (
-        <SystemDesignPage isLoading={isLoading} items={items} onChanged={refreshData} />
-      ) : null}
+      {activePage === "system-design" ? <SystemDesignPage onChanged={refreshData} /> : null}
 
       {activePage === "basics" ? <BasicsPage basicExercises={basicExercises} onChanged={refreshData} /> : null}
     </main>

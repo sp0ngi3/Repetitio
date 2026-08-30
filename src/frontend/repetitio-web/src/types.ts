@@ -429,3 +429,137 @@ export interface DsaProblemTemplate {
   /** Missed mental steps template. */
   missedMentalSteps: string;
 }
+
+/**
+ * Represents the payload used to create a System Design problem.
+ */
+export interface CreateSystemDesignProblemRequest {
+  /** Problem title. */
+  title: string;
+  /** Optional short description. */
+  description?: string;
+  /** Problem source, such as a course or interview list. */
+  source?: string;
+  /** External problem URL. */
+  externalUrl?: string;
+  /** Rough problem difficulty. */
+  difficulty: LearningDifficulty;
+  /** Tag names to assign. */
+  tags: string[];
+  /** Markdown prompt or scenario. */
+  promptMarkdown?: string;
+  /** Functional requirements in markdown. */
+  functionalRequirementsMarkdown?: string;
+  /** Non-functional requirements in markdown. */
+  nonFunctionalRequirementsMarkdown?: string;
+  /** Constraints and assumptions in markdown. */
+  constraintsMarkdown?: string;
+  /** Capacity estimates in markdown. */
+  capacityEstimatesMarkdown?: string;
+  /** API design notes in markdown. */
+  apiDesignMarkdown?: string;
+  /** Data model notes in markdown. */
+  dataModelMarkdown?: string;
+  /** Architecture notes in markdown. */
+  architectureMarkdown?: string;
+  /** Scaling strategy notes in markdown. */
+  scalingStrategyMarkdown?: string;
+  /** Tradeoff notes in markdown. */
+  tradeoffsMarkdown?: string;
+  /** Reflection notes in markdown. */
+  reflectionMarkdown?: string;
+  /** What helped solve or explain the design. */
+  whatHelped?: string;
+  /** What was difficult about the design. */
+  whatWasDifficult?: string;
+  /** What should be improved on the next attempt. */
+  improveNext?: string;
+}
+
+/**
+ * Represents the payload used to update a System Design problem.
+ */
+export interface UpdateSystemDesignProblemRequest extends CreateSystemDesignProblemRequest {
+  /** Current progress state. */
+  status: LearningItemStatus;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+}
+
+/**
+ * Represents a System Design problem returned by the API.
+ */
+export interface SystemDesignProblem {
+  /** Related learning item identifier. */
+  id: string;
+  /** Problem title. */
+  title: string;
+  /** Optional short description. */
+  description?: string | null;
+  /** Current progress state. */
+  status: LearningItemStatus;
+  /** Rough problem difficulty. */
+  difficulty: LearningDifficulty;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+  /** Last practice date and time. */
+  lastPracticedAt?: string | null;
+  /** Next review date and time. */
+  nextReviewAt?: string | null;
+  /** Number of recorded attempts. */
+  totalAttempts: number;
+  /** Number of successful attempts. */
+  successfulAttempts: number;
+  /** Problem source, such as a course or interview list. */
+  source?: string | null;
+  /** External problem URL. */
+  externalUrl?: string | null;
+  /** Assigned tag names. */
+  tags: string[];
+  /** Markdown prompt or scenario. */
+  promptMarkdown?: string | null;
+  /** Functional requirements in markdown. */
+  functionalRequirementsMarkdown?: string | null;
+  /** Non-functional requirements in markdown. */
+  nonFunctionalRequirementsMarkdown?: string | null;
+  /** Constraints and assumptions in markdown. */
+  constraintsMarkdown?: string | null;
+  /** Capacity estimates in markdown. */
+  capacityEstimatesMarkdown?: string | null;
+  /** API design notes in markdown. */
+  apiDesignMarkdown?: string | null;
+  /** Data model notes in markdown. */
+  dataModelMarkdown?: string | null;
+  /** Architecture notes in markdown. */
+  architectureMarkdown?: string | null;
+  /** Scaling strategy notes in markdown. */
+  scalingStrategyMarkdown?: string | null;
+  /** Tradeoff notes in markdown. */
+  tradeoffsMarkdown?: string | null;
+  /** Reflection notes in markdown. */
+  reflectionMarkdown?: string | null;
+  /** What helped solve or explain the design. */
+  whatHelped?: string | null;
+  /** What was difficult about the design. */
+  whatWasDifficult?: string | null;
+  /** What should be improved on the next attempt. */
+  improveNext?: string | null;
+  /** Practice sessions recorded for the problem. */
+  practiceSessions: PracticeSession[];
+}
+
+/**
+ * Represents the default System Design markdown template returned by the API.
+ */
+export interface SystemDesignProblemTemplate {
+  /** Prompt template. */
+  promptMarkdown: string;
+  /** Functional requirements template. */
+  functionalRequirementsMarkdown: string;
+  /** Non-functional requirements template. */
+  nonFunctionalRequirementsMarkdown: string;
+  /** Constraints template. */
+  constraintsMarkdown: string;
+  /** Reflection template. */
+  reflectionMarkdown: string;
+}

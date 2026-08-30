@@ -4,6 +4,7 @@ import type {
   CreateDsaSolutionRequest,
   CreateLearningItemRequest,
   CreatePracticeSessionRequest,
+  CreateSystemDesignProblemRequest,
   Dashboard,
   DsaProblem,
   DsaProblemTemplate,
@@ -14,7 +15,10 @@ import type {
   LearningItem,
   LearningItemStatus,
   PracticeSession,
-  UpdateDsaProblemRequest
+  SystemDesignProblem,
+  SystemDesignProblemTemplate,
+  UpdateDsaProblemRequest,
+  UpdateSystemDesignProblemRequest
 } from "./types";
 
 /**
@@ -220,4 +224,91 @@ export function createDsaSolution(id: string, request: CreateDsaSolutionRequest)
     method: "POST",
     body: JSON.stringify(request)
   });
+}
+
+/**
+ * Loads System Design problems with optional filters.
+ *
+ * @param filters - Optional System Design list filters.
+ * @returns System Design problems sorted by review status and title.
+ */
+export function getSystemDesignProblems(filters: {
+  status?: LearningItemStatus | "";
+  difficulty?: LearningDifficulty | "";
+  search?: string;
+} = {}): Promise<SystemDesignProblem[]> {
+  const query = new URLSearchParams();
+
+  if (filters.status) {
+    query.set("status", filters.status);
+  }
+
+  if (filters.difficulty) {
+    query.set("difficulty", filters.difficulty);
+  }
+
+  if (filters.search?.trim()) {
+    query.set("search", filters.search.trim());
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return requestJson<SystemDesignProblem[]>(`/api/system-design${suffix}`);
+}
+
+/**
+ * Loads the default System Design markdown template.
+ *
+ * @returns The System Design problem template.
+ */
+export function getSystemDesignProblemTemplate(): Promise<SystemDesignProblemTemplate> {
+  return requestJson<SystemDesignProblemTemplate>("/api/system-design/template");
+}
+
+/**
+ * Creates a System Design problem.
+ *
+ * @param request - System Design problem creation payload.
+ * @returns The created System Design problem.
+ */
+export function createSystemDesignProblem(
+  request: CreateSystemDesignProblemRequest
+): Promise<SystemDesignProblem> {
+  return requestJson<SystemDesignProblem>("/api/system-design", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Updates a System Design problem.
+ *
+ * @param id - System Design problem identifier.
+ * @param request - System Design problem update payload.
+ * @returns The updated System Design problem.
+ */
+export function updateSystemDesignProblem(
+  id: string,
+  request: UpdateSystemDesignProblemRequest
+): Promise<SystemDesignProblem> {
+  return requestJson<SystemDesignProblem>(`/api/system-design/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Deletes a System Design problem.
+ *
+ * @param id - System Design problem identifier.
+ * @returns A promise that resolves when deletion completes.
+ */
+export async function deleteSystemDesignProblem(id: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/system-design/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
 }
