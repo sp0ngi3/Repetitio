@@ -182,6 +182,11 @@ public static class LearningItemEndpoints
             return Results.NotFound();
         }
 
+        if (item.Type == LearningItemType.Basics)
+        {
+            return Results.BadRequest("Basics exercises are built in and cannot be deleted through learning item endpoints.");
+        }
+
         dbContext.LearningItems.Remove(item);
         await dbContext.SaveChangesAsync();
 

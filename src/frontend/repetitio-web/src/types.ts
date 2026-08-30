@@ -84,6 +84,8 @@ export interface CreatePracticeSessionRequest {
   confidence?: number | null;
   /** Free-form notes. */
   notes?: string;
+  /** Source code submitted or drafted during the attempt. */
+  sourceCode?: string;
   /** What helped during the attempt. */
   whatHelped?: string;
   /** What was difficult during the attempt. */
@@ -98,12 +100,26 @@ export interface CreatePracticeSessionRequest {
 export interface BasicExercise {
   /** Stable exercise slug. */
   slug: string;
+  /** Related learning item identifier used for practice tracking. */
+  learningItemId: string;
   /** Exercise title. */
   title: string;
   /** Programming language used by the exercise. */
   language: string;
+  /** Rough exercise difficulty. */
+  difficulty: LearningDifficulty;
   /** Exercise instructions. */
   instructions: string;
+  /** Detailed problem statement. */
+  problemStatement: string;
+  /** Worked examples for the exercise. */
+  examples: string;
+  /** Input constraints for the exercise. */
+  constraints: string;
+  /** Suggested test cases for local practice. */
+  testCases: string;
+  /** Short explanation of the intended approach. */
+  approachGuide: string;
   /** Starter code shown to the user. */
   starterCode: string;
   /** Function signature expected by the exercise. */
@@ -112,6 +128,64 @@ export interface BasicExercise {
   referenceSolution: string;
   /** Assigned tag names. */
   tags: string[];
+  /** Current progress state. */
+  status: LearningItemStatus;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+  /** Last practice date and time. */
+  lastPracticedAt?: string | null;
+  /** Next review date and time. */
+  nextReviewAt?: string | null;
+  /** Total recorded practice attempts. */
+  totalAttempts: number;
+  /** Total successful solve attempts. */
+  successfulAttempts: number;
+  /** Practice sessions recorded for the exercise. */
+  practiceSessions: PracticeSession[];
+}
+
+/**
+ * Represents a Basics code execution request.
+ */
+export interface ExecuteBasicExerciseRequest {
+  /** C# source code to compile and run. */
+  sourceCode: string;
+  /** Optional execution timeout in milliseconds. */
+  timeoutMs?: number;
+}
+
+/**
+ * Represents one automated Basics test result.
+ */
+export interface BasicExerciseTestResult {
+  /** Test case name. */
+  name: string;
+  /** Whether the test passed. */
+  passed: boolean;
+  /** Expected output for the test. */
+  expected: string;
+  /** Actual output from the submitted solution. */
+  actual: string;
+  /** Optional runtime error message. */
+  error?: string | null;
+}
+
+/**
+ * Represents the compilation and automated test result for a Basics submission.
+ */
+export interface ExecuteBasicExerciseResponse {
+  /** Whether the source code compiled successfully. */
+  compiled: boolean;
+  /** Whether execution exceeded the timeout. */
+  timedOut: boolean;
+  /** Whether every automated test passed. */
+  passed: boolean;
+  /** Optional compiler output. */
+  compilerOutput?: string | null;
+  /** Optional runtime output. */
+  runtimeOutput?: string | null;
+  /** Automated test results. */
+  testResults: BasicExerciseTestResult[];
 }
 
 /**
@@ -154,6 +228,8 @@ export interface PracticeSession {
   confidence?: number | null;
   /** Free-form notes. */
   notes?: string | null;
+  /** Source code submitted or drafted during the attempt. */
+  sourceCode?: string | null;
   /** What helped during the attempt. */
   whatHelped?: string | null;
   /** What was difficult during the attempt. */

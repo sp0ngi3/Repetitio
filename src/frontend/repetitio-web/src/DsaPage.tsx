@@ -740,6 +740,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
             <label>
               Approach
               <textarea
+                className="medium-textarea expanding-textarea"
                 value={props.attemptForm.approach}
                 onChange={(event) => props.onAttemptChange("approach", event.target.value)}
                 placeholder="What approach did you use this time?"
@@ -749,6 +750,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
             <label>
               Notes
               <textarea
+                className="medium-textarea expanding-textarea"
                 value={props.attemptForm.notes}
                 onChange={(event) => props.onAttemptChange("notes", event.target.value)}
                 placeholder="What happened during this attempt?"
@@ -758,6 +760,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
             <label>
               What helped
               <textarea
+                className="medium-textarea expanding-textarea"
                 value={props.attemptForm.whatHelped}
                 onChange={(event) => props.onAttemptChange("whatHelped", event.target.value)}
                 placeholder="Pattern, hint, or idea that unlocked progress."
@@ -767,6 +770,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
             <label>
               What was difficult
               <textarea
+                className="medium-textarea expanding-textarea"
                 value={props.attemptForm.whatWasDifficult}
                 onChange={(event) => props.onAttemptChange("whatWasDifficult", event.target.value)}
                 placeholder="Where did you get stuck?"
@@ -776,6 +780,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
             <label>
               Improve next
               <textarea
+                className="medium-textarea expanding-textarea"
                 value={props.attemptForm.improveNext}
                 onChange={(event) => props.onAttemptChange("improveNext", event.target.value)}
                 placeholder="One thing to do better next time."
@@ -797,7 +802,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
               <label>
                 Source code
                 <textarea
-                  className="code-input"
+                  className="code-input expanding-textarea"
                   value={props.solutionForm.sourceCode}
                   onChange={(event) => props.onSolutionChange("sourceCode", event.target.value)}
                   placeholder="Paste your accepted solution."
@@ -824,6 +829,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
               <label>
                 Explanation
                 <textarea
+                  className="medium-textarea expanding-textarea"
                   value={props.solutionForm.explanation}
                   onChange={(event) => props.onSolutionChange("explanation", event.target.value)}
                   placeholder="Why this solution works."
@@ -916,7 +922,7 @@ function ProblemEditorPanel(props: ProblemEditorPanelProps) {
       <label>
         Problem statement
         <textarea
-          className="large-textarea"
+          className="large-textarea expanding-textarea"
           value={props.form.problemStatement}
           onChange={(event) => props.onChange("problemStatement", event.target.value)}
           placeholder="Paste the prompt, examples, and constraints."
@@ -927,6 +933,7 @@ function ProblemEditorPanel(props: ProblemEditorPanelProps) {
         <label>
           Test cases
           <textarea
+            className="medium-textarea expanding-textarea"
             value={props.form.testCases}
             onChange={(event) => props.onChange("testCases", event.target.value)}
             placeholder="Edge cases and sample inputs."
@@ -935,6 +942,7 @@ function ProblemEditorPanel(props: ProblemEditorPanelProps) {
         <label>
           Assumptions
           <textarea
+            className="medium-textarea expanding-textarea"
             value={props.form.assumptions}
             onChange={(event) => props.onChange("assumptions", event.target.value)}
             placeholder="Constraints and clarifying assumptions."
@@ -1008,6 +1016,7 @@ function MetadataFields(props: MetadataFieldsProps) {
       <label>
         Description
         <textarea
+          className="medium-textarea expanding-textarea"
           value={props.form.description}
           onChange={(event) => props.onChange("description", event.target.value)}
           placeholder="Short reminder for future practice."

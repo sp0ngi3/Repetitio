@@ -43,6 +43,11 @@ public sealed record CreatePracticeSessionRequest
     public string? Notes { get; init; }
 
     /// <summary>
+    /// Gets the source code submitted or drafted during the session.
+    /// </summary>
+    public string? SourceCode { get; init; }
+
+    /// <summary>
     /// Gets what helped during the session.
     /// </summary>
     public string? WhatHelped { get; init; }
@@ -107,6 +112,11 @@ public sealed record PracticeSessionResponse
     /// Gets free-form notes about the session.
     /// </summary>
     public string? Notes { get; init; }
+
+    /// <summary>
+    /// Gets the source code submitted or drafted during the session.
+    /// </summary>
+    public string? SourceCode { get; init; }
 
     /// <summary>
     /// Gets what helped during the session.

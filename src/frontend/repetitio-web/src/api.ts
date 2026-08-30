@@ -8,6 +8,8 @@ import type {
   DsaProblem,
   DsaProblemTemplate,
   DsaSolution,
+  ExecuteBasicExerciseRequest,
+  ExecuteBasicExerciseResponse,
   LearningDifficulty,
   LearningItem,
   LearningItemStatus,
@@ -69,6 +71,23 @@ export function getLearningItems(): Promise<LearningItem[]> {
  */
 export function getBasicExercises(): Promise<BasicExercise[]> {
   return requestJson<BasicExercise[]>("/api/basics");
+}
+
+/**
+ * Compiles and runs automated tests for a built-in Basics exercise.
+ *
+ * @param slug - Basics exercise slug.
+ * @param request - Code execution payload.
+ * @returns Compilation and automated test results.
+ */
+export function executeBasicExercise(
+  slug: string,
+  request: ExecuteBasicExerciseRequest
+): Promise<ExecuteBasicExerciseResponse> {
+  return requestJson<ExecuteBasicExerciseResponse>(`/api/basics/${slug}/execute`, {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
 }
 
 /**

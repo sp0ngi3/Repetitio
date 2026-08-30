@@ -1,14 +1,23 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { getBasicExercises, getDashboard, getDsaProblemTemplate, getDsaProblems, getLearningItems } from "./api";
+import {
+  executeBasicExercise,
+  getBasicExercises,
+  getDashboard,
+  getDsaProblemTemplate,
+  getDsaProblems,
+  getLearningItems
+} from "./api";
 import type { BasicExercise, Dashboard, DsaProblem, DsaProblemTemplate, LearningItem } from "./types";
 
 vi.mock("./api", () => ({
   createDsaProblem: vi.fn(),
   createDsaSolution: vi.fn(),
   createLearningItem: vi.fn(),
+  createPracticeSession: vi.fn(),
   deleteDsaProblem: vi.fn(),
+  executeBasicExercise: vi.fn(),
   getBasicExercises: vi.fn(),
   getDashboard: vi.fn(),
   getDsaProblemTemplate: vi.fn(),
@@ -34,14 +43,28 @@ const dashboard: Dashboard = {
  */
 const basics: BasicExercise[] = [
   {
-    slug: "kadane-algorithm",
-    title: "Kadane's Algorithm",
+    slug: "reverse-linked-list",
+    learningItemId: "basic-1",
+    title: "Reverse Linked List",
     language: "C#",
-    instructions: "Return the maximum subarray sum.",
-    starterCode: "public static int MaxSubArray(int[] values)",
-    functionSignature: "public static int MaxSubArray(int[] values)",
-    referenceSolution: "return best;",
-    tags: ["arrays", "dynamic-programming"]
+    difficulty: "Easy",
+    instructions: "Reverse a singly linked list.",
+    problemStatement: "Reverse the list in place and return the new head.",
+    examples: "Example panel content\nInput: 1 -> 2\nOutput: 2 -> 1",
+    constraints: "Constraint panel content\n- The list may be empty.",
+    testCases: "Reverse(null) => null",
+    approachGuide: "Keep previous, current, and next pointers.",
+    starterCode: "public static class Solution { public static ListNode? Reverse(ListNode? head) => head; }",
+    functionSignature: "public static ListNode? Reverse(ListNode? head)",
+    referenceSolution: "return previous;",
+    tags: ["linked-list", "pointers"],
+    status: "NotStarted",
+    confidence: null,
+    lastPracticedAt: null,
+    nextReviewAt: null,
+    totalAttempts: 0,
+    successfulAttempts: 0,
+    practiceSessions: []
   }
 ];
 
@@ -124,6 +147,22 @@ beforeEach(() => {
   vi.mocked(getLearningItems).mockResolvedValue(learningItems);
   vi.mocked(getDsaProblems).mockResolvedValue(dsaProblems);
   vi.mocked(getDsaProblemTemplate).mockResolvedValue(dsaTemplate);
+  vi.mocked(executeBasicExercise).mockResolvedValue({
+    compiled: true,
+    timedOut: false,
+    passed: true,
+    compilerOutput: null,
+    runtimeOutput: null,
+    testResults: [
+      {
+        name: "two nodes",
+        passed: true,
+        expected: "2 -> 1",
+        actual: "2 -> 1",
+        error: null
+      }
+    ]
+  });
 });
 
 describe("App", () => {
@@ -176,14 +215,49 @@ describe("App", () => {
   });
 
   /**
-   * Verifies that built-in Basics exercises are displayed with a peekable solution.
+   * Verifies that built-in Basics exercises use the tracker-style dashboard and detail page.
    */
-  it("renders built-in Basics exercises with reference solutions", async () => {
+  it("renders built-in Basics as a dashboard with a detail page", async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Basics" }));
 
-    expect(await screen.findByText("Kadane's Algorithm")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Exercises" })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Reverse Linked List"));
+
     expect(screen.getByText("Peek solution")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Attempt exercise" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run tests" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that Basics prompt tabs switch between examples and constraints.
+   */
+  it("switches Basics prompt tabs", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
+    fireEvent.click(await screen.findByText("Reverse Linked List"));
+    fireEvent.click(screen.getByRole("tab", { name: "Examples" }));
+
+    expect(screen.getByText(/Example panel content/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Constraints" }));
+
+    expect(screen.getByText(/Constraint panel content/i)).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that Basics can execute automated tests from the detail page.
+   */
+  it("runs Basics automated tests from the code editor", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
+    fireEvent.click(await screen.findByText("Reverse Linked List"));
+    fireEvent.click(screen.getByRole("button", { name: "Run tests" }));
+
+    expect(await screen.findByText("All tests passed")).toBeInTheDocument();
+    expect(screen.getByText("two nodes")).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getBasicExercises, getDashboard, getLearningItems } from "./api";
+import { BasicsPage } from "./BasicsPage";
 import { DsaPage } from "./DsaPage";
 import { SystemDesignPage } from "./SystemDesignPage";
 import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from "./types";
@@ -51,7 +52,10 @@ export function App() {
   const groupedCounts = useMemo(() => {
     return items.reduce<Record<LearningItemType, number>>(
       (counts, item) => {
-        counts[item.type] += 1;
+        if (item.type !== "Basics") {
+          counts[item.type] += 1;
+        }
+
         return counts;
       },
       { Basics: basicExercises.length, Dsa: 0, SystemDesign: 0 }
@@ -97,7 +101,7 @@ export function App() {
         <SystemDesignPage isLoading={isLoading} items={items} onChanged={refreshData} />
       ) : null}
 
-      {activePage === "basics" ? <BasicsPage basicExercises={basicExercises} /> : null}
+      {activePage === "basics" ? <BasicsPage basicExercises={basicExercises} onChanged={refreshData} /> : null}
     </main>
   );
 }
@@ -158,62 +162,6 @@ function OverviewPage(props: OverviewPageProps) {
         )}
       </section>
     </>
-  );
-}
-
-/**
- * Props accepted by the Basics page.
- */
-interface BasicsPageProps {
-  /** Built-in Basics exercises. */
-  basicExercises: BasicExercise[];
-}
-
-/**
- * Renders the built-in Basics catalog.
- *
- * @param props - Component props.
- * @returns The Basics catalog page.
- */
-function BasicsPage({ basicExercises }: BasicsPageProps) {
-  return (
-    <section className="content-section" aria-labelledby="basics-title">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Built-in catalog</p>
-          <h2 id="basics-title">Basics</h2>
-        </div>
-      </div>
-
-      {basicExercises.length ? (
-        <div className="item-grid">
-          {basicExercises.map((exercise) => (
-            <article className="item-card" key={exercise.slug}>
-              <div className="item-card-header">
-                <span>{exercise.language}</span>
-                <span>Built in</span>
-              </div>
-              <h3>{exercise.title}</h3>
-              <p>{exercise.instructions}</p>
-              <code className="signature">{exercise.functionSignature}</code>
-              <div className="tag-row">
-                {exercise.tags.map((tag) => (
-                  <span key={tag}>#{tag}</span>
-                ))}
-              </div>
-              <details className="solution-peek">
-                <summary>Peek solution</summary>
-                <pre>
-                  <code>{exercise.referenceSolution}</code>
-                </pre>
-              </details>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="empty-state">Loading built-in basics...</p>
-      )}
-    </section>
   );
 }
 

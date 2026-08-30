@@ -77,6 +77,7 @@ internal static class ApiMappings
             Outcome = session.Outcome,
             Confidence = session.Confidence,
             Notes = session.Notes,
+            SourceCode = session.SourceCode,
             WhatHelped = session.WhatHelped,
             WhatWasDifficult = session.WhatWasDifficult,
             ImproveNext = session.ImproveNext,

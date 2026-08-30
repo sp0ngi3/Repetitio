@@ -93,6 +93,7 @@ public static class PracticeSessionEndpoints
             Outcome = request.Outcome,
             Confidence = request.Confidence,
             Notes = request.Notes?.Trim(),
+            SourceCode = request.SourceCode?.Trim(),
             WhatHelped = request.WhatHelped?.Trim(),
             WhatWasDifficult = request.WhatWasDifficult?.Trim(),
             ImproveNext = request.ImproveNext?.Trim(),

@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 using Repetitio.Api.Endpoints;
+using Repetitio.Api.Execution;
+using Repetitio.Api.Execution.Harnesses;
 using Repetitio.Domain.LearningItems;
 using Repetitio.Domain.Practice;
 using Repetitio.Infrastructure;
@@ -25,6 +27,8 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod());
 });
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<BasicExerciseExecutionService>();
+builder.Services.AddSingleton<IBasicExerciseHarness, ReverseLinkedListHarness>();
 
 var app = builder.Build();
 

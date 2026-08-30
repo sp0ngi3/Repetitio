@@ -307,6 +307,15 @@ textarea {
   font-size: 0.86rem;
 }
 
+.code-block {
+  margin: 0;
+  border-radius: 8px;
+  padding: 14px;
+  overflow-x: auto;
+  color: #eef8f1;
+  background: #20272d;
+}
+
 .solution-peek {
   border-top: 1px solid #e1e6eb;
   padding-top: 10px;
@@ -455,6 +464,13 @@ textarea {
   align-items: start;
 }
 
+.leetcode-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.95fr) minmax(460px, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .problem-panel,
 .solve-panel,
 .narrow-form,
@@ -477,7 +493,99 @@ textarea {
 }
 
 .large-textarea {
-  min-height: 260px;
+  min-height: 360px;
+}
+
+.medium-textarea {
+  min-height: 190px;
+}
+
+.expanding-textarea:focus {
+  min-height: 420px;
+  outline: 2px solid rgba(52, 120, 199, 0.22);
+  outline-offset: 2px;
+}
+
+.leetcode-problem-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.problem-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #e1e6eb;
+  padding: 10px 12px 0;
+  background: #fbfcfe;
+}
+
+.problem-tabs button {
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 9px 12px;
+  color: #65717b;
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.problem-tabs button.active {
+  color: #1f2428;
+  background: #ffffff;
+  box-shadow: inset 0 -2px 0 #3478c7;
+}
+
+.problem-tabs button:focus-visible {
+  outline: 2px solid rgba(52, 120, 199, 0.36);
+  outline-offset: -2px;
+}
+
+.problem-document {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.problem-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.problem-title-row h3 {
+  margin-bottom: 0;
+  font-size: 1.35rem;
+}
+
+.difficulty-pill {
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #1c7a5a;
+  background: #e9f7f0;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.problem-document h4 {
+  margin: 0 0 8px;
+  color: #24313a;
+  font-size: 0.96rem;
+}
+
+.problem-document p {
+  white-space: pre-line;
+}
+
+.example-block {
+  margin: 0;
+  border-radius: 8px;
+  padding: 14px;
+  overflow-x: auto;
+  color: #27323a;
+  background: #f3f6f8;
+  font-size: 0.92rem;
 }
 
 .attempt-form,
@@ -629,6 +737,149 @@ textarea {
   min-height: 140px;
 }
 
+.code-input,
+.code-editor-textarea {
+  min-height: 360px;
+  color: #eef8f1;
+  background: #20272d;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  tab-size: 4;
+}
+
+.code-editor-textarea {
+  min-height: 460px;
+}
+
+.editor-field {
+  display: grid;
+  gap: 8px;
+}
+
+.editor-toolbar,
+.execution-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.compact-button {
+  width: auto;
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 0.84rem;
+}
+
+.execution-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.execution-panel.passed {
+  border-color: #b8ddc7;
+  background: #f1fbf5;
+}
+
+.execution-panel.failed {
+  border-color: #efc5bd;
+  background: #fff7f5;
+}
+
+.execution-summary strong {
+  color: #23313a;
+}
+
+.execution-summary span {
+  color: #65717b;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.output-block {
+  max-height: 180px;
+  margin: 0;
+  border-radius: 8px;
+  padding: 10px;
+  overflow: auto;
+  color: #eef8f1;
+  background: #20272d;
+  font-size: 0.82rem;
+}
+
+.test-result-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.test-result-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.test-result-row div,
+.history-code {
+  display: grid;
+  gap: 4px;
+}
+
+.test-result-row strong {
+  color: #24313a;
+}
+
+.test-result-row span {
+  color: #65717b;
+  font-size: 0.84rem;
+}
+
+.test-result-row > span {
+  color: #24313a;
+  font-weight: 900;
+}
+
+.test-result-row.passed {
+  border-color: #b8ddc7;
+}
+
+.test-result-row.failed {
+  border-color: #efc5bd;
+}
+
+.attempt-history .list-row {
+  align-items: start;
+}
+
+.history-code summary {
+  cursor: pointer;
+  color: #3478c7;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.history-code pre {
+  max-height: 220px;
+  margin: 4px 0 0;
+  border-radius: 8px;
+  padding: 10px;
+  overflow: auto;
+  color: #eef8f1;
+  background: #20272d;
+  font-size: 0.8rem;
+}
+
 @media (max-width: 900px) {
   .metric-grid,
   .workspace-grid,
@@ -636,7 +887,8 @@ textarea {
   .tracker-toolbar,
   .dsa-layout,
   .reflection-grid,
-  .coding-layout {
+  .coding-layout,
+  .leetcode-layout {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -671,6 +923,7 @@ textarea {
   .reflection-grid,
   .two-columns,
   .coding-layout,
+  .leetcode-layout,
   .attempt-stats {
     grid-template-columns: 1fr;
   }

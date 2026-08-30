@@ -53,6 +53,11 @@ public sealed class PracticeSession
     public string? Notes { get; set; }
 
     /// <summary>
+    /// Gets or sets the source code submitted or drafted during the attempt.
+    /// </summary>
+    public string? SourceCode { get; set; }
+
+    /// <summary>
     /// Gets or sets what helped during the attempt.
     /// </summary>
     public string? WhatHelped { get; set; }
