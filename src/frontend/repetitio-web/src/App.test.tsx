@@ -2,14 +2,18 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
+  exportBackup,
   executeBasicExercise,
+  getBackupStatus,
   getBasicExercises,
   getDashboard,
   getDsaProblemTemplate,
   getDsaProblems,
   getLearningItems,
   getSystemDesignProblemTemplate,
-  getSystemDesignProblems
+  getSystemDesignProblems,
+  importBackup,
+  validateBackup
 } from "./api";
 import type {
   BasicExercise,
@@ -29,7 +33,9 @@ vi.mock("./api", () => ({
   createSystemDesignProblem: vi.fn(),
   deleteDsaProblem: vi.fn(),
   deleteSystemDesignProblem: vi.fn(),
+  exportBackup: vi.fn(),
   executeBasicExercise: vi.fn(),
+  getBackupStatus: vi.fn(),
   getBasicExercises: vi.fn(),
   getDashboard: vi.fn(),
   getDsaProblemTemplate: vi.fn(),
@@ -38,7 +44,9 @@ vi.mock("./api", () => ({
   getSystemDesignProblemTemplate: vi.fn(),
   getSystemDesignProblems: vi.fn(),
   updateDsaProblem: vi.fn(),
-  updateSystemDesignProblem: vi.fn()
+  updateSystemDesignProblem: vi.fn(),
+  importBackup: vi.fn(),
+  validateBackup: vi.fn()
 }));
 
 /**
@@ -218,6 +226,16 @@ const systemDesignTemplate: SystemDesignProblemTemplate = {
 };
 
 /**
+ * Mocked backup status response used by component tests.
+ */
+const backupStatus = {
+  databasePath: "C:/Users/studn/Desktop/Repetitio/data/repetitio.db",
+  databaseExists: true,
+  backupDirectory: "C:/Users/studn/Desktop/Repetitio/backups",
+  databaseSchemaVersion: "20260830193638_AddSystemDesignTracker"
+};
+
+/**
  * Configures default API mocks before each component test.
  */
 beforeEach(() => {
@@ -228,6 +246,30 @@ beforeEach(() => {
   vi.mocked(getDsaProblemTemplate).mockResolvedValue(dsaTemplate);
   vi.mocked(getSystemDesignProblems).mockResolvedValue(systemDesignProblems);
   vi.mocked(getSystemDesignProblemTemplate).mockResolvedValue(systemDesignTemplate);
+  vi.mocked(getBackupStatus).mockResolvedValue(backupStatus);
+  vi.mocked(exportBackup).mockResolvedValue({
+    blob: new Blob(["backup"], { type: "application/zip" }),
+    fileName: "repetitio-backup-2026-08-30.zip"
+  });
+  vi.mocked(validateBackup).mockResolvedValue({
+    isValid: true,
+    message: "Backup is valid.",
+    manifest: {
+      application: "Repetitio",
+      schemaVersion: 1,
+      createdAt: "2026-08-30T14:30:00Z",
+      databaseSchemaVersion: "20260830193638_AddSystemDesignTracker"
+    }
+  });
+  vi.mocked(importBackup).mockResolvedValue({
+    imported: true,
+    message: "Backup imported successfully.",
+    preImportBackupFileName: "repetitio-pre-import-2026-08-30-143000.zip",
+    validation: {
+      isValid: true,
+      message: "Backup is valid."
+    }
+  });
   vi.mocked(executeBasicExercise).mockResolvedValue({
     compiled: true,
     timedOut: false,
@@ -247,6 +289,20 @@ beforeEach(() => {
 });
 
 describe("App", () => {
+  /**
+   * Verifies that backup settings expose export and import controls.
+   */
+  it("renders backup settings", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(await screen.findByRole("heading", { name: "Backup" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export Data" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Validate Backup" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import Data" })).toBeInTheDocument();
+  });
+
   /**
    * Verifies that the manual refresh button is not rendered.
    */

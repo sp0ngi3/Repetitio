@@ -1,4 +1,6 @@
 import type {
+  BackupStatus,
+  BackupValidation,
   BasicExercise,
   CreateDsaProblemRequest,
   CreateDsaSolutionRequest,
@@ -17,6 +19,7 @@ import type {
   PracticeSession,
   SystemDesignProblem,
   SystemDesignProblemTemplate,
+  ImportBackupResult,
   UpdateDsaProblemRequest,
   UpdateSystemDesignProblemRequest
 } from "./types";
@@ -311,4 +314,98 @@ export async function deleteSystemDesignProblem(id: string): Promise<void> {
     const message = await response.text();
     throw new Error(message || `Request failed with ${response.status}`);
   }
+}
+
+/**
+ * Loads the current backup system status.
+ *
+ * @returns Backup system status.
+ */
+export function getBackupStatus(): Promise<BackupStatus> {
+  return requestJson<BackupStatus>("/api/backup/status");
+}
+
+/**
+ * Exports the current data backup as a zip file.
+ *
+ * @returns The downloaded backup blob and its file name.
+ */
+export async function exportBackup(): Promise<{ blob: Blob; fileName: string }> {
+  const response = await fetch(`${apiBaseUrl}/api/backup/export`);
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: readFileName(response.headers.get("content-disposition")) ?? createFallbackBackupFileName()
+  };
+}
+
+/**
+ * Validates a backup file without importing it.
+ *
+ * @param file - Backup zip file selected by the user.
+ * @returns Backup validation result.
+ */
+export function validateBackup(file: File): Promise<BackupValidation> {
+  return postBackupFile<BackupValidation>("/api/backup/validate", file);
+}
+
+/**
+ * Imports a validated backup file.
+ *
+ * @param file - Backup zip file selected by the user.
+ * @returns Backup import result.
+ */
+export function importBackup(file: File): Promise<ImportBackupResult> {
+  return postBackupFile<ImportBackupResult>("/api/backup/import", file);
+}
+
+/**
+ * Uploads a backup file to an API endpoint.
+ *
+ * @param path - API path beginning with a slash.
+ * @param file - Backup zip file selected by the user.
+ * @returns Parsed JSON response.
+ */
+async function postBackupFile<T>(path: string, file: File): Promise<T> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+/**
+ * Reads a file name from a Content-Disposition header.
+ *
+ * @param value - Content-Disposition header value.
+ * @returns The parsed file name when present.
+ */
+function readFileName(value: string | null) {
+  const match = value?.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
+  const fileName = match?.[1] ?? match?.[2];
+
+  return fileName ? decodeURIComponent(fileName) : null;
+}
+
+/**
+ * Creates a fallback backup file name when the server header is unavailable.
+ *
+ * @returns A timestamped backup file name.
+ */
+function createFallbackBackupFileName() {
+  return `repetitio-backup-${new Date().toISOString().slice(0, 10)}.zip`;
 }

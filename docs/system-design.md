@@ -457,6 +457,7 @@ The following directories should normally not be committed:
 The UI should provide explicit backup functionality from Settings:
 
 - Export Data
+- Validate Backup
 - Import Data
 
 Export creates a file such as:
@@ -480,11 +481,19 @@ Example manifest:
 {
   "application": "Repetitio",
   "schemaVersion": 1,
-  "createdAt": "2026-08-30T14:30:00Z"
+  "createdAt": "2026-08-30T14:30:00Z",
+  "databaseSchemaVersion": "20260830193638_AddSystemDesignTracker"
 }
 ```
 
 The export process should use the SQLite backup mechanism rather than blindly copying an active database file.
+
+Implemented API endpoints:
+
+- `GET /api/backup/status`
+- `GET /api/backup/export`
+- `POST /api/backup/validate`
+- `POST /api/backup/import`
 
 Import should:
 
@@ -496,6 +505,14 @@ Import should:
 6. Restart or reload the database connection.
 
 A corrupted or incompatible backup must never overwrite the current database without validation.
+
+The Docker Compose setup bind-mounts both persistent runtime directories:
+
+```yaml
+volumes:
+  - ./data:/data
+  - ./backups:/backups
+```
 
 ## 13. Docker Compose
 

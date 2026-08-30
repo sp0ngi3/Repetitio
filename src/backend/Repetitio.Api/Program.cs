@@ -50,5 +50,6 @@ app.MapTagEndpoints();
 app.MapPracticeSessionEndpoints();
 app.MapReviewEndpoints();
 app.MapDashboardEndpoints();
+app.MapBackupEndpoints();
 
 await app.RunAsync();

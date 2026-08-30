@@ -59,7 +59,17 @@ Default local URLs:
 - API: `http://localhost:8080`
 - API health check: `http://localhost:8080/api/health`
 
-When the API starts, it automatically applies pending Entity Framework Core migrations. The SQLite database is stored on the host under `data/repetitio.db` when Docker Compose is used.
+When the API starts, it automatically applies pending Entity Framework Core migrations. The SQLite database is stored on the host under `data/repetitio.db` when Docker Compose is used, and pre-import safety backups are stored under `backups/`.
+
+## Backup And Restore
+
+Open Settings in the frontend to export or import data.
+
+- Export Data creates a validated `repetitio-backup-YYYY-MM-DD-HHmmss.zip` archive.
+- Validate Backup checks the manifest, SQLite integrity, required tables, and schema version without changing data.
+- Import Data validates the uploaded backup, writes a pre-import backup to `backups/`, and restores the validated SQLite database.
+
+The backup archive contains `manifest.json` and `repetitio.db`.
 
 ## Testing
 

@@ -563,3 +563,57 @@ export interface SystemDesignProblemTemplate {
   /** Reflection template. */
   reflectionMarkdown: string;
 }
+
+/**
+ * Represents backup manifest metadata returned by the API.
+ */
+export interface BackupManifest {
+  /** Application name that produced the backup. */
+  application: string;
+  /** Backup manifest schema version. */
+  schemaVersion: number;
+  /** UTC date and time when the backup was created. */
+  createdAt: string;
+  /** Database schema version captured by the backup. */
+  databaseSchemaVersion: string;
+}
+
+/**
+ * Represents the current backup system status.
+ */
+export interface BackupStatus {
+  /** Configured SQLite database path. */
+  databasePath: string;
+  /** Whether the SQLite database file exists. */
+  databaseExists: boolean;
+  /** Configured backup directory path. */
+  backupDirectory: string;
+  /** Current database schema version. */
+  databaseSchemaVersion: string;
+}
+
+/**
+ * Represents backup validation results.
+ */
+export interface BackupValidation {
+  /** Whether the backup is valid for the current app. */
+  isValid: boolean;
+  /** Validation message. */
+  message: string;
+  /** Parsed backup manifest, when available. */
+  manifest?: BackupManifest | null;
+}
+
+/**
+ * Represents the result of importing a backup.
+ */
+export interface ImportBackupResult {
+  /** Whether the import completed. */
+  imported: boolean;
+  /** Import result message. */
+  message: string;
+  /** Name of the automatic pre-import backup. */
+  preImportBackupFileName?: string | null;
+  /** Validation result created before import. */
+  validation: BackupValidation;
+}

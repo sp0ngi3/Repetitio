@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Repetitio.Infrastructure.Backup;
 using Repetitio.Infrastructure.Persistence;
 
 namespace Repetitio.Infrastructure;
@@ -28,6 +29,12 @@ public static class DependencyInjection
             options.UseSqlite(
                 connectionString,
                 sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+        services.Configure<BackupOptions>(options =>
+        {
+            options.Directory = configuration["Backup:Directory"] ?? options.Directory;
+        });
+        services.AddSingleton<BackupArchiveValidator>();
+        services.AddScoped<IRepetitioBackupService, RepetitioBackupService>();
 
         return services;
     }

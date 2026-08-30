@@ -649,6 +649,90 @@ textarea {
   gap: 8px;
 }
 
+.backup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.backup-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.backup-status-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.backup-status-list div {
+  min-width: 0;
+  border: 1px solid #e1e6eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfe;
+}
+
+.backup-status-list dt {
+  color: #717b84;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.backup-status-list dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: #24313a;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.status-pill.ready {
+  color: #1c7a5a;
+  background: #e9f7f0;
+}
+
+.status-pill.warning {
+  color: #8a4c18;
+  background: #fff2d9;
+}
+
+.muted-copy {
+  color: #65717b;
+}
+
+.validation-box {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.validation-box.valid {
+  border-color: #b8ddc7;
+  background: #f1fbf5;
+}
+
+.validation-box.invalid {
+  border-color: #efc5bd;
+  background: #fff7f5;
+}
+
+.validation-box span,
+.validation-box small {
+  color: #65717b;
+}
+
 .dsa-layout {
   display: grid;
   grid-template-columns: minmax(280px, 360px) 1fr;
@@ -913,6 +997,7 @@ textarea {
   .item-grid,
   .tracker-toolbar,
   .dsa-layout,
+  .backup-grid,
   .reflection-grid,
   .coding-layout,
   .leetcode-layout {
@@ -947,6 +1032,7 @@ textarea {
   .item-meta,
   .tracker-toolbar,
   .dsa-layout,
+  .backup-grid,
   .reflection-grid,
   .two-columns,
   .coding-layout,

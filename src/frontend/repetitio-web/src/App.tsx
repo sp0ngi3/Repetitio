@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getBasicExercises, getDashboard, getLearningItems } from "./api";
+import { BackupPage } from "./BackupPage";
 import { BasicsPage } from "./BasicsPage";
 import { DsaPage } from "./DsaPage";
 import { SystemDesignPage } from "./SystemDesignPage";
@@ -8,7 +9,7 @@ import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from ".
 /**
  * Application page identifiers.
  */
-type AppPage = "overview" | "dsa" | "system-design" | "basics";
+type AppPage = "overview" | "dsa" | "system-design" | "basics" | "settings";
 
 /**
  * Renders the Repetitio application shell.
@@ -86,6 +87,13 @@ export function App() {
           <button className={activePage === "basics" ? "active" : ""} type="button" onClick={() => setActivePage("basics")}>
             Basics
           </button>
+          <button
+            className={activePage === "settings" ? "active" : ""}
+            type="button"
+            onClick={() => setActivePage("settings")}
+          >
+            Settings
+          </button>
         </nav>
       </section>
 
@@ -100,6 +108,8 @@ export function App() {
       {activePage === "system-design" ? <SystemDesignPage onChanged={refreshData} /> : null}
 
       {activePage === "basics" ? <BasicsPage basicExercises={basicExercises} onChanged={refreshData} /> : null}
+
+      {activePage === "settings" ? <BackupPage /> : null}
     </main>
   );
 }

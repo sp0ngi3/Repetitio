@@ -8,9 +8,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Repetitio: Data Source=/data/repetitio.db
+      Backup__Directory: /backups
       Cors__AllowedOrigins__0: http://localhost:3000
       Cors__AllowedOrigins__1: http://localhost:5173
     ports:
       - "8080:8080"
     volumes:
       - ./data:/data
+      - ./backups:/backups
