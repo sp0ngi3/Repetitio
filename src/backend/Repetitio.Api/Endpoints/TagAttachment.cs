@@ -35,6 +35,11 @@ internal static class TagAttachment
             .Where(tag => normalizedNames.Contains(tag.Name))
             .ToDictionaryAsync(tag => tag.Name, StringComparer.Ordinal);
 
+        foreach (var localTag in dbContext.Tags.Local.Where(tag => normalizedNames.Contains(tag.Name)))
+        {
+            existingTags[localTag.Name] = localTag;
+        }
+
         foreach (var tagName in normalizedNames)
         {
             if (!existingTags.TryGetValue(tagName, out var tag))
@@ -47,6 +52,7 @@ internal static class TagAttachment
                 };
 
                 dbContext.Tags.Add(tag);
+                existingTags[tagName] = tag;
             }
 
             item.Tags.Add(new LearningItemTag

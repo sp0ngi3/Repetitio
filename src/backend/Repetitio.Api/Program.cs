@@ -30,6 +30,11 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<BasicExerciseExecutionService>();
 builder.Services.AddSingleton<IBasicExerciseHarness, ReverseLinkedListHarness>();
 
+foreach (var harness in BasicExerciseHarnessCatalog.GetAll())
+{
+    builder.Services.AddSingleton<IBasicExerciseHarness>(harness);
+}
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

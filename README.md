@@ -4,13 +4,15 @@ Repetitio is a local-first personal learning and repetition platform for softwar
 
 The first version focuses on three learning areas:
 
-- Basics: short implementation exercises such as sorting algorithms, linked lists, tree traversals, and other fundamentals.
+- Basics: built-in implementation exercises covering Kadane's algorithm, two pointers, prefix sums, sliding windows, linked lists, recursion, sorting, and binary search.
 - Data Structures & Algorithms: a personal problem database and learning journal for problems from LeetCode, HackerRank, Codeforces, books, interviews, and custom exercises.
 - System Design: architecture practice sessions with requirements, estimates, trade-offs, bottlenecks, and reflection notes.
 
 The core idea is simple: practice, reflect, save, review, repeat.
 
 Basics exercises are built into the application. Users create only Data Structures & Algorithms and System Design learning items.
+
+The current Basics catalog contains 14 executable C# exercises. It includes Reverse Linked List, Kadane maximum-subarray range, sorted Two Sum, two prefix-sum exercises, two sliding-window exercises, linked-list operations, Floyd's duplicate finder, factorial, Fibonacci, four sorting algorithms, binary search in a sorted array, and first-passing-version binary search.
 
 ## Product Goals
 
@@ -52,6 +54,15 @@ docker compose -f docker-compose.frontend.yml up --build
 This runs the frontend in Vite development mode and expects the API at `http://localhost:5182`.
 
 The solution also includes `docker-compose.dcproj` so Visual Studio can discover the Docker Compose setup from `Repetitio.sln`.
+
+On Windows, the launcher project can start and stop the whole site:
+
+```bash
+tools/Repetitio.Launcher/bin/Release/net10.0/win-x64/publish/Repetitio.exe start
+tools/Repetitio.Launcher/bin/Release/net10.0/win-x64/publish/Repetitio.exe stop
+```
+
+Running `Repetitio.exe` without arguments opens a small Start/Stop/Restart/Status menu.
 
 Default local URLs:
 

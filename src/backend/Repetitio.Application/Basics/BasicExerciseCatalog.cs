@@ -31,6 +31,19 @@ public static class BasicExerciseCatalog
     /// </summary>
     private static readonly BasicExerciseResponse[] Exercises =
     [
-        ReverseLinkedListExercise.Definition
+        ReverseLinkedListExercise.Definition,
+        ArrayTechniqueExercises.KadaneMaxSubarrayRange,
+        ArrayTechniqueExercises.TwoSumSorted,
+        ArrayTechniqueExercises.PrefixRangeSum,
+        ArrayTechniqueExercises.PivotIndex,
+        ArrayTechniqueExercises.MaxAverageSubarray,
+        ArrayTechniqueExercises.MinimumSizeSubarraySum,
+        LinkedListTechniqueExercises.LinkedListOperations,
+        LinkedListTechniqueExercises.FindDuplicateNumber,
+        RecursionExercises.Factorial,
+        RecursionExercises.Fibonacci,
+        SortingExercises.SortingAlgorithms,
+        BinarySearchExercises.SearchSortedArray,
+        BinarySearchExercises.FirstPassingVersion
     ];
 }

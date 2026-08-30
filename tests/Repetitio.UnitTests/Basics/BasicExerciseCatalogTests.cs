@@ -34,14 +34,27 @@ public sealed class BasicExerciseCatalogTests
     }
 
     /// <summary>
-    /// Verifies that the temporary Basics catalog contains only Reverse Linked List.
+    /// Verifies that the Basics catalog contains the implemented Phase exercises.
     /// </summary>
     [Fact]
-    public void GetAll_WhenRead_ReturnsOnlyReverseLinkedList()
+    public void GetAll_WhenRead_ReturnsImplementedPhaseExercises()
     {
-        var exercise = Assert.Single(BasicExerciseCatalog.GetAll());
+        var slugs = BasicExerciseCatalog.GetAll().Select(exercise => exercise.Slug).ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal("reverse-linked-list", exercise.Slug);
+        Assert.Contains("reverse-linked-list", slugs);
+        Assert.Contains("kadane-max-subarray-range", slugs);
+        Assert.Contains("two-pointers-two-sum-sorted", slugs);
+        Assert.Contains("prefix-sum-range-query", slugs);
+        Assert.Contains("prefix-sum-pivot-index", slugs);
+        Assert.Contains("sliding-window-max-average", slugs);
+        Assert.Contains("sliding-window-min-size-subarray-sum", slugs);
+        Assert.Contains("linked-list-operations", slugs);
+        Assert.Contains("fast-slow-find-duplicate-number", slugs);
+        Assert.Contains("recursion-factorial", slugs);
+        Assert.Contains("recursion-fibonacci", slugs);
+        Assert.Contains("sorting-algorithms", slugs);
+        Assert.Contains("binary-search-sorted-array", slugs);
+        Assert.Contains("binary-search-first-passing-version", slugs);
     }
 
     /// <summary>

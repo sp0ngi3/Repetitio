@@ -48,6 +48,11 @@ Reverse(1) => 1
 Reverse(1 -> 2) => 2 -> 1
 Reverse(1 -> 2 -> 3 -> 4 -> 5) => 5 -> 4 -> 3 -> 2 -> 1
 Reverse(1 -> -2 -> -2 -> 4) => 4 -> -2 -> -2 -> 1
+Reverse(0 -> 0 -> 0) => 0 -> 0 -> 0
+Reverse(-1 -> -2 -> -3) => -3 -> -2 -> -1
+Reverse(10 -> -10 -> 5) => 5 -> -10 -> 10
+Reverse(1 -> 1 -> 2 -> 3) => 3 -> 2 -> 1 -> 1
+Reverse(9 -> 8 -> 7 -> 6 -> 5 -> 4) => 4 -> 5 -> 6 -> 7 -> 8 -> 9
 """,
         ApproachGuide = """
 Keep three pointers: previous, current, and next. Walk through the list once. For each node, remember current.Next, point current.Next back to previous, then move previous and current one step forward. When current becomes null, previous is the new head.

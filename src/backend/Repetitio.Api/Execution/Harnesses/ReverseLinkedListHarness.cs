@@ -35,7 +35,12 @@ public static class RepetitioTestHarness
             RunReverseTest("single node", [42], [42]),
             RunReverseTest("two nodes", [1, 2], [2, 1]),
             RunReverseTest("five nodes", [1, 2, 3, 4, 5], [5, 4, 3, 2, 1]),
-            RunReverseTest("duplicates and negatives", [1, -2, -2, 4], [4, -2, -2, 1])
+            RunReverseTest("duplicates and negatives", [1, -2, -2, 4], [4, -2, -2, 1]),
+            RunReverseTest("zeroes", [0, 0, 0], [0, 0, 0]),
+            RunReverseTest("all negative", [-1, -2, -3], [-3, -2, -1]),
+            RunReverseTest("mixed signs", [10, -10, 5], [5, -10, 10]),
+            RunReverseTest("duplicates", [1, 1, 2, 3], [3, 2, 1, 1]),
+            RunReverseTest("six nodes", [9, 8, 7, 6, 5, 4], [4, 5, 6, 7, 8, 9])
         };
 
         Console.WriteLine("{{BasicExerciseExecutionMarkers.ResultsMarker}}" + JsonSerializer.Serialize(results));
