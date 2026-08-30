@@ -1,0 +1,16 @@
+services:
+  repetitio-api:
+    image: repetitio-api:production
+    build:
+      context: .
+      dockerfile: src/backend/Repetitio.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Repetitio: Data Source=/data/repetitio.db
+      Cors__AllowedOrigins__0: http://localhost:3000
+      Cors__AllowedOrigins__1: http://localhost:5173
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data

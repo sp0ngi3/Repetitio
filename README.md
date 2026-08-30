@@ -10,6 +10,8 @@ The first version focuses on three learning areas:
 
 The core idea is simple: practice, reflect, save, review, repeat.
 
+Basics exercises are built into the application. Users create only Data Structures & Algorithms and System Design learning items.
+
 ## Product Goals
 
 Repetitio should help answer questions like:
@@ -25,3 +27,51 @@ Repetitio should help answer questions like:
 
 The application is intentionally local, single-user, and lightweight. The MVP does not require authentication, cloud infrastructure, distributed systems, or multi-user features.
 
+## Running Locally
+
+Start the whole system:
+
+```bash
+docker compose up --build
+```
+
+This runs the API container and a production frontend build served by nginx.
+
+Start only the API:
+
+```bash
+docker compose -f docker-compose.api.yml up --build
+```
+
+Start only the frontend:
+
+```bash
+docker compose -f docker-compose.frontend.yml up --build
+```
+
+This runs the frontend in Vite development mode and expects the API at `http://localhost:5182`.
+
+The solution also includes `docker-compose.dcproj` so Visual Studio can discover the Docker Compose setup from `Repetitio.sln`.
+
+Default local URLs:
+
+- Frontend: `http://localhost:3000`
+- API: `http://localhost:8080`
+- API health check: `http://localhost:8080/api/health`
+
+When the API starts, it automatically applies pending Entity Framework Core migrations. The SQLite database is stored on the host under `data/repetitio.db` when Docker Compose is used.
+
+## Testing
+
+Run backend unit tests:
+
+```bash
+dotnet test Repetitio.sln
+```
+
+Run frontend unit tests:
+
+```bash
+cd src/frontend/repetitio-web
+npm test
+```

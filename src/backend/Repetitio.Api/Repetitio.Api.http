@@ -1,0 +1,29 @@
+@Repetitio.Api_HostAddress = http://localhost:5182
+
+GET {{Repetitio.Api_HostAddress}}/api/health
+Accept: application/json
+
+###
+
+GET {{Repetitio.Api_HostAddress}}/api/dashboard
+Accept: application/json
+
+###
+
+POST {{Repetitio.Api_HostAddress}}/api/items
+Content-Type: application/json
+
+{
+  "type": "Dsa",
+  "title": "Two Sum",
+  "description": "First Phase 1 DSA learning item.",
+  "difficulty": "Medium",
+  "tags": ["arrays", "hash-map"]
+}
+
+###
+
+GET {{Repetitio.Api_HostAddress}}/api/basics
+Accept: application/json
+
+###

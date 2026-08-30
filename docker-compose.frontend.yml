@@ -1,0 +1,10 @@
+services:
+  repetitio-web:
+    image: repetitio-web:development
+    build:
+      context: ./src/frontend/repetitio-web
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_API_BASE_URL: http://localhost:5182
+    ports:
+      - "3000:3000"
