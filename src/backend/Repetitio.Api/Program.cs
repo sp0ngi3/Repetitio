@@ -39,6 +39,7 @@ await app.Services.ApplyDatabaseMigrationsAsync();
 
 app.MapHealthEndpoints();
 app.MapBasicExerciseEndpoints();
+app.MapDsaEndpoints();
 app.MapLearningItemEndpoints();
 app.MapTagEndpoints();
 app.MapPracticeSessionEndpoints();

@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Repetitio.Application.LearningItems;
 using Repetitio.Domain.LearningItems;
-using Repetitio.Domain.Tags;
 using Repetitio.Infrastructure.Persistence;
 
 namespace Repetitio.Api.Endpoints;
@@ -109,7 +108,7 @@ public static class LearningItemEndpoints
             UpdatedAt = now
         };
 
-        await AttachTagsAsync(dbContext, item, request.Tags, now);
+        await TagAttachment.AttachTagsAsync(dbContext, item, request.Tags, now);
 
         dbContext.LearningItems.Add(item);
         await dbContext.SaveChangesAsync();
@@ -162,7 +161,7 @@ public static class LearningItemEndpoints
         item.UpdatedAt = now;
         item.Tags.Clear();
 
-        await AttachTagsAsync(dbContext, item, request.Tags, now);
+        await TagAttachment.AttachTagsAsync(dbContext, item, request.Tags, now);
         await dbContext.SaveChangesAsync();
 
         return Results.Ok(ApiMappings.ToResponse(item));
@@ -189,52 +188,4 @@ public static class LearningItemEndpoints
         return Results.NoContent();
     }
 
-    /// <summary>
-    /// Attaches normalized tag names to a learning item.
-    /// </summary>
-    /// <param name="dbContext">The database context.</param>
-    /// <param name="item">The learning item.</param>
-    /// <param name="tagNames">The raw tag names.</param>
-    /// <param name="createdAt">The creation timestamp for new tags.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    private static async Task AttachTagsAsync(
-        RepetitioDbContext dbContext,
-        LearningItem item,
-        IEnumerable<string> tagNames,
-        DateTime createdAt)
-    {
-        var normalizedNames = TagNameNormalizer.NormalizeMany(tagNames);
-
-        if (normalizedNames.Count == 0)
-        {
-            return;
-        }
-
-        var existingTags = await dbContext.Tags
-            .Where(tag => normalizedNames.Contains(tag.Name))
-            .ToDictionaryAsync(tag => tag.Name, StringComparer.Ordinal);
-
-        foreach (var tagName in normalizedNames)
-        {
-            if (!existingTags.TryGetValue(tagName, out var tag))
-            {
-                tag = new Tag
-                {
-                    Id = Guid.NewGuid(),
-                    Name = tagName,
-                    CreatedAt = createdAt
-                };
-
-                dbContext.Tags.Add(tag);
-            }
-
-            item.Tags.Add(new LearningItemTag
-            {
-                LearningItem = item,
-                LearningItemId = item.Id,
-                Tag = tag,
-                TagId = tag.Id
-            });
-        }
-    }
 }

@@ -68,7 +68,9 @@ public static class PracticeSessionEndpoints
             return Results.BadRequest("Confidence must be between 1 and 5.");
         }
 
-        var learningItem = await dbContext.LearningItems.FirstOrDefaultAsync(item => item.Id == request.LearningItemId);
+        var learningItem = await dbContext.LearningItems
+            .Include(item => item.PracticeSessions)
+            .FirstOrDefaultAsync(item => item.Id == request.LearningItemId);
 
         if (learningItem is null)
         {
@@ -124,13 +126,12 @@ public static class PracticeSessionEndpoints
                 session.Confidence.Value);
         }
 
-        learningItem.Status = session.Outcome switch
-        {
-            PracticeOutcome.Passed or PracticeOutcome.Completed when learningItem.Status != LearningItemStatus.Mastered
-                => LearningItemStatus.Completed,
-            PracticeOutcome.Partial or PracticeOutcome.Failed when learningItem.Status == LearningItemStatus.NotStarted
-                => LearningItemStatus.InProgress,
-            _ => learningItem.Status
-        };
+        var successfulAttemptCount = learningItem.PracticeSessions.Count(PracticeProgressPolicy.IsSuccessfulAttempt)
+            + (PracticeProgressPolicy.IsSuccessfulAttempt(session) ? 1 : 0);
+
+        learningItem.Status = PracticeProgressPolicy.CalculateStatus(
+            learningItem.Status,
+            session.Outcome,
+            successfulAttemptCount);
     }
 }

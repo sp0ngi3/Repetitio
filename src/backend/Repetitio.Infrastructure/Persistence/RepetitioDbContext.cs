@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Repetitio.Domain.Dsa;
 using Repetitio.Domain.LearningItems;
 using Repetitio.Domain.Practice;
 using Repetitio.Domain.Tags;
@@ -38,6 +39,16 @@ public sealed class RepetitioDbContext : DbContext
     /// Gets the practice sessions table.
     /// </summary>
     public DbSet<PracticeSession> PracticeSessions => Set<PracticeSession>();
+
+    /// <summary>
+    /// Gets the DSA problems table.
+    /// </summary>
+    public DbSet<DsaProblem> DsaProblems => Set<DsaProblem>();
+
+    /// <summary>
+    /// Gets the DSA solutions table.
+    /// </summary>
+    public DbSet<DsaSolution> DsaSolutions => Set<DsaSolution>();
 
     /// <summary>
     /// Configures the database model.
@@ -98,6 +109,48 @@ public sealed class RepetitioDbContext : DbContext
             entity.HasOne(session => session.LearningItem)
                 .WithMany(item => item.PracticeSessions)
                 .HasForeignKey(session => session.LearningItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DsaProblem>(entity =>
+        {
+            entity.HasKey(problem => problem.LearningItemId);
+            entity.Property(problem => problem.Source).HasMaxLength(120);
+            entity.Property(problem => problem.ExternalUrl).HasMaxLength(1000);
+            entity.Property(problem => problem.ProblemStatement).HasMaxLength(8000);
+            entity.Property(problem => problem.TestCases).HasMaxLength(8000);
+            entity.Property(problem => problem.Assumptions).HasMaxLength(4000);
+            entity.Property(problem => problem.Approach).HasMaxLength(8000);
+            entity.Property(problem => problem.Notes).HasMaxLength(8000);
+            entity.Property(problem => problem.WhatHelped).HasMaxLength(4000);
+            entity.Property(problem => problem.WhatWasDifficult).HasMaxLength(4000);
+            entity.Property(problem => problem.ImproveNext).HasMaxLength(4000);
+            entity.Property(problem => problem.KnowledgeChecklist).HasMaxLength(4000);
+            entity.Property(problem => problem.QuestionsToAsk).HasMaxLength(4000);
+            entity.Property(problem => problem.MissedMentalSteps).HasMaxLength(4000);
+            entity.Property(problem => problem.ExpectedTimeComplexity).HasMaxLength(80);
+            entity.Property(problem => problem.ExpectedSpaceComplexity).HasMaxLength(80);
+            entity.Property(problem => problem.CreatedAt).IsRequired();
+            entity.Property(problem => problem.UpdatedAt).IsRequired();
+            entity.HasOne(problem => problem.LearningItem)
+                .WithOne()
+                .HasForeignKey<DsaProblem>(problem => problem.LearningItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DsaSolution>(entity =>
+        {
+            entity.HasKey(solution => solution.Id);
+            entity.Property(solution => solution.Language).HasMaxLength(80).IsRequired();
+            entity.Property(solution => solution.SourceCode).HasMaxLength(20000).IsRequired();
+            entity.Property(solution => solution.Explanation).HasMaxLength(8000);
+            entity.Property(solution => solution.TimeComplexity).HasMaxLength(80);
+            entity.Property(solution => solution.SpaceComplexity).HasMaxLength(80);
+            entity.Property(solution => solution.CreatedAt).IsRequired();
+            entity.HasIndex(solution => solution.LearningItemId);
+            entity.HasOne(solution => solution.Problem)
+                .WithMany(problem => problem.Solutions)
+                .HasForeignKey(solution => solution.LearningItemId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

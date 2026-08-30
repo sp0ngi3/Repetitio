@@ -24,7 +24,10 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("Repetitio")
             ?? "Data Source=../../../../data/repetitio.db";
 
-        services.AddDbContext<RepetitioDbContext>(options => options.UseSqlite(connectionString));
+        services.AddDbContext<RepetitioDbContext>(options =>
+            options.UseSqlite(
+                connectionString,
+                sqliteOptions => sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
         return services;
     }

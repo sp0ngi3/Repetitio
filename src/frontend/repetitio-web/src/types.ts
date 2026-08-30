@@ -67,6 +67,32 @@ export interface CreateLearningItemRequest {
 }
 
 /**
+ * Represents the payload used to create a practice session.
+ */
+export interface CreatePracticeSessionRequest {
+  /** Practiced learning item identifier. */
+  learningItemId: string;
+  /** Optional session start date and time. */
+  startedAt?: string;
+  /** Optional session completion date and time. */
+  completedAt?: string;
+  /** Optional duration in milliseconds. */
+  durationMs?: number;
+  /** Session outcome. */
+  outcome: PracticeOutcome;
+  /** Confidence value from 1 to 5. */
+  confidence?: number | null;
+  /** Free-form notes. */
+  notes?: string;
+  /** What helped during the attempt. */
+  whatHelped?: string;
+  /** What was difficult during the attempt. */
+  whatWasDifficult?: string;
+  /** What should be improved next time. */
+  improveNext?: string;
+}
+
+/**
  * Represents a built-in Basics exercise.
  */
 export interface BasicExercise {
@@ -154,4 +180,176 @@ export interface Dashboard {
   dueReviews: DueReviewItem[];
   /** Recent practice sessions. */
   recentPractice: PracticeSession[];
+}
+
+/**
+ * Represents the payload used to create a DSA problem.
+ */
+export interface CreateDsaProblemRequest {
+  /** Problem title. */
+  title: string;
+  /** Optional short description. */
+  description?: string;
+  /** Problem source, such as LeetCode or a book. */
+  source?: string;
+  /** External problem URL. */
+  externalUrl?: string;
+  /** Rough problem difficulty. */
+  difficulty: LearningDifficulty;
+  /** Tag names to assign. */
+  tags: string[];
+  /** Problem statement or prompt. */
+  problemStatement?: string;
+  /** Test cases captured by the user. */
+  testCases?: string;
+  /** Assumptions made before solving. */
+  assumptions?: string;
+  /** Chosen solving approach. */
+  approach?: string;
+  /** Free-form personal notes. */
+  notes?: string;
+  /** What helped solve the problem. */
+  whatHelped?: string;
+  /** What was difficult about the problem. */
+  whatWasDifficult?: string;
+  /** What should be improved on the next attempt. */
+  improveNext?: string;
+  /** What should be known after solving the problem. */
+  knowledgeChecklist?: string;
+  /** Questions the user should have asked while solving. */
+  questionsToAsk?: string;
+  /** Missed mental steps from the solving process. */
+  missedMentalSteps?: string;
+  /** Expected time complexity. */
+  expectedTimeComplexity?: string;
+  /** Expected space complexity. */
+  expectedSpaceComplexity?: string;
+}
+
+/**
+ * Represents the payload used to update a DSA problem.
+ */
+export interface UpdateDsaProblemRequest extends CreateDsaProblemRequest {
+  /** Current progress state. */
+  status: LearningItemStatus;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+}
+
+/**
+ * Represents the payload used to save a DSA solution.
+ */
+export interface CreateDsaSolutionRequest {
+  /** Programming language used by the solution. */
+  language: string;
+  /** Source code for the solution. */
+  sourceCode: string;
+  /** Explanation of the solution. */
+  explanation?: string;
+  /** Time complexity. */
+  timeComplexity?: string;
+  /** Space complexity. */
+  spaceComplexity?: string;
+}
+
+/**
+ * Represents a saved DSA solution.
+ */
+export interface DsaSolution {
+  /** Unique solution identifier. */
+  id: string;
+  /** Programming language used by the solution. */
+  language: string;
+  /** Source code for the solution. */
+  sourceCode: string;
+  /** Explanation of the solution. */
+  explanation?: string | null;
+  /** Time complexity. */
+  timeComplexity?: string | null;
+  /** Space complexity. */
+  spaceComplexity?: string | null;
+  /** Creation date and time. */
+  createdAt: string;
+}
+
+/**
+ * Represents a DSA problem returned by the API.
+ */
+export interface DsaProblem {
+  /** Related learning item identifier. */
+  id: string;
+  /** Problem title. */
+  title: string;
+  /** Optional short description. */
+  description?: string | null;
+  /** Current progress state. */
+  status: LearningItemStatus;
+  /** Rough problem difficulty. */
+  difficulty: LearningDifficulty;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+  /** Last practice date and time. */
+  lastPracticedAt?: string | null;
+  /** Next review date and time. */
+  nextReviewAt?: string | null;
+  /** Number of recorded attempts. */
+  totalAttempts: number;
+  /** Number of successful attempts. */
+  successfulAttempts: number;
+  /** Problem source, such as LeetCode or a book. */
+  source?: string | null;
+  /** External problem URL. */
+  externalUrl?: string | null;
+  /** Assigned tag names. */
+  tags: string[];
+  /** Problem statement or prompt. */
+  problemStatement?: string | null;
+  /** Test cases captured by the user. */
+  testCases?: string | null;
+  /** Assumptions made before solving. */
+  assumptions?: string | null;
+  /** Chosen solving approach. */
+  approach?: string | null;
+  /** Free-form personal notes. */
+  notes?: string | null;
+  /** What helped solve the problem. */
+  whatHelped?: string | null;
+  /** What was difficult about the problem. */
+  whatWasDifficult?: string | null;
+  /** What should be improved on the next attempt. */
+  improveNext?: string | null;
+  /** What should be known after solving the problem. */
+  knowledgeChecklist?: string | null;
+  /** Questions the user should have asked while solving. */
+  questionsToAsk?: string | null;
+  /** Missed mental steps from the solving process. */
+  missedMentalSteps?: string | null;
+  /** Expected time complexity. */
+  expectedTimeComplexity?: string | null;
+  /** Expected space complexity. */
+  expectedSpaceComplexity?: string | null;
+  /** Saved solutions for the problem. */
+  solutions: DsaSolution[];
+  /** Practice sessions recorded for the problem. */
+  practiceSessions: PracticeSession[];
+}
+
+/**
+ * Represents the default DSA reflection template returned by the API.
+ */
+export interface DsaProblemTemplate {
+  /** Problem statement template. */
+  problemStatement: string;
+  /** Test cases template. */
+  testCases: string;
+  /** Assumptions template. */
+  assumptions: string;
+  /** Approach template. */
+  approach: string;
+  /** Knowledge checklist template. */
+  knowledgeChecklist: string;
+  /** Self-question template. */
+  questionsToAsk: string;
+  /** Missed mental steps template. */
+  missedMentalSteps: string;
 }
