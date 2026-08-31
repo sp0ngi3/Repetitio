@@ -12,22 +12,24 @@ internal static class Program
     /// <summary>
     /// Runs the launcher command.
     /// </summary>
-    /// <param name="args">Optional command arguments: start, stop, restart, status.</param>
+    /// <param name="args">Optional command arguments: run, start, stop, restart, status.</param>
     /// <returns>The process exit code.</returns>
     public static async Task<int> Main(string[] args)
     {
         var workspace = FindWorkspaceRoot(AppContext.BaseDirectory);
+        var isInteractive = args.Length == 0;
 
         if (workspace is null)
         {
             Console.Error.WriteLine("Could not find docker-compose.yml for Repetitio.");
+            PauseIfInteractive(isInteractive);
             return 1;
         }
 
-        var command = args.FirstOrDefault()?.Trim().ToLowerInvariant() ?? ReadInteractiveCommand();
-
-        return command switch
+        var command = isInteractive ? ReadInteractiveCommand() : args.First().Trim().ToLowerInvariant();
+        var exitCode = command switch
         {
+            "run" => await RunUntilEnterAsync(workspace),
             "start" => await StartAsync(workspace),
             "stop" => await StopAsync(workspace),
             "restart" => await RestartAsync(workspace),
@@ -35,6 +37,36 @@ internal static class Program
             "exit" => 0,
             _ => WriteUsage()
         };
+
+        PauseIfInteractive(isInteractive && command is not "run" and not "exit");
+        return exitCode;
+    }
+
+    /// <summary>
+    /// Starts Repetitio, waits for the user, and then stops the Docker Compose stack.
+    /// </summary>
+    /// <param name="workspace">The Repetitio workspace root.</param>
+    /// <returns>The process exit code.</returns>
+    private static async Task<int> RunUntilEnterAsync(string workspace)
+    {
+        var exitCode = await StartAsync(workspace);
+
+        if (exitCode != 0)
+        {
+            Console.WriteLine("Startup failed. Press Enter to close this window.");
+            Console.ReadLine();
+            return exitCode;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Repetitio is running.");
+        Console.WriteLine($"Frontend: {FrontendUrl}");
+        Console.WriteLine("API:      http://localhost:8080");
+        Console.WriteLine();
+        Console.WriteLine("Press Enter to stop Repetitio.");
+        Console.ReadLine();
+
+        return await StopAsync(workspace);
     }
 
     /// <summary>
@@ -148,19 +180,21 @@ internal static class Program
     private static string ReadInteractiveCommand()
     {
         Console.WriteLine("Repetitio");
-        Console.WriteLine("1. Start");
-        Console.WriteLine("2. Stop");
-        Console.WriteLine("3. Restart");
-        Console.WriteLine("4. Status");
+        Console.WriteLine("1. Run until Enter, then stop");
+        Console.WriteLine("2. Start and keep running");
+        Console.WriteLine("3. Stop");
+        Console.WriteLine("4. Restart");
+        Console.WriteLine("5. Status");
         Console.WriteLine("0. Exit");
         Console.Write("Choose: ");
 
         return Console.ReadLine()?.Trim() switch
         {
-            "1" => "start",
-            "2" => "stop",
-            "3" => "restart",
-            "4" => "status",
+            "1" => "run",
+            "2" => "start",
+            "3" => "stop",
+            "4" => "restart",
+            "5" => "status",
             "0" => "exit",
             var value => value ?? "exit"
         };
@@ -195,8 +229,24 @@ internal static class Program
     /// <returns>A failing process exit code.</returns>
     private static int WriteUsage()
     {
-        Console.WriteLine("Usage: Repetitio.exe [start|stop|restart|status]");
+        Console.WriteLine("Usage: 00-REPETITIO.exe [run|start|stop|restart|status]");
         return 1;
+    }
+
+    /// <summary>
+    /// Keeps the console window open after interactive commands.
+    /// </summary>
+    /// <param name="shouldPause">Whether the launcher should wait before closing.</param>
+    private static void PauseIfInteractive(bool shouldPause)
+    {
+        if (!shouldPause)
+        {
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Press Enter to close this window.");
+        Console.ReadLine();
     }
 
     /// <summary>

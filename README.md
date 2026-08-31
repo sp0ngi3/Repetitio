@@ -55,14 +55,15 @@ This runs the frontend in Vite development mode and expects the API at `http://l
 
 The solution also includes `docker-compose.dcproj` so Visual Studio can discover the Docker Compose setup from `Repetitio.sln`.
 
-On Windows, the launcher project can start and stop the whole site:
+On Windows, the root folder can contain a visible launcher executable:
 
 ```bash
-tools/Repetitio.Launcher/bin/Release/net10.0/win-x64/publish/Repetitio.exe start
-tools/Repetitio.Launcher/bin/Release/net10.0/win-x64/publish/Repetitio.exe stop
+./00-REPETITIO.exe
 ```
 
-Running `Repetitio.exe` without arguments opens a small Start/Stop/Restart/Status menu.
+Double-clicking `00-REPETITIO.exe` opens a small console menu with Run, Start, Stop, Restart, and Status actions. `Run` starts Docker Compose, opens the frontend, waits for Enter, and then shuts the stack down.
+
+The executable is generated from `tools/Repetitio.Launcher` and copied into the root folder for convenience.
 
 Default local URLs:
 

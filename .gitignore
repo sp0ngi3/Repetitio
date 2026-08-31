@@ -4,6 +4,7 @@ obj/
 dist/
 node_modules/
 *.tsbuildinfo
+00-REPETITIO.exe
 
 # Local runtime data
 data/
