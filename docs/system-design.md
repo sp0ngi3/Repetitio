@@ -40,13 +40,16 @@ Basics are small implementation exercises that should be repeated regularly. The
 
 Example exercises:
 
-- Kadane's Algorithm
+- Two Sum on a Sorted Array
 - Insertion Sort
+- Radix Sort
 - Quick Sort
 - Merge Sort
+- Linked List Insert
+- Linked List Get
 - Binary Search
 - Reverse Linked List
-- Binary Search Tree Traversal
+- Linked List Cycle Detection
 
 Example exercise:
 
@@ -55,12 +58,12 @@ Title: Quick Sort
 Language: C#
 
 Requirements:
-- Sort the array in place.
+- Return a sorted copy of the array.
 - Average time complexity should be O(n log n).
 - Do not use Array.Sort().
 
 Function signature:
-public static void QuickSort(int[] values)
+public static int[] Sort(int[] nums)
 ```
 
 When a Basics submission is submitted, Repetitio should:
@@ -224,7 +227,7 @@ Due Today
 
 Quick Sort
 Binary Search
-Sliding Window
+Insertion Sort
 Design a Rate Limiter
 ```
 

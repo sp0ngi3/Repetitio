@@ -4,7 +4,7 @@ Repetitio is a local-first personal learning and repetition platform for softwar
 
 The first version focuses on four learning areas:
 
-- Basics: built-in implementation exercises covering Kadane's algorithm, two pointers, prefix sums, sliding windows, linked lists, recursion, sorting, and binary search.
+- Basics: built-in implementation exercises covering two pointers, linked lists, recursion, sorting, and binary search.
 - Data Structures & Algorithms: a personal problem database and learning journal for problems from LeetCode, HackerRank, Codeforces, books, interviews, and custom exercises.
 - System Design: architecture practice sessions with requirements, estimates, trade-offs, bottlenecks, and reflection notes.
 - Flashcards: question/explanation cards, saved learning sessions, flip-based review, and knew/did-not-know evaluation.
@@ -13,7 +13,7 @@ The core idea is simple: practice, reflect, save, review, repeat.
 
 Basics exercises are built into the application. Users create Data Structures & Algorithms, System Design, and Flashcard learning items.
 
-The current Basics catalog contains 15 executable C# exercises. It includes Reverse Linked List, classic Kadane maximum subarray, Kadane maximum-subarray range, sorted Two Sum, two prefix-sum exercises, two sliding-window exercises, linked-list operations, Floyd's duplicate finder, factorial, Fibonacci, four sorting algorithms, binary search in a sorted array, and first-passing-version binary search.
+The current Basics catalog contains 13 executable C# exercises. It includes Reverse Linked List, sorted Two Sum, separate linked-list insertion and indexed lookup exercises, Floyd's linked-list cycle detection, factorial, Fibonacci, five separate sorting exercises (Insertion, Merge, Quick, Bucket, and Radix), and binary search in a sorted array.
 
 Flashcards are stored in the same SQLite database as the rest of the system, so export, import, validation, and pre-import safety backups include cards, saved flashcard sessions, and review history.
 

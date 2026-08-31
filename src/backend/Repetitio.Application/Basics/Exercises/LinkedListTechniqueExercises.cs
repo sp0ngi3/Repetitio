@@ -8,20 +8,19 @@ namespace Repetitio.Application.Basics.Exercises;
 public static class LinkedListTechniqueExercises
 {
     /// <summary>
-    /// Gets the linked list operations exercise.
+    /// Gets the linked list insertion exercise.
     /// </summary>
-    public static BasicExerciseResponse LinkedListOperations { get; } = BasicExerciseFactory.Create(
-        "linked-list-operations",
-        "Linked List: Insert And Get",
+    public static BasicExerciseResponse LinkedListInsert { get; } = BasicExerciseFactory.Create(
+        "linked-list-insert",
+        "Linked List: Insert",
         LearningDifficulty.Easy,
-        "Implement basic linked list insertion and indexed lookup operations.",
+        "Implement insertion at the head, tail, and a zero-based index.",
         """
-Implement four basic operations for a singly linked list:
+Implement three insertion operations for a singly linked list:
 
 - InsertAtHead
 - InsertAtEnd
 - InsertAtIndex
-- GetByIndex
 
 Indexes are zero-based. InsertAtIndex should leave the list unchanged when the index is invalid.
 """,
@@ -35,18 +34,19 @@ Input: head = 1 -> 3, InsertAtIndex(head, 1, 2)
 Output: 1 -> 2 -> 3
 
 Example 3:
-Input: head = 1 -> 2, GetByIndex(head, 1)
-Output: 2
+Input: head = 1 -> 2, InsertAtEnd(head, 3)
+Output: 1 -> 2 -> 3
 """,
         """
 - The list may be empty.
 - Indexes are zero-based.
-- Invalid get indexes return null.
+- InsertAtHead always returns a non-null head.
+- InsertAtEnd always returns a non-null head.
 - Invalid insert indexes leave the list unchanged.
 - Target time complexity: O(n) for end/index operations and O(1) for head insertion.
 """,
         """
-InsertAtHead([], 1) => 1
+InsertAtHead([], 1) => [1]
 InsertAtHead([2,3], 1) => [1,2,3]
 InsertAtEnd([], 1) => [1]
 InsertAtEnd([1,2], 3) => [1,2,3]
@@ -54,120 +54,189 @@ InsertAtIndex([1,3], 1, 2) => [1,2,3]
 InsertAtIndex([2,3], 0, 1) => [1,2,3]
 InsertAtIndex([1,2], 2, 3) => [1,2,3]
 InsertAtIndex([1,2], 5, 9) => [1,2]
-GetByIndex([4,5,6], 2) => 6
-GetByIndex([4,5,6], 3) => null
+InsertAtIndex([1,2], -1, 9) => [1,2]
 """,
         """
-Use a tiny ListNode model and carefully handle empty-list and index-zero cases before walking the list.
+Handle index zero as a special case. For the other operations, walk the list while keeping the node before the insertion point, then connect the new node without losing the remaining list.
 """,
         """
 public static ListNode InsertAtHead(ListNode? head, int value)
 public static ListNode InsertAtEnd(ListNode? head, int value)
 public static ListNode? InsertAtIndex(ListNode? head, int index, int value)
-public static int? GetByIndex(ListNode? head, int index)
 """,
-        ["linked-list", "insertion", "indexing", "pointers"],
-        LinkedListStarter(),
-        LinkedListReferenceSolution());
+        ["linked-list", "insertion", "pointers"],
+        LinkedListInsertStarter(),
+        LinkedListInsertReference());
 
     /// <summary>
-    /// Gets the duplicate number fast and slow pointer exercise.
+    /// Gets the linked list indexed lookup exercise.
     /// </summary>
-    public static BasicExerciseResponse FindDuplicateNumber { get; } = BasicExerciseFactory.Create(
-        "fast-slow-find-duplicate-number",
-        "Fast And Slow Pointers: Find Duplicate Number",
-        LearningDifficulty.Medium,
-        "Find the duplicate value in an array by treating indexes as links.",
+    public static BasicExerciseResponse LinkedListGet { get; } = BasicExerciseFactory.Create(
+        "linked-list-get",
+        "Linked List: Get",
+        LearningDifficulty.Easy,
+        "Return the value stored at a zero-based linked list index.",
         """
-Given an array nums containing n + 1 integers where each value is in the range [1, n], return the duplicated number.
+Implement indexed lookup for a singly linked list. Return the value at the requested zero-based index, or null when the index is outside the list.
 
-Solve it without modifying nums and using only constant extra space.
+The list may be empty and indexes may be negative. Walk the list one node at a time; do not convert it to an array.
 """,
         """
 Example 1:
-Input: nums = [1,3,4,2,2]
-Output: 2
+Input: head = 4 -> 5 -> 6, index = 2
+Output: 6
 
 Example 2:
-Input: nums = [3,1,3,4,2]
-Output: 3
+Input: head = 4 -> 5 -> 6, index = 3
+Output: null
 """,
         """
-- nums.length == n + 1.
-- 1 <= nums[i] <= n.
-- Exactly one value is duplicated, but it may appear more than twice.
+- The list may be empty.
+- Indexes are zero-based.
+- Negative or out-of-range indexes return null.
+- Node values may be negative or zero.
+- Target time complexity: O(n).
+- Target extra space complexity: O(1).
+""",
+        """
+GetByIndex([4,5,6], 0) => 4
+GetByIndex([4,5,6], 2) => 6
+GetByIndex([4,5,6], 3) => null
+GetByIndex([], 0) => null
+GetByIndex([7], -1) => null
+GetByIndex([0,-2,5], 1) => -2
+""",
+        """
+Return null for a negative index. Otherwise advance current exactly index times and return current.Value when a node exists.
+""",
+        "public static int? GetByIndex(ListNode? head, int index)",
+        ["linked-list", "indexing", "pointers"],
+        LinkedListGetStarter(),
+        LinkedListGetReference());
+
+    /// <summary>
+    /// Gets the linked list cycle detection exercise.
+    /// </summary>
+    public static BasicExerciseResponse DetectLinkedListCycle { get; } = BasicExerciseFactory.Create(
+        "fast-slow-detect-linked-list-cycle",
+        "Fast And Slow Pointers: Detect Linked List Cycle",
+        LearningDifficulty.Medium,
+        "Determine whether a singly linked list contains a cycle using two pointers.",
+        """
+Given the head of a singly linked list, determine whether the list contains a cycle.
+
+Use a slow pointer that advances one node at a time and a fast pointer that advances two nodes at a time. Return true when they meet and false when the fast pointer reaches the end of the list.
+""",
+        """
+Example 1:
+Input: head = 3 -> 2 -> 0 -> -4, with -4 pointing to 2
+Output: true
+
+Example 2:
+Input: head = 1 -> 2 -> null
+Output: false
+
+Example 3:
+Input: head = 1, with 1 pointing to itself
+Output: true
+""",
+        """
+- The list may be empty.
+- Node values may be duplicated and may be negative.
+- The cycle may start at the head, in the middle, or at the only node.
+- Do not modify the list.
 - Target time complexity: O(n).
 - Target space complexity: O(1).
 """,
         """
-FindDuplicate([1,3,4,2,2]) => 2
-FindDuplicate([3,1,3,4,2]) => 3
-FindDuplicate([1,1]) => 1
-FindDuplicate([1,1,2]) => 1
-FindDuplicate([2,2,2,2,2]) => 2
-FindDuplicate([2,5,9,6,9,3,8,9,7,1]) => 9
-FindDuplicate([4,3,1,4,2]) => 4
-FindDuplicate([1,4,6,2,6,3,5]) => 6
-FindDuplicate([5,4,3,2,1,5]) => 5
-FindDuplicate([2,1,2]) => 2
+HasCycle(null) => false
+HasCycle([1]) => false
+HasCycle([1], cycle starts at 0) => true
+HasCycle([1,2]) => false
+HasCycle([1,2], cycle starts at 0) => true
+HasCycle([1,2,3,4], cycle starts at 2) => true
+HasCycle([3,-2,-2,4], cycle starts at 1) => true
+HasCycle([1,2,3,4], no cycle) => false
 """,
         """
-Use Floyd's cycle detection. Treat nums[i] as the next pointer. First find the meeting point, then reset one pointer to index 0 and move both one step until they meet at the duplicate value.
+Initialize slow and fast at head. Move slow once and fast twice in a loop. If they meet, the list has a cycle; if fast or fast.Next becomes null, the list is acyclic.
 """,
-        "public static int FindDuplicate(int[] nums)",
-        ["array", "fast-slow-pointers", "cycle-detection", "floyd"],
+        "public static bool HasCycle(ListNode? head)",
+        ["linked-list", "fast-slow-pointers", "cycle-detection", "floyd"],
         """
+public sealed class ListNode
+{
+    /// <summary>
+    /// Gets or sets the node value.
+    /// </summary>
+    public int Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the next node.
+    /// </summary>
+    public ListNode? Next { get; set; }
+}
+
 public static class Solution
 {
     /// <summary>
-    /// Finds the duplicate number without modifying the input.
+    /// Determines whether a linked list contains a cycle.
     /// </summary>
-    /// <param name="nums">The input values.</param>
-    /// <returns>The duplicate number.</returns>
-    public static int FindDuplicate(int[] nums)
+    /// <param name="head">The linked list head.</param>
+    /// <returns><see langword="true"/> when the list contains a cycle.</returns>
+    public static bool HasCycle(ListNode? head)
     {
-        return 0;
+        return false;
     }
 }
 """,
         """
+public sealed class ListNode
+{
+    /// <summary>
+    /// Gets or sets the node value.
+    /// </summary>
+    public int Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the next node.
+    /// </summary>
+    public ListNode? Next { get; set; }
+}
+
 public static class Solution
 {
     /// <summary>
-    /// Finds the duplicate number without modifying the input.
+    /// Determines whether a linked list contains a cycle.
     /// </summary>
-    /// <param name="nums">The input values.</param>
-    /// <returns>The duplicate number.</returns>
-    public static int FindDuplicate(int[] nums)
+    /// <param name="head">The linked list head.</param>
+    /// <returns><see langword="true"/> when the list contains a cycle.</returns>
+    public static bool HasCycle(ListNode? head)
     {
-        var slow = nums[0];
-        var fast = nums[0];
+        var slow = head;
+        var fast = head;
 
-        do
+        while (fast is not null && fast.Next is not null)
         {
-            slow = nums[slow];
-            fast = nums[nums[fast]];
-        }
-        while (slow != fast);
+            slow = slow!.Next;
+            fast = fast.Next.Next;
 
-        slow = nums[0];
-
-        while (slow != fast)
-        {
-            slow = nums[slow];
-            fast = nums[fast];
+            if (slow == fast)
+            {
+                return true;
+            }
         }
 
-        return slow;
+        return false;
     }
 }
 """);
 
     /// <summary>
-    /// Creates starter code for linked list operations.
+    /// Creates the linked list insertion starter code.
     /// </summary>
-    /// <returns>The starter code.</returns>
-    private static string LinkedListStarter()
+    /// <returns>The insertion starter code.</returns>
+    private static string LinkedListInsertStarter()
     {
         return """
 public sealed class ListNode
@@ -193,7 +262,7 @@ public static class Solution
     /// <returns>The new list head.</returns>
     public static ListNode InsertAtHead(ListNode? head, int value)
     {
-        return new ListNode { Value = value, Next = head };
+        return new ListNode { Value = value };
     }
 
     /// <summary>
@@ -218,26 +287,15 @@ public static class Solution
     {
         return head;
     }
-
-    /// <summary>
-    /// Gets the value at a zero-based index.
-    /// </summary>
-    /// <param name="head">The current list head.</param>
-    /// <param name="index">The lookup index.</param>
-    /// <returns>The value at the index, or null when the index is invalid.</returns>
-    public static int? GetByIndex(ListNode? head, int index)
-    {
-        return null;
-    }
 }
 """;
     }
 
     /// <summary>
-    /// Creates reference code for linked list operations.
+    /// Creates the linked list insertion reference solution.
     /// </summary>
-    /// <returns>The reference solution.</returns>
-    private static string LinkedListReferenceSolution()
+    /// <returns>The insertion reference solution.</returns>
+    private static string LinkedListInsertReference()
     {
         return """
 public sealed class ListNode
@@ -326,7 +384,68 @@ public static class Solution
         current.Next = new ListNode { Value = value, Next = current.Next };
         return head;
     }
+}
+""";
+    }
 
+    /// <summary>
+    /// Creates the linked list indexed lookup starter code.
+    /// </summary>
+    /// <returns>The lookup starter code.</returns>
+    private static string LinkedListGetStarter()
+    {
+        return """
+public sealed class ListNode
+{
+    /// <summary>
+    /// Gets or sets the node value.
+    /// </summary>
+    public int Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the next node.
+    /// </summary>
+    public ListNode? Next { get; set; }
+}
+
+public static class Solution
+{
+    /// <summary>
+    /// Gets the value at a zero-based index.
+    /// </summary>
+    /// <param name="head">The current list head.</param>
+    /// <param name="index">The lookup index.</param>
+    /// <returns>The value at the index, or null when the index is invalid.</returns>
+    public static int? GetByIndex(ListNode? head, int index)
+    {
+        return null;
+    }
+}
+""";
+    }
+
+    /// <summary>
+    /// Creates the linked list indexed lookup reference solution.
+    /// </summary>
+    /// <returns>The lookup reference solution.</returns>
+    private static string LinkedListGetReference()
+    {
+        return """
+public sealed class ListNode
+{
+    /// <summary>
+    /// Gets or sets the node value.
+    /// </summary>
+    public int Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the next node.
+    /// </summary>
+    public ListNode? Next { get; set; }
+}
+
+public static class Solution
+{
     /// <summary>
     /// Gets the value at a zero-based index.
     /// </summary>

@@ -93,119 +93,6 @@ public static class Solution
 """);
 
     /// <summary>
-    /// Gets the binary search on answer exercise.
-    /// </summary>
-    public static BasicExerciseResponse FirstPassingVersion { get; } = BasicExerciseFactory.Create(
-        "binary-search-first-passing-version",
-        "Binary Search Range: First Passing Version",
-        LearningDifficulty.Medium,
-        "Find the first value in a range for which a monotonic check becomes true.",
-        """
-You are given a search range from 1 to n and a hidden first passing version.
-
-Implement FirstPassingVersion so that it returns the smallest version x where IsPassing(x) is true. The check is monotonic: once a version passes, every larger version also passes.
-""",
-        """
-Example 1:
-Input: n = 10, firstPassing = 6
-Output: 6
-
-Example 2:
-Input: n = 1, firstPassing = 1
-Output: 1
-""",
-        """
-- 1 <= firstPassing <= n <= 1000000.
-- IsPassing is monotonic.
-- Target time complexity: O(log n).
-- Target space complexity: O(1).
-""",
-        """
-FirstPassingVersion(10) with firstPassing 6 => 6
-FirstPassingVersion(1) with firstPassing 1 => 1
-FirstPassingVersion(2) with firstPassing 1 => 1
-FirstPassingVersion(2) with firstPassing 2 => 2
-FirstPassingVersion(100) with firstPassing 50 => 50
-FirstPassingVersion(100) with firstPassing 100 => 100
-FirstPassingVersion(999) with firstPassing 321 => 321
-FirstPassingVersion(1000000) with firstPassing 999999 => 999999
-FirstPassingVersion(77) with firstPassing 7 => 7
-FirstPassingVersion(500) with firstPassing 250 => 250
-""",
-        """
-When middle passes, keep it as a candidate and move left. When it fails, move right.
-""",
-        "public static int FirstPassingVersion(int n)",
-        ["binary-search", "search-space", "monotonic-predicate"],
-        """
-public static class Solution
-{
-    /// <summary>
-    /// Finds the first passing version.
-    /// </summary>
-    /// <param name="n">The highest version number.</param>
-    /// <returns>The first passing version.</returns>
-    public static int FirstPassingVersion(int n)
-    {
-        return 0;
-    }
-
-    /// <summary>
-    /// Returns whether a version passes.
-    /// </summary>
-    /// <param name="version">The version to check.</param>
-    /// <returns>True when the version passes; otherwise false.</returns>
-    public static bool IsPassing(int version)
-    {
-        return RepetitioVersionApi.IsPassing(version);
-    }
-}
-""",
-        """
-public static class Solution
-{
-    /// <summary>
-    /// Finds the first passing version.
-    /// </summary>
-    /// <param name="n">The highest version number.</param>
-    /// <returns>The first passing version.</returns>
-    public static int FirstPassingVersion(int n)
-    {
-        var low = 1;
-        var high = n;
-        var answer = n;
-
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-
-            if (IsPassing(middle))
-            {
-                answer = middle;
-                high = middle - 1;
-            }
-            else
-            {
-                low = middle + 1;
-            }
-        }
-
-        return answer;
-    }
-
-    /// <summary>
-    /// Returns whether a version passes.
-    /// </summary>
-    /// <param name="version">The version to check.</param>
-    /// <returns>True when the version passes; otherwise false.</returns>
-    public static bool IsPassing(int version)
-    {
-        return RepetitioVersionApi.IsPassing(version);
-    }
-}
-""");
-
-    /// <summary>
     /// Creates an integer-returning starter.
     /// </summary>
     /// <param name="methodName">The method name.</param>
@@ -217,9 +104,11 @@ public static class Solution
 public static class Solution
 {
     /// <summary>
-    /// Implement the {{methodName}} exercise.
+    /// Implements the {{methodName}} exercise.
     /// </summary>
-    /// <returns>The computed integer result.</returns>
+    /// <param name="nums">The sorted input values.</param>
+    /// <param name="target">The target value.</param>
+    /// <returns>The computed index.</returns>
     public static int {{methodName}}({{parameters}})
     {
         return -1;

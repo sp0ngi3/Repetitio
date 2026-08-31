@@ -96,6 +96,19 @@ public static class RepetitioTestHarness
         }
     }
 
+    private static RepetitioTestResult RunBool(string name, bool expected, Func<bool> action)
+    {
+        try
+        {
+            var actual = action();
+            return new RepetitioTestResult(name, actual == expected, expected.ToString(), actual.ToString(), null);
+        }
+        catch (Exception exception)
+        {
+            return CreateExceptionResult(name, expected.ToString(), exception);
+        }
+    }
+
     private static RepetitioTestResult RunArray(string name, int[] expected, Func<int[]> action)
     {
         try
@@ -192,6 +205,38 @@ public sealed record RepetitioTestResult(string Name, bool Passed, string Expect
             };
         }
 
+        return head;
+    }
+
+    private static ListNode? BuildCyclicList(int[] values, int cycleStartIndex)
+    {
+        var head = BuildList(values);
+
+        if (head is null || cycleStartIndex < 0)
+        {
+            return head;
+        }
+
+        var cycleStart = head;
+
+        for (var index = 0; index < cycleStartIndex && cycleStart is not null; index++)
+        {
+            cycleStart = cycleStart.Next;
+        }
+
+        if (cycleStart is null)
+        {
+            return head;
+        }
+
+        var tail = head;
+
+        while (tail.Next is not null)
+        {
+            tail = tail.Next;
+        }
+
+        tail.Next = cycleStart;
         return head;
     }
 

@@ -32,19 +32,17 @@ public static class BasicExerciseCatalog
     private static readonly BasicExerciseResponse[] Exercises =
     [
         ReverseLinkedListExercise.Definition,
-        ArrayTechniqueExercises.KadaneMaximumSubarray,
-        ArrayTechniqueExercises.KadaneMaxSubarrayRange,
         ArrayTechniqueExercises.TwoSumSorted,
-        ArrayTechniqueExercises.PrefixRangeSum,
-        ArrayTechniqueExercises.PivotIndex,
-        ArrayTechniqueExercises.MaxAverageSubarray,
-        ArrayTechniqueExercises.MinimumSizeSubarraySum,
-        LinkedListTechniqueExercises.LinkedListOperations,
-        LinkedListTechniqueExercises.FindDuplicateNumber,
+        LinkedListTechniqueExercises.LinkedListInsert,
+        LinkedListTechniqueExercises.LinkedListGet,
+        LinkedListTechniqueExercises.DetectLinkedListCycle,
         RecursionExercises.Factorial,
         RecursionExercises.Fibonacci,
-        SortingExercises.SortingAlgorithms,
-        BinarySearchExercises.SearchSortedArray,
-        BinarySearchExercises.FirstPassingVersion
+        SortingExercises.InsertionSort,
+        SortingExercises.MergeSort,
+        SortingExercises.QuickSort,
+        SortingExercises.BucketSort,
+        SortingExercises.RadixSort,
+        BinarySearchExercises.SearchSortedArray
     ];
 }
