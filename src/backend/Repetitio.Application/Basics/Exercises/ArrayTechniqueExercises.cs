@@ -8,6 +8,92 @@ namespace Repetitio.Application.Basics.Exercises;
 public static class ArrayTechniqueExercises
 {
     /// <summary>
+    /// Gets the classic Kadane maximum subarray sum exercise.
+    /// </summary>
+    public static BasicExerciseResponse KadaneMaximumSubarray { get; } = BasicExerciseFactory.Create(
+        "kadane-maximum-subarray",
+        "Kadane Algorithm: Maximum Subarray",
+        LearningDifficulty.Easy,
+        "Find the largest sum of any contiguous non-empty subarray.",
+        """
+Given an integer array nums, find the contiguous non-empty subarray with the largest sum and return that sum.
+
+The important idea is that a negative running sum hurts every future subarray, so it can be discarded before starting a new candidate.
+""",
+        """
+Example 1:
+Input: nums = [-2,1,-3,4,-1,2,1,-5,4]
+Output: 6
+Explanation: The subarray [4,-1,2,1] has the largest sum.
+
+Example 2:
+Input: nums = [1]
+Output: 1
+
+Example 3:
+Input: nums = [5,4,-1,7,8]
+Output: 23
+""",
+        """
+- nums must not be null.
+- nums must contain at least one value.
+- -100000 <= nums[i] <= 100000.
+- Target time complexity: O(n).
+- Target space complexity: O(1).
+""",
+        """
+MaxSubArray([-2,1,-3,4,-1,2,1,-5,4]) => 6
+MaxSubArray([1]) => 1
+MaxSubArray([5,4,-1,7,8]) => 23
+MaxSubArray([-5,-2,-8]) => -2
+MaxSubArray([0,0,0]) => 0
+MaxSubArray([5,-1,5]) => 9
+MaxSubArray([-1,5,-2,5,-10]) => 8
+MaxSubArray([9,-10,8]) => 9
+MaxSubArray(null) => ArgumentNullException
+MaxSubArray([]) => ArgumentException
+""",
+        """
+Keep two values: the best sum seen so far and the best sum ending at the current index. At each element, decide whether to extend the previous subarray or start fresh at the current value.
+""",
+        "public static int MaxSubArray(int[] nums)",
+        ["array", "kadane", "greedy", "dynamic-programming"],
+        SimpleIntStarter("MaxSubArray", "int[] nums"),
+        """
+public static class Solution
+{
+    /// <summary>
+    /// Finds the maximum sum of any contiguous non-empty subarray.
+    /// </summary>
+    /// <param name="nums">The input values.</param>
+    /// <returns>The maximum contiguous subarray sum.</returns>
+    public static int MaxSubArray(int[] nums)
+    {
+        if (nums is null)
+        {
+            throw new ArgumentNullException(nameof(nums));
+        }
+
+        if (nums.Length == 0)
+        {
+            throw new ArgumentException("Array must contain at least one value.", nameof(nums));
+        }
+
+        var currentSum = nums[0];
+        var bestSum = nums[0];
+
+        for (var index = 1; index < nums.Length; index++)
+        {
+            currentSum = Math.Max(nums[index], currentSum + nums[index]);
+            bestSum = Math.Max(bestSum, currentSum);
+        }
+
+        return bestSum;
+    }
+}
+""");
+
+    /// <summary>
     /// Gets the Kadane maximum subarray range exercise.
     /// </summary>
     public static BasicExerciseResponse KadaneMaxSubarrayRange { get; } = BasicExerciseFactory.Create(

@@ -42,6 +42,7 @@ public sealed class BasicExerciseCatalogTests
         var slugs = BasicExerciseCatalog.GetAll().Select(exercise => exercise.Slug).ToHashSet(StringComparer.Ordinal);
 
         Assert.Contains("reverse-linked-list", slugs);
+        Assert.Contains("kadane-maximum-subarray", slugs);
         Assert.Contains("kadane-max-subarray-range", slugs);
         Assert.Contains("two-pointers-two-sum-sorted", slugs);
         Assert.Contains("prefix-sum-range-query", slugs);

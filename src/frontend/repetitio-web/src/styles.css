@@ -419,6 +419,67 @@ textarea {
   grid-template-columns: minmax(260px, 1.5fr) minmax(190px, 1fr) minmax(110px, 0.6fr) minmax(110px, 0.55fr) minmax(90px, 0.4fr);
 }
 
+.basics-filter-panel {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid #e1e6eb;
+  padding: 0 0 16px;
+  margin-bottom: 14px;
+}
+
+.tag-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-filter-chip,
+.pagination-button {
+  min-height: 34px;
+  border: 1px solid #ccd6df;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #25313a;
+  background: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.tag-filter-chip.active {
+  border-color: #3478c7;
+  color: #ffffff;
+  background: #3478c7;
+}
+
+.basics-title-table .record-header,
+.basics-title-table .record-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.basics-title-table .record-row {
+  min-height: 54px;
+}
+
+.pagination-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e1e6eb;
+  padding-top: 14px;
+  margin-top: 6px;
+  color: #65717b;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .record-header {
   padding: 0 0 10px;
   color: #65717b;

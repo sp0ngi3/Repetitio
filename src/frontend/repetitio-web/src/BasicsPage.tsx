@@ -1,4 +1,5 @@
-import { FormEvent, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { createPracticeSession, executeBasicExercise } from "./api";
 import type {
   BasicExercise,
@@ -11,6 +12,16 @@ import type {
  * Practice outcome choices rendered by the Basics attempt form.
  */
 const outcomes: PracticeOutcome[] = ["Completed", "Passed", "Partial", "Failed"];
+
+/**
+ * Number of Basics exercises shown on one dashboard page.
+ */
+const basicsPageSize = 10;
+
+/**
+ * Number of spaces inserted by the code editor Tab key.
+ */
+const codeEditorIndent = "    ";
 
 /**
  * Basics page view modes.
@@ -87,6 +98,9 @@ interface BasicsPageProps {
 export function BasicsPage(props: BasicsPageProps) {
   const [view, setView] = useState<BasicsView>("dashboard");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [activeProblemTab, setActiveProblemTab] = useState<BasicsProblemTab>("description");
   const [attemptForm, setAttemptForm] = useState<BasicsAttemptForm>(emptyAttemptForm);
   const [executionResult, setExecutionResult] = useState<ExecuteBasicExerciseResponse | null>(null);
@@ -98,6 +112,26 @@ export function BasicsPage(props: BasicsPageProps) {
     () => props.basicExercises.find((exercise) => exercise.slug === selectedSlug) ?? null,
     [props.basicExercises, selectedSlug]
   );
+
+  const availableTags = useMemo(() => getAllBasicTags(props.basicExercises), [props.basicExercises]);
+  const filteredExercises = useMemo(
+    () => filterBasicExercises(props.basicExercises, searchQuery, selectedTag),
+    [props.basicExercises, searchQuery, selectedTag]
+  );
+  const pageCount = Math.max(1, Math.ceil(filteredExercises.length / basicsPageSize));
+  const effectivePage = Math.min(currentPage, pageCount);
+  const pagedExercises = useMemo(
+    () => paginateBasicExercises(filteredExercises, effectivePage, basicsPageSize),
+    [filteredExercises, effectivePage]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTag]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, pageCount));
+  }, [pageCount]);
 
   /**
    * Opens the selected Basics exercise detail page.
@@ -131,6 +165,31 @@ export function BasicsPage(props: BasicsPageProps) {
    */
   function updateAttemptForm<K extends keyof BasicsAttemptForm>(key: K, value: BasicsAttemptForm[K]) {
     setAttemptForm((current) => ({ ...current, [key]: value }));
+  }
+
+  /**
+   * Inserts or removes indentation when Tab is pressed inside the code editor.
+   *
+   * @param event - Keyboard event raised by the code editor textarea.
+   */
+  function handleCodeEditorKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    event.preventDefault();
+
+    const textarea = event.currentTarget;
+    const edit = event.shiftKey
+      ? removeCodeEditorIndentation(textarea.value, textarea.selectionStart, textarea.selectionEnd)
+      : addCodeEditorIndentation(textarea.value, textarea.selectionStart, textarea.selectionEnd);
+
+    updateAttemptForm("codeDraft", edit.value);
+
+    requestAnimationFrame(() => {
+      textarea.selectionStart = edit.selectionStart;
+      textarea.selectionEnd = edit.selectionEnd;
+    });
   }
 
   /**
@@ -282,6 +341,7 @@ export function BasicsPage(props: BasicsPageProps) {
                   spellCheck={false}
                   value={attemptForm.codeDraft}
                   onChange={(event) => updateAttemptForm("codeDraft", event.target.value)}
+                  onKeyDown={handleCodeEditorKeyDown}
                   placeholder="Write your solution here."
                 />
               </div>
@@ -411,36 +471,140 @@ export function BasicsPage(props: BasicsPageProps) {
 
       <section className="panel data-panel" aria-label="Basics exercise records">
         {props.basicExercises.length ? (
-          <div className="record-table">
-            <div className="record-header">
-              <span>Exercise</span>
-              <span>Tags</span>
-              <span>Status</span>
-              <span>Difficulty</span>
-              <span>Times solved</span>
+          <>
+            <div className="basics-filter-panel" aria-label="Basics filters">
+              <label>
+                Search
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="exercise or hashtag..."
+                />
+              </label>
+
+              <div className="tag-filter-list" aria-label="Basics hashtags">
+                <button
+                  aria-pressed={selectedTag === ""}
+                  className={selectedTag === "" ? "tag-filter-chip active" : "tag-filter-chip"}
+                  type="button"
+                  onClick={() => setSelectedTag("")}
+                >
+                  All
+                </button>
+                {availableTags.map((tag) => (
+                  <button
+                    aria-pressed={selectedTag === tag}
+                    className={selectedTag === tag ? "tag-filter-chip active" : "tag-filter-chip"}
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedTag((current) => (current === tag ? "" : tag))}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
             </div>
-            {props.basicExercises.map((exercise) => (
-              <button className="record-row" type="button" key={exercise.slug} onClick={() => openExercise(exercise)}>
-                <span>
-                  <strong>{exercise.title}</strong>
-                  <small>{exercise.functionSignature}</small>
-                </span>
-                <span className="tag-row compact">
-                  {exercise.tags.map((tag) => (
-                    <span key={tag}>#{tag}</span>
+
+            {filteredExercises.length ? (
+              <>
+                <div className="record-table basics-title-table">
+                  <div className="record-header">
+                    <span>Exercise</span>
+                  </div>
+                  {pagedExercises.map((exercise) => (
+                    <button className="record-row" type="button" key={exercise.slug} onClick={() => openExercise(exercise)}>
+                      <span>
+                        <strong>{exercise.title}</strong>
+                      </span>
+                    </button>
                   ))}
-                </span>
-                <span>{formatStatus(exercise.status)}</span>
-                <span>{exercise.difficulty}</span>
-                <span>{exercise.successfulAttempts}</span>
-              </button>
-            ))}
-          </div>
+                </div>
+
+                <PaginationBar
+                  currentPage={effectivePage}
+                  pageCount={pageCount}
+                  totalCount={filteredExercises.length}
+                  pageSize={basicsPageSize}
+                  onPageChange={setCurrentPage}
+                />
+              </>
+            ) : (
+              <p className="empty-state">No Basics exercises match the current filters.</p>
+            )}
+          </>
         ) : (
           <p className="empty-state">Loading built-in basics...</p>
         )}
       </section>
     </section>
+  );
+}
+
+/**
+ * Props accepted by the dashboard pagination bar.
+ */
+interface PaginationBarProps {
+  /** Current one-based page number. */
+  currentPage: number;
+  /** Total page count. */
+  pageCount: number;
+  /** Total filtered record count. */
+  totalCount: number;
+  /** Number of records per page. */
+  pageSize: number;
+  /** Updates the current page. */
+  onPageChange: (page: number) => void;
+}
+
+/**
+ * Represents an edited code textarea value and the selection that should be restored.
+ */
+interface CodeEditorEdit {
+  /** Edited textarea value. */
+  value: string;
+  /** Next selection start. */
+  selectionStart: number;
+  /** Next selection end. */
+  selectionEnd: number;
+}
+
+/**
+ * Renders dashboard pagination controls.
+ *
+ * @param props - Component props.
+ * @returns Pagination controls for the current filtered list.
+ */
+function PaginationBar(props: PaginationBarProps) {
+  const firstItem = (props.currentPage - 1) * props.pageSize + 1;
+  const lastItem = Math.min(props.currentPage * props.pageSize, props.totalCount);
+
+  return (
+    <nav className="pagination-bar" aria-label="Basics pagination">
+      <span>
+        Showing {firstItem}-{lastItem} of {props.totalCount}
+      </span>
+      <div className="pagination-controls">
+        <button
+          className="pagination-button"
+          type="button"
+          disabled={props.currentPage === 1}
+          onClick={() => props.onPageChange(props.currentPage - 1)}
+        >
+          Previous page
+        </button>
+        <span>
+          {props.currentPage}/{props.pageCount}
+        </span>
+        <button
+          className="pagination-button"
+          type="button"
+          disabled={props.currentPage === props.pageCount}
+          onClick={() => props.onPageChange(props.currentPage + 1)}
+        >
+          Next page
+        </button>
+      </div>
+    </nav>
   );
 }
 
@@ -583,6 +747,163 @@ function createAttemptForm(exercise: BasicExercise): BasicsAttemptForm {
     ...emptyAttemptForm,
     codeDraft: exercise.starterCode
   };
+}
+
+/**
+ * Returns every hashtag used by the Basics catalog.
+ *
+ * @param exercises - Basics exercises.
+ * @returns Sorted unique tag names.
+ */
+function getAllBasicTags(exercises: BasicExercise[]) {
+  return [...new Set(exercises.flatMap((exercise) => exercise.tags))].sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * Filters Basics exercises by free-text search and selected hashtag.
+ *
+ * @param exercises - Basics exercises.
+ * @param searchQuery - Current search input.
+ * @param selectedTag - Current selected tag filter.
+ * @returns Exercises matching the current filters.
+ */
+function filterBasicExercises(exercises: BasicExercise[], searchQuery: string, selectedTag: string) {
+  const query = searchQuery.trim().toLowerCase();
+
+  return exercises.filter((exercise) => {
+    const matchesTag = !selectedTag || exercise.tags.includes(selectedTag);
+    const searchableText = [
+      exercise.title,
+      exercise.slug,
+      exercise.difficulty,
+      exercise.status,
+      exercise.language,
+      exercise.instructions,
+      exercise.problemStatement,
+      exercise.functionSignature,
+      ...exercise.tags.map((tag) => `#${tag} ${tag}`)
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return matchesTag && (!query || searchableText.includes(query));
+  });
+}
+
+/**
+ * Returns one page of Basics exercises.
+ *
+ * @param exercises - Filtered Basics exercises.
+ * @param currentPage - One-based page number.
+ * @param pageSize - Number of exercises per page.
+ * @returns Exercises for the requested page.
+ */
+function paginateBasicExercises(exercises: BasicExercise[], currentPage: number, pageSize: number) {
+  const startIndex = (currentPage - 1) * pageSize;
+  return exercises.slice(startIndex, startIndex + pageSize);
+}
+
+/**
+ * Adds indentation to the current cursor or selected lines.
+ *
+ * @param value - Current editor value.
+ * @param selectionStart - Current selection start.
+ * @param selectionEnd - Current selection end.
+ * @returns Edited code and selection.
+ */
+function addCodeEditorIndentation(value: string, selectionStart: number, selectionEnd: number): CodeEditorEdit {
+  if (selectionStart === selectionEnd || !value.slice(selectionStart, selectionEnd).includes("\n")) {
+    return {
+      value: `${value.slice(0, selectionStart)}${codeEditorIndent}${value.slice(selectionEnd)}`,
+      selectionStart: selectionStart + codeEditorIndent.length,
+      selectionEnd: selectionStart + codeEditorIndent.length
+    };
+  }
+
+  const lineStart = findLineStart(value, selectionStart);
+  const lineEnd = findSelectedLineEnd(value, selectionStart, selectionEnd);
+  const block = value.slice(lineStart, lineEnd);
+  const lineCount = block.split("\n").length;
+  const indentedBlock = block
+    .split("\n")
+    .map((line) => `${codeEditorIndent}${line}`)
+    .join("\n");
+
+  return {
+    value: `${value.slice(0, lineStart)}${indentedBlock}${value.slice(lineEnd)}`,
+    selectionStart: selectionStart + codeEditorIndent.length,
+    selectionEnd: selectionEnd + lineCount * codeEditorIndent.length
+  };
+}
+
+/**
+ * Removes one indentation level from the current line or selected lines.
+ *
+ * @param value - Current editor value.
+ * @param selectionStart - Current selection start.
+ * @param selectionEnd - Current selection end.
+ * @returns Edited code and selection.
+ */
+function removeCodeEditorIndentation(value: string, selectionStart: number, selectionEnd: number): CodeEditorEdit {
+  const lineStart = findLineStart(value, selectionStart);
+  const lineEnd = findSelectedLineEnd(value, selectionStart, selectionEnd);
+  const block = value.slice(lineStart, lineEnd);
+  let removedBeforeSelection = 0;
+  let removedInsideSelection = 0;
+  let offset = lineStart;
+
+  const outdentedBlock = block
+    .split("\n")
+    .map((line) => {
+      const removeCount = line.startsWith(codeEditorIndent) ? codeEditorIndent.length : line.startsWith("\t") ? 1 : 0;
+
+      if (removeCount > 0) {
+        if (offset < selectionStart) {
+          removedBeforeSelection += Math.min(removeCount, selectionStart - offset);
+        }
+
+        if (offset < selectionEnd) {
+          removedInsideSelection += removeCount;
+        }
+      }
+
+      offset += line.length + 1;
+      return line.slice(removeCount);
+    })
+    .join("\n");
+
+  return {
+    value: `${value.slice(0, lineStart)}${outdentedBlock}${value.slice(lineEnd)}`,
+    selectionStart: Math.max(lineStart, selectionStart - removedBeforeSelection),
+    selectionEnd: Math.max(lineStart, selectionEnd - removedInsideSelection)
+  };
+}
+
+/**
+ * Finds the first character index of the line containing a selection.
+ *
+ * @param value - Current editor value.
+ * @param selectionStart - Current selection start.
+ * @returns Start index for the containing line.
+ */
+function findLineStart(value: string, selectionStart: number) {
+  return value.lastIndexOf("\n", Math.max(0, selectionStart - 1)) + 1;
+}
+
+/**
+ * Finds the end index of the selected line block.
+ *
+ * @param value - Current editor value.
+ * @param selectionStart - Current selection start.
+ * @param selectionEnd - Current selection end.
+ * @returns End index for the selected line block.
+ */
+function findSelectedLineEnd(value: string, selectionStart: number, selectionEnd: number) {
+  if (selectionStart === selectionEnd) {
+    return value.indexOf("\n", selectionEnd) === -1 ? value.length : value.indexOf("\n", selectionEnd);
+  }
+
+  return value[selectionEnd - 1] === "\n" ? selectionEnd - 1 : selectionEnd;
 }
 
 /**

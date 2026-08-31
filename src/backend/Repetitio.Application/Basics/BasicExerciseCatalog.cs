@@ -32,6 +32,7 @@ public static class BasicExerciseCatalog
     private static readonly BasicExerciseResponse[] Exercises =
     [
         ReverseLinkedListExercise.Definition,
+        ArrayTechniqueExercises.KadaneMaximumSubarray,
         ArrayTechniqueExercises.KadaneMaxSubarrayRange,
         ArrayTechniqueExercises.TwoSumSorted,
         ArrayTechniqueExercises.PrefixRangeSum,

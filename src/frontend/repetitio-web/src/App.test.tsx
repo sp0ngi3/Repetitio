@@ -62,10 +62,13 @@ const dashboard: Dashboard = {
 };
 
 /**
- * Mocked Basics catalog response used by component tests.
+ * Creates a mocked Basics exercise response for component tests.
+ *
+ * @param overrides - Exercise values to override.
+ * @returns A mocked Basics exercise.
  */
-const basics: BasicExercise[] = [
-  {
+function createBasicExercise(overrides: Partial<BasicExercise>): BasicExercise {
+  return {
     slug: "reverse-linked-list",
     learningItemId: "basic-1",
     title: "Reverse Linked List",
@@ -87,8 +90,28 @@ const basics: BasicExercise[] = [
     nextReviewAt: null,
     totalAttempts: 0,
     successfulAttempts: 0,
-    practiceSessions: []
-  }
+    practiceSessions: [],
+    ...overrides
+  };
+}
+
+/**
+ * Mocked Basics catalog response used by component tests.
+ */
+const basics: BasicExercise[] = [
+  createBasicExercise({}),
+  ...Array.from({ length: 12 }, (_, index) =>
+    createBasicExercise({
+      slug: `generated-basic-${index + 1}`,
+      learningItemId: `basic-generated-${index + 1}`,
+      title: `Generated Basic ${index + 1}`,
+      instructions: `Practice generated pattern ${index + 1}.`,
+      problemStatement: `Solve generated pattern ${index + 1}.`,
+      functionSignature: `public static int Solve${index + 1}(int[] nums)`,
+      tags: index % 2 === 0 ? ["array", "prefix-sum"] : ["binary-search"],
+      successfulAttempts: index % 3
+    })
+  )
 ];
 
 /**
@@ -389,11 +412,40 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Basics" }));
 
     expect(await screen.findByRole("heading", { name: "Exercises" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reverse Linked List" })).toBeInTheDocument();
     fireEvent.click(screen.getByText("Reverse Linked List"));
 
     expect(screen.getByText("Peek solution")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Attempt exercise" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run tests" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that Basics dashboard search, hashtag filtering, and pagination work together.
+   */
+  it("filters and paginates the Basics dashboard", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
+
+    expect(await screen.findByRole("heading", { name: "Exercises" })).toBeInTheDocument();
+    expect(screen.getByText("Showing 1-10 of 13")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generated Basic 10" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+
+    expect(screen.getByRole("button", { name: "Generated Basic 10" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "Generated Basic 12" } });
+
+    expect(screen.getByRole("button", { name: "Generated Basic 12" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reverse Linked List" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "#linked-list" }));
+
+    expect(screen.getByRole("button", { name: "Reverse Linked List" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generated Basic 1" })).not.toBeInTheDocument();
   });
 
   /**
@@ -425,5 +477,22 @@ describe("App", () => {
 
     expect(await screen.findByText("All tests passed")).toBeInTheDocument();
     expect(screen.getByText("two nodes")).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that the Basics code editor handles Tab as indentation.
+   */
+  it("inserts indentation when Tab is pressed in the Basics code editor", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
+    fireEvent.click(await screen.findByText("Reverse Linked List"));
+
+    const editor = screen.getByLabelText("Code") as HTMLTextAreaElement;
+    fireEvent.change(editor, { target: { value: "public static class Solution\n{\n}" } });
+    editor.setSelectionRange("public static class Solution\n{\n".length, "public static class Solution\n{\n".length);
+    fireEvent.keyDown(editor, { key: "Tab" });
+
+    expect(editor.value).toContain("{\n    }");
   });
 });

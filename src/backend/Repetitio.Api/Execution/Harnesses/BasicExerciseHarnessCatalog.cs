@@ -13,6 +13,18 @@ public static class BasicExerciseHarnessCatalog
     {
         return
         [
+            new BasicExerciseHarness("kadane-maximum-subarray", """
+        results.Add(RunInt("classic mixed input", 6, () => Solution.MaxSubArray([-2, 1, -3, 4, -1, 2, 1, -5, 4])));
+        results.Add(RunInt("single value", 1, () => Solution.MaxSubArray([1])));
+        results.Add(RunInt("all positive values", 23, () => Solution.MaxSubArray([5, 4, -1, 7, 8])));
+        results.Add(RunInt("all negative values", -2, () => Solution.MaxSubArray([-5, -2, -8])));
+        results.Add(RunInt("all zeroes", 0, () => Solution.MaxSubArray([0, 0, 0])));
+        results.Add(RunInt("whole array is best", 9, () => Solution.MaxSubArray([5, -1, 5])));
+        results.Add(RunInt("middle range wins", 8, () => Solution.MaxSubArray([-1, 5, -2, 5, -10])));
+        results.Add(RunInt("earliest best remains best", 9, () => Solution.MaxSubArray([9, -10, 8])));
+        results.Add(RunException<ArgumentNullException>("null input throws", () => Solution.MaxSubArray(null!)));
+        results.Add(RunException<ArgumentException>("empty input throws", () => Solution.MaxSubArray([])));
+"""),
             new BasicExerciseHarness("kadane-max-subarray-range", """
         results.Add(RunArray("classic mixed input", [3, 6], () => Solution.FindMaxSubarrayRange(new CustomDynamicArray<int>([-2, 1, -3, 4, -1, 2, 1, -5, 4]))));
         results.Add(RunArray("all positive values", [0, 2], () => Solution.FindMaxSubarrayRange(new CustomDynamicArray<int>([1, 2, 3]))));
