@@ -50,6 +50,7 @@ app.MapHealthEndpoints();
 app.MapBasicExerciseEndpoints();
 app.MapDsaEndpoints();
 app.MapSystemDesignEndpoints();
+app.MapFlashcardEndpoints();
 app.MapLearningItemEndpoints();
 app.MapTagEndpoints();
 app.MapPracticeSessionEndpoints();

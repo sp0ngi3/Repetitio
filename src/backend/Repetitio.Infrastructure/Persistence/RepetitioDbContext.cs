@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Repetitio.Domain.Dsa;
+using Repetitio.Domain.Flashcards;
 using Repetitio.Domain.LearningItems;
 using Repetitio.Domain.Practice;
 using Repetitio.Domain.SystemDesign;
@@ -55,6 +56,26 @@ public sealed class RepetitioDbContext : DbContext
     /// Gets the System Design problems table.
     /// </summary>
     public DbSet<SystemDesignProblem> SystemDesignProblems => Set<SystemDesignProblem>();
+
+    /// <summary>
+    /// Gets the flashcards table.
+    /// </summary>
+    public DbSet<Flashcard> Flashcards => Set<Flashcard>();
+
+    /// <summary>
+    /// Gets the saved flashcard decks table.
+    /// </summary>
+    public DbSet<FlashcardDeck> FlashcardDecks => Set<FlashcardDeck>();
+
+    /// <summary>
+    /// Gets the flashcard deck card selections table.
+    /// </summary>
+    public DbSet<FlashcardDeckCard> FlashcardDeckCards => Set<FlashcardDeckCard>();
+
+    /// <summary>
+    /// Gets the flashcard review records table.
+    /// </summary>
+    public DbSet<FlashcardReview> FlashcardReviews => Set<FlashcardReview>();
 
     /// <summary>
     /// Configures the database model.
@@ -185,6 +206,70 @@ public sealed class RepetitioDbContext : DbContext
             entity.HasOne(problem => problem.LearningItem)
                 .WithOne()
                 .HasForeignKey<SystemDesignProblem>(problem => problem.LearningItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Flashcard>(entity =>
+        {
+            entity.HasKey(flashcard => flashcard.LearningItemId);
+            entity.Property(flashcard => flashcard.Question).HasMaxLength(8000).IsRequired();
+            entity.Property(flashcard => flashcard.Explanation).HasMaxLength(12000).IsRequired();
+            entity.Property(flashcard => flashcard.Source).HasMaxLength(120);
+            entity.Property(flashcard => flashcard.CreatedAt).IsRequired();
+            entity.Property(flashcard => flashcard.UpdatedAt).IsRequired();
+            entity.HasOne(flashcard => flashcard.LearningItem)
+                .WithOne()
+                .HasForeignKey<Flashcard>(flashcard => flashcard.LearningItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<FlashcardDeck>(entity =>
+        {
+            entity.HasKey(deck => deck.Id);
+            entity.Property(deck => deck.Name).HasMaxLength(200).IsRequired();
+            entity.Property(deck => deck.Description).HasMaxLength(4000);
+            entity.Property(deck => deck.DefaultSessionSize).IsRequired();
+            entity.Property(deck => deck.TotalRuns).IsRequired();
+            entity.Property(deck => deck.CreatedAt).IsRequired();
+            entity.Property(deck => deck.UpdatedAt).IsRequired();
+            entity.HasIndex(deck => deck.Name);
+            entity.HasIndex(deck => deck.NextReviewAt);
+        });
+
+        modelBuilder.Entity<FlashcardDeckCard>(entity =>
+        {
+            entity.HasKey(deckCard => new { deckCard.DeckId, deckCard.FlashcardLearningItemId });
+            entity.Property(deckCard => deckCard.SortOrder).IsRequired();
+            entity.HasOne(deckCard => deckCard.Deck)
+                .WithMany(deck => deck.Cards)
+                .HasForeignKey(deckCard => deckCard.DeckId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(deckCard => deckCard.Flashcard)
+                .WithMany(flashcard => flashcard.DeckCards)
+                .HasForeignKey(deckCard => deckCard.FlashcardLearningItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(deckCard => deckCard.FlashcardLearningItemId);
+        });
+
+        modelBuilder.Entity<FlashcardReview>(entity =>
+        {
+            entity.HasKey(review => review.Id);
+            entity.Property(review => review.KnewAnswer).IsRequired();
+            entity.Property(review => review.CreatedAt).IsRequired();
+            entity.HasIndex(review => review.DeckId);
+            entity.HasIndex(review => review.FlashcardLearningItemId);
+            entity.HasIndex(review => review.PracticeSessionId).IsUnique();
+            entity.HasOne(review => review.Deck)
+                .WithMany(deck => deck.Reviews)
+                .HasForeignKey(review => review.DeckId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(review => review.Flashcard)
+                .WithMany(flashcard => flashcard.Reviews)
+                .HasForeignKey(review => review.FlashcardLearningItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(review => review.PracticeSession)
+                .WithOne()
+                .HasForeignKey<FlashcardReview>(review => review.PracticeSessionId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

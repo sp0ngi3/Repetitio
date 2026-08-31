@@ -18,5 +18,10 @@ public enum LearningItemType
     /// <summary>
     /// A system design practice problem.
     /// </summary>
-    SystemDesign = 3
+    SystemDesign = 3,
+
+    /// <summary>
+    /// A question-and-explanation flashcard.
+    /// </summary>
+    Flashcard = 4
 }

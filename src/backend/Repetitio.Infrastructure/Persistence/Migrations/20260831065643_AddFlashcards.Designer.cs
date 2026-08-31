@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Repetitio.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using Repetitio.Infrastructure.Persistence;
 namespace Repetitio.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RepetitioDbContext))]
-    partial class RepetitioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831065643_AddFlashcards")]
+    partial class AddFlashcards
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
@@ -173,14 +176,8 @@ namespace Repetitio.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("DefaultSessionSize")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("LastPracticedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -188,20 +185,12 @@ namespace Repetitio.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("NextReviewAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("TotalRuns")
-                        .HasColumnType("INTEGER");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Name");
-
-                    b.HasIndex("NextReviewAt");
 
                     b.ToTable("FlashcardDecks");
                 });

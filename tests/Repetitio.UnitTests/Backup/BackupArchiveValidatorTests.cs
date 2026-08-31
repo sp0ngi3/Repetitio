@@ -10,7 +10,7 @@ namespace Repetitio.UnitTests.Backup;
 /// </summary>
 public sealed class BackupArchiveValidatorTests
 {
-    private const string SchemaVersion = "20260830193638_AddSystemDesignTracker";
+    private const string SchemaVersion = "20260831070355_AlignFlashcardModel";
 
     /// <summary>
     /// Verifies that a well-formed Repetitio backup archive is accepted.
@@ -130,6 +130,10 @@ public sealed class BackupArchiveValidatorTests
             "CREATE TABLE DsaProblems (LearningItemId TEXT NOT NULL PRIMARY KEY);",
             "CREATE TABLE DsaSolutions (Id TEXT NOT NULL PRIMARY KEY);",
             "CREATE TABLE SystemDesignProblems (LearningItemId TEXT NOT NULL PRIMARY KEY);",
+            "CREATE TABLE Flashcards (LearningItemId TEXT NOT NULL PRIMARY KEY);",
+            "CREATE TABLE FlashcardDecks (Id TEXT NOT NULL PRIMARY KEY);",
+            "CREATE TABLE FlashcardDeckCards (DeckId TEXT NOT NULL, FlashcardLearningItemId TEXT NOT NULL);",
+            "CREATE TABLE FlashcardReviews (Id TEXT NOT NULL PRIMARY KEY);",
             $"INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('{schemaVersion}', '10.0.11');"
         };
 

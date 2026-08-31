@@ -23,7 +23,11 @@ public sealed class BackupArchiveValidator
         "LearningItemTags",
         "DsaProblems",
         "DsaSolutions",
-        "SystemDesignProblems"
+        "SystemDesignProblems",
+        "Flashcards",
+        "FlashcardDecks",
+        "FlashcardDeckCards",
+        "FlashcardReviews"
     ];
 
     /// <summary>

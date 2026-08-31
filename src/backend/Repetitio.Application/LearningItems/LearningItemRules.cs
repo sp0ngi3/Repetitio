@@ -14,6 +14,6 @@ public static class LearningItemRules
     /// <returns><see langword="true"/> when the type is user-managed; otherwise, <see langword="false"/>.</returns>
     public static bool CanBeCreatedByUser(LearningItemType type)
     {
-        return type is LearningItemType.Dsa or LearningItemType.SystemDesign;
+        return type is LearningItemType.Dsa or LearningItemType.SystemDesign or LearningItemType.Flashcard;
     }
 }

@@ -419,6 +419,11 @@ textarea {
   grid-template-columns: minmax(260px, 1.5fr) minmax(190px, 1fr) minmax(110px, 0.6fr) minmax(110px, 0.55fr) minmax(90px, 0.4fr);
 }
 
+.flashcard-table .record-header,
+.flashcard-table .record-row {
+  grid-template-columns: minmax(240px, 1.35fr) minmax(190px, 1fr) minmax(110px, 0.55fr) minmax(110px, 0.55fr) minmax(90px, 0.45fr);
+}
+
 .basics-filter-panel {
   display: grid;
   gap: 12px;
@@ -708,6 +713,172 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.flashcard-form {
+  display: grid;
+  gap: 14px;
+}
+
+.flashcard-selection {
+  display: grid;
+  max-height: 420px;
+  gap: 8px;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.flashcard-selection legend {
+  padding: 0 6px;
+  color: #65717b;
+  font-weight: 800;
+}
+
+.card-picker-toolbar,
+.session-filter-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.card-picker-toolbar > span {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #24313a;
+  background: #fbfcfe;
+  font-weight: 900;
+}
+
+.selected-card-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfe;
+}
+
+.selected-card-strip > span {
+  display: inline-flex;
+  align-items: center;
+  color: #65717b;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.flashcard-picker-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid #e1e6eb;
+  border-radius: 8px;
+  padding: 0 12px 12px;
+  background: #ffffff;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.picker-row {
+  min-height: 58px;
+  border-bottom: 1px solid #edf1f4;
+}
+
+.picker-row strong,
+.picker-row small {
+  display: block;
+}
+
+.picker-row small {
+  margin-top: 3px;
+  color: #65717b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.flashcard-deck-row {
+  align-items: end;
+}
+
+.flashcard-deck-row label {
+  width: 112px;
+}
+
+.compact-actions {
+  justify-content: end;
+  gap: 8px;
+}
+
+.session-metrics,
+.date-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.session-metrics span,
+.date-chip {
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: #52616c;
+  background: #fbfcfe;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.date-chip.strong-date {
+  border-color: #b9d5f0;
+  color: #225f9f;
+  background: #eef7ff;
+}
+
+.flashcard-study-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.flashcard-card {
+  display: grid;
+  min-height: 360px;
+  align-content: center;
+  gap: 14px;
+  border: 1px solid #d9e0e6;
+  border-radius: 8px;
+  padding: 32px;
+  text-align: left;
+  color: #24313a;
+  background: #fbfcfe;
+}
+
+.flashcard-card span {
+  color: #65717b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.flashcard-card strong {
+  white-space: pre-line;
+  font-size: 1.18rem;
+  line-height: 1.6;
 }
 
 .backup-grid {
@@ -1092,6 +1263,8 @@ textarea {
   .item-grid,
   .item-meta,
   .tracker-toolbar,
+  .card-picker-toolbar,
+  .session-filter-panel,
   .dsa-layout,
   .backup-grid,
   .reflection-grid,
@@ -1120,5 +1293,18 @@ textarea {
 
   .app-nav button {
     flex: 1 1 0;
+  }
+
+  .flashcard-deck-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .flashcard-deck-row label {
+    width: 100%;
+  }
+
+  .flashcard-deck-row .compact-actions {
+    justify-content: flex-start;
   }
 }

@@ -1,7 +1,7 @@
 /**
  * Learning domains supported by the backend.
  */
-export type LearningItemType = "Basics" | "Dsa" | "SystemDesign";
+export type LearningItemType = "Basics" | "Dsa" | "SystemDesign" | "Flashcard";
 
 /**
  * Progress states supported by the backend.
@@ -562,6 +562,210 @@ export interface SystemDesignProblemTemplate {
   constraintsMarkdown: string;
   /** Reflection template. */
   reflectionMarkdown: string;
+}
+
+/**
+ * Represents the payload used to create a flashcard.
+ */
+export interface CreateFlashcardRequest {
+  /** Flashcard title. */
+  title: string;
+  /** Question shown on the front side. */
+  question: string;
+  /** Explanation shown on the back side. */
+  explanation: string;
+  /** Optional source. */
+  source?: string;
+  /** Optional short description. */
+  description?: string;
+  /** Rough flashcard difficulty. */
+  difficulty: LearningDifficulty;
+  /** Tag names to assign. */
+  tags: string[];
+}
+
+/**
+ * Represents the payload used to update a flashcard.
+ */
+export interface UpdateFlashcardRequest extends CreateFlashcardRequest {
+  /** Current progress state. */
+  status: LearningItemStatus;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+}
+
+/**
+ * Represents a flashcard returned by the API.
+ */
+export interface Flashcard {
+  /** Related learning item identifier. */
+  id: string;
+  /** Flashcard title. */
+  title: string;
+  /** Optional short description. */
+  description?: string | null;
+  /** Question shown on the front side. */
+  question: string;
+  /** Explanation shown on the back side. */
+  explanation: string;
+  /** Optional source. */
+  source?: string | null;
+  /** Current progress state. */
+  status: LearningItemStatus;
+  /** Rough flashcard difficulty. */
+  difficulty: LearningDifficulty;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+  /** Last practice date and time. */
+  lastPracticedAt?: string | null;
+  /** Next review date and time. */
+  nextReviewAt?: string | null;
+  /** Assigned tag names. */
+  tags: string[];
+  /** Total recorded reviews. */
+  totalReviews: number;
+  /** Total known reviews. */
+  knownReviews: number;
+  /** Practice sessions recorded for the flashcard. */
+  practiceSessions: PracticeSession[];
+}
+
+/**
+ * Represents the payload used to save a flashcard deck.
+ */
+export interface SaveFlashcardDeckRequest {
+  /** Deck name. */
+  name: string;
+  /** Optional deck description. */
+  description?: string;
+  /** Default number of cards to review in one run. */
+  defaultSessionSize: number;
+  /** Selected flashcard identifiers. */
+  flashcardIds: string[];
+}
+
+/**
+ * Represents a saved flashcard deck returned by the API.
+ */
+export interface FlashcardDeck {
+  /** Deck identifier. */
+  id: string;
+  /** Deck name. */
+  name: string;
+  /** Optional deck description. */
+  description?: string | null;
+  /** Selected flashcards. */
+  cards: Flashcard[];
+  /** Default number of cards to review in one run. */
+  defaultSessionSize: number;
+  /** Number of completed runs for this saved session. */
+  totalRuns: number;
+  /** Number of reviews submitted from this saved session. */
+  totalReviews: number;
+  /** Number of known answers submitted from this saved session. */
+  knownReviews: number;
+  /** Date and time when this saved session was last practiced. */
+  lastPracticedAt?: string | null;
+  /** Next review date for this saved session. */
+  nextReviewAt?: string | null;
+  /** Creation date and time. */
+  createdAt: string;
+  /** Last update date and time. */
+  updatedAt: string;
+}
+
+/**
+ * Represents a saved flashcard learning session summary returned by list endpoints.
+ */
+export interface FlashcardDeckSummary {
+  /** Deck identifier. */
+  id: string;
+  /** Deck name. */
+  name: string;
+  /** Optional deck description. */
+  description?: string | null;
+  /** Number of selected flashcards. */
+  cardCount: number;
+  /** Default number of cards to review in one run. */
+  defaultSessionSize: number;
+  /** Number of completed runs for this saved session. */
+  totalRuns: number;
+  /** Number of reviews submitted from this saved session. */
+  totalReviews: number;
+  /** Number of known answers submitted from this saved session. */
+  knownReviews: number;
+  /** Date and time when this saved session was last practiced. */
+  lastPracticedAt?: string | null;
+  /** Next review date for this saved session. */
+  nextReviewAt?: string | null;
+  /** Creation date and time. */
+  createdAt: string;
+  /** Last update date and time. */
+  updatedAt: string;
+}
+
+/**
+ * Represents a paged flashcard API response.
+ */
+export interface PagedFlashcardResponse {
+  /** Flashcards on the current page. */
+  items: Flashcard[];
+  /** Total number of matching flashcards. */
+  totalCount: number;
+  /** Current one-based page number. */
+  page: number;
+  /** Number of requested flashcards per page. */
+  pageSize: number;
+}
+
+/**
+ * Represents a paged saved flashcard learning session API response.
+ */
+export interface PagedFlashcardDeckResponse {
+  /** Saved learning sessions on the current page. */
+  items: FlashcardDeckSummary[];
+  /** Total number of matching saved learning sessions. */
+  totalCount: number;
+  /** Current one-based page number. */
+  page: number;
+  /** Number of requested saved sessions per page. */
+  pageSize: number;
+}
+
+/**
+ * Represents one completed flashcard review.
+ */
+export interface CompleteFlashcardReviewRequest {
+  /** Reviewed flashcard identifier. */
+  flashcardId: string;
+  /** Whether the answer was known. */
+  knewAnswer: boolean;
+  /** Optional confidence value from 1 to 5. */
+  confidence?: number | null;
+}
+
+/**
+ * Represents the payload submitted after a flashcard learning session.
+ */
+export interface CompleteFlashcardSessionRequest {
+  /** Optional deck identifier used for the session. */
+  deckId?: string | null;
+  /** Optional notes for created practice sessions. */
+  notes?: string;
+  /** Completed card reviews. */
+  reviews: CompleteFlashcardReviewRequest[];
+}
+
+/**
+ * Represents the saved flashcard learning session summary.
+ */
+export interface CompleteFlashcardSessionResponse {
+  /** Number of saved reviews. */
+  savedReviews: number;
+  /** Number of known answers. */
+  knownAnswers: number;
+  /** Number of missed answers. */
+  missedAnswers: number;
 }
 
 /**

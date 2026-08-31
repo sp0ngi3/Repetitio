@@ -3,13 +3,14 @@ import { getBasicExercises, getDashboard, getLearningItems } from "./api";
 import { BackupPage } from "./BackupPage";
 import { BasicsPage } from "./BasicsPage";
 import { DsaPage } from "./DsaPage";
+import { FlashcardsPage } from "./FlashcardsPage";
 import { SystemDesignPage } from "./SystemDesignPage";
 import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from "./types";
 
 /**
  * Application page identifiers.
  */
-type AppPage = "overview" | "dsa" | "system-design" | "basics" | "settings";
+type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "settings";
 
 /**
  * Renders the Repetitio application shell.
@@ -59,7 +60,7 @@ export function App() {
 
         return counts;
       },
-      { Basics: basicExercises.length, Dsa: 0, SystemDesign: 0 }
+      { Basics: basicExercises.length, Dsa: 0, SystemDesign: 0, Flashcard: 0 }
     );
   }, [basicExercises.length, items]);
 
@@ -88,6 +89,13 @@ export function App() {
             Basics
           </button>
           <button
+            className={activePage === "flashcards" ? "active" : ""}
+            type="button"
+            onClick={() => setActivePage("flashcards")}
+          >
+            Flashcards
+          </button>
+          <button
             className={activePage === "settings" ? "active" : ""}
             type="button"
             onClick={() => setActivePage("settings")}
@@ -108,6 +116,8 @@ export function App() {
       {activePage === "system-design" ? <SystemDesignPage onChanged={refreshData} /> : null}
 
       {activePage === "basics" ? <BasicsPage basicExercises={basicExercises} onChanged={refreshData} /> : null}
+
+      {activePage === "flashcards" ? <FlashcardsPage onChanged={refreshData} /> : null}
 
       {activePage === "settings" ? <BackupPage /> : null}
     </main>
@@ -150,6 +160,7 @@ function OverviewPage(props: OverviewPageProps) {
             <span>Basics {props.groupedCounts.Basics}</span>
             <span>DSA {props.groupedCounts.Dsa}</span>
             <span>System Design {props.groupedCounts.SystemDesign}</span>
+            <span>Flashcards {props.groupedCounts.Flashcard}</span>
           </div>
         </div>
 
@@ -195,5 +206,5 @@ function Metric(props: { label: string; value: number }) {
  * @returns Human-readable item type.
  */
 function formatType(type: LearningItemType) {
-  return type === "Dsa" ? "DSA" : type === "SystemDesign" ? "System Design" : "Basics";
+  return type === "Dsa" ? "DSA" : type === "SystemDesign" ? "System Design" : type === "Flashcard" ? "Flashcard" : "Basics";
 }

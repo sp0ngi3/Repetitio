@@ -2,6 +2,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
+  completeFlashcardSession,
+  createFlashcard,
+  createFlashcardDeck,
+  deleteFlashcard,
+  deleteFlashcardDeck,
   exportBackup,
   executeBasicExercise,
   getBackupStatus,
@@ -9,10 +14,15 @@ import {
   getDashboard,
   getDsaProblemTemplate,
   getDsaProblems,
+  getFlashcardDeck,
+  getFlashcardDecks,
+  getFlashcards,
   getLearningItems,
   getSystemDesignProblemTemplate,
   getSystemDesignProblems,
   importBackup,
+  updateFlashcard,
+  updateFlashcardDeck,
   validateBackup
 } from "./api";
 import type {
@@ -20,17 +30,25 @@ import type {
   Dashboard,
   DsaProblem,
   DsaProblemTemplate,
+  Flashcard,
+  FlashcardDeck,
+  FlashcardDeckSummary,
   LearningItem,
   SystemDesignProblem,
   SystemDesignProblemTemplate
 } from "./types";
 
 vi.mock("./api", () => ({
+  completeFlashcardSession: vi.fn(),
+  createFlashcard: vi.fn(),
+  createFlashcardDeck: vi.fn(),
   createDsaProblem: vi.fn(),
   createDsaSolution: vi.fn(),
   createLearningItem: vi.fn(),
   createPracticeSession: vi.fn(),
   createSystemDesignProblem: vi.fn(),
+  deleteFlashcard: vi.fn(),
+  deleteFlashcardDeck: vi.fn(),
   deleteDsaProblem: vi.fn(),
   deleteSystemDesignProblem: vi.fn(),
   exportBackup: vi.fn(),
@@ -40,10 +58,15 @@ vi.mock("./api", () => ({
   getDashboard: vi.fn(),
   getDsaProblemTemplate: vi.fn(),
   getDsaProblems: vi.fn(),
+  getFlashcardDeck: vi.fn(),
+  getFlashcardDecks: vi.fn(),
+  getFlashcards: vi.fn(),
   getLearningItems: vi.fn(),
   getSystemDesignProblemTemplate: vi.fn(),
   getSystemDesignProblems: vi.fn(),
   updateDsaProblem: vi.fn(),
+  updateFlashcard: vi.fn(),
+  updateFlashcardDeck: vi.fn(),
   updateSystemDesignProblem: vi.fn(),
   importBackup: vi.fn(),
   validateBackup: vi.fn()
@@ -132,8 +155,118 @@ const learningItems: LearningItem[] = [
     nextReviewAt: null,
     tags: ["hash-map"],
     totalAttempts: 0
+  },
+  {
+    id: "flashcard-1",
+    type: "Flashcard",
+    title: "CAP theorem",
+    description: "Distributed systems flashcard.",
+    status: "NotStarted",
+    difficulty: "Medium",
+    confidence: null,
+    createdAt: "2026-08-30T12:00:00Z",
+    updatedAt: "2026-08-30T12:00:00Z",
+    lastPracticedAt: null,
+    nextReviewAt: null,
+    tags: ["system-design"],
+    totalAttempts: 0
   }
 ];
+
+/**
+ * Mocked flashcard response used by component tests.
+ */
+const flashcards: Flashcard[] = [
+  {
+    id: "flashcard-1",
+    title: "CAP theorem",
+    description: "Distributed systems flashcard.",
+    question: "What does CAP theorem say?",
+    explanation: "A distributed system can provide at most two of consistency, availability, and partition tolerance.",
+    source: "System Design",
+    status: "NotStarted",
+    difficulty: "Medium",
+    confidence: null,
+    lastPracticedAt: null,
+    nextReviewAt: null,
+    tags: ["system-design"],
+    totalReviews: 0,
+    knownReviews: 0,
+    practiceSessions: []
+  },
+  {
+    id: "flashcard-2",
+    title: "Binary search invariant",
+    description: "Algorithm flashcard.",
+    question: "What invariant should binary search preserve?",
+    explanation: "The answer stays inside the current low-high search interval.",
+    source: "Basics",
+    status: "InProgress",
+    difficulty: "Easy",
+    confidence: 3,
+    lastPracticedAt: null,
+    nextReviewAt: null,
+    tags: ["binary-search"],
+    totalReviews: 1,
+    knownReviews: 1,
+    practiceSessions: []
+  },
+  ...Array.from({ length: 11 }, (_, index) => ({
+    id: `flashcard-generated-${index + 1}`,
+    title: `Generated Flashcard ${index + 1}`,
+    description: "Generated flashcard.",
+    question: `Question ${index + 1}?`,
+    explanation: `Explanation ${index + 1}.`,
+    source: "Generated",
+    status: "NotStarted" as const,
+    difficulty: "Easy" as const,
+    confidence: null,
+    lastPracticedAt: null,
+    nextReviewAt: null,
+    tags: ["generated"],
+    totalReviews: 0,
+    knownReviews: 0,
+    practiceSessions: []
+  }))
+];
+
+/**
+ * Mocked saved flashcard learning sessions used by component tests.
+ */
+const flashcardDecks: FlashcardDeck[] = [
+  {
+    id: "deck-1",
+    name: "Interview flashcards",
+    description: "Mixed review.",
+    cards: flashcards,
+    defaultSessionSize: 25,
+    totalRuns: 2,
+    totalReviews: 4,
+    knownReviews: 3,
+    lastPracticedAt: "2026-08-30T12:00:00Z",
+    nextReviewAt: "2026-09-06T12:00:00Z",
+    createdAt: "2026-08-30T12:00:00Z",
+    updatedAt: "2026-08-30T12:00:00Z"
+  }
+];
+
+/**
+ * Mocked lightweight saved session response used by paginated dashboard tests.
+ */
+const flashcardDeckSummaries: FlashcardDeckSummary[] = flashcardDecks.map((deck) => ({
+  id: deck.id,
+  name: deck.name,
+  description: deck.description,
+  cardCount: deck.cards.length,
+  defaultSessionSize: deck.defaultSessionSize,
+  totalRuns: deck.totalRuns,
+  totalReviews: deck.totalReviews,
+  knownReviews: deck.knownReviews,
+  lastPracticedAt: deck.lastPracticedAt,
+  nextReviewAt: deck.nextReviewAt,
+  createdAt: deck.createdAt,
+  updatedAt: deck.updatedAt
+}));
 
 /**
  * Mocked DSA problem response used by component tests.
@@ -267,6 +400,46 @@ beforeEach(() => {
   vi.mocked(getLearningItems).mockResolvedValue(learningItems);
   vi.mocked(getDsaProblems).mockResolvedValue(dsaProblems);
   vi.mocked(getDsaProblemTemplate).mockResolvedValue(dsaTemplate);
+  vi.mocked(getFlashcards).mockImplementation(async (filters = {}) => {
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 10;
+    const normalizedSearch = filters.search?.trim().toLowerCase() ?? "";
+    const filteredCards = normalizedSearch
+      ? flashcards.filter((card) =>
+          [card.title, card.question, card.explanation, card.source ?? "", ...card.tags]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedSearch)
+        )
+      : flashcards;
+    const start = (page - 1) * pageSize;
+
+    return {
+      items: filteredCards.slice(start, start + pageSize),
+      totalCount: filteredCards.length,
+      page,
+      pageSize
+    };
+  });
+  vi.mocked(getFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
+  vi.mocked(getFlashcardDecks).mockImplementation(async (filters = {}) => {
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 10;
+    const normalizedSearch = filters.search?.trim().toLowerCase() ?? "";
+    const filteredDecks = normalizedSearch
+      ? flashcardDeckSummaries.filter((deck) =>
+          [deck.name, deck.description ?? ""].join(" ").toLowerCase().includes(normalizedSearch)
+        )
+      : flashcardDeckSummaries;
+    const start = (page - 1) * pageSize;
+
+    return {
+      items: filteredDecks.slice(start, start + pageSize),
+      totalCount: filteredDecks.length,
+      page,
+      pageSize
+    };
+  });
   vi.mocked(getSystemDesignProblems).mockResolvedValue(systemDesignProblems);
   vi.mocked(getSystemDesignProblemTemplate).mockResolvedValue(systemDesignTemplate);
   vi.mocked(getBackupStatus).mockResolvedValue(backupStatus);
@@ -292,6 +465,17 @@ beforeEach(() => {
       isValid: true,
       message: "Backup is valid."
     }
+  });
+  vi.mocked(createFlashcard).mockResolvedValue(flashcards[0]);
+  vi.mocked(updateFlashcard).mockResolvedValue(flashcards[0]);
+  vi.mocked(deleteFlashcard).mockResolvedValue();
+  vi.mocked(createFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
+  vi.mocked(updateFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
+  vi.mocked(deleteFlashcardDeck).mockResolvedValue();
+  vi.mocked(completeFlashcardSession).mockResolvedValue({
+    savedReviews: 1,
+    knownAnswers: 1,
+    missedAnswers: 0
   });
   vi.mocked(executeBasicExercise).mockResolvedValue({
     compiled: true,
@@ -388,6 +572,121 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Problems" })).toBeInTheDocument();
     expect(await screen.findByText("Valid Parentheses")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add problem" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that the Flashcards page exposes cards and saved learning sessions.
+   */
+  it("renders flashcards and starts a learning session", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+
+    expect(await screen.findByRole("heading", { name: "Cards" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /CAP theorem/i })).toBeInTheDocument();
+    expect(screen.getByText("Interview flashcards")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue("25"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Flip" }));
+
+    expect(screen.getByText(/low-high search interval/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
+
+    expect(completeFlashcardSession).toHaveBeenCalledWith({
+      deckId: "deck-1",
+      reviews: [
+        {
+          flashcardId: "flashcard-2",
+          knewAnswer: true,
+          confidence: 4
+        }
+      ]
+    });
+  });
+
+  /**
+   * Verifies that the Flashcards page can create a new card and saved learning session.
+   */
+  it("creates flashcards and saved learning sessions", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add flashcard" }));
+
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Redis eviction" } });
+    fireEvent.change(screen.getByLabelText("Question"), { target: { value: "What is LRU?" } });
+    fireEvent.change(screen.getByLabelText("Explanation"), { target: { value: "Least recently used eviction." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save flashcard" }));
+
+    expect(createFlashcard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Redis eviction",
+        question: "What is LRU?",
+        explanation: "Least recently used eviction."
+      })
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Create learning session" }));
+    fireEvent.change(screen.getByLabelText("Session name"), { target: { value: "System Design deck" } });
+    fireEvent.click(await screen.findByRole("checkbox", { name: /CAP theorem/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Save learning session" }));
+
+    expect(createFlashcardDeck).toHaveBeenCalledWith({
+      name: "System Design deck",
+      description: "",
+      defaultSessionSize: 25,
+      flashcardIds: ["flashcard-1"]
+    });
+  });
+
+  /**
+   * Verifies that the Flashcards dashboard paginates card records.
+   */
+  it("paginates flashcards", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+
+    expect(await screen.findByText("Showing 1-10 of 13")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Generated Flashcard 9/i })).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("navigation", { name: "Flashcards pagination" }).querySelector("button:not([disabled]):last-child") as HTMLButtonElement
+    );
+
+    expect(await screen.findByRole("button", { name: /Generated Flashcard 9/i })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that saved Flashcard learning sessions can be edited and deleted.
+   */
+  it("edits and deletes saved flashcard learning sessions", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("heading", { name: "Edit learning session" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Session name"), { target: { value: "Core interview cards" } });
+    fireEvent.change(screen.getByLabelText("Default cards per run"), { target: { value: "30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save learning session" }));
+
+    expect(updateFlashcardDeck).toHaveBeenCalledWith(
+      "deck-1",
+      expect.objectContaining({
+        name: "Core interview cards",
+        defaultSessionSize: 30,
+        flashcardIds: expect.arrayContaining(["flashcard-1", "flashcard-2"])
+      })
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("heading", { name: "Edit learning session" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(deleteFlashcardDeck).toHaveBeenCalledWith("deck-1");
   });
 
   /**

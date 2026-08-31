@@ -2,8 +2,11 @@ import type {
   BackupStatus,
   BackupValidation,
   BasicExercise,
+  CompleteFlashcardSessionRequest,
+  CompleteFlashcardSessionResponse,
   CreateDsaProblemRequest,
   CreateDsaSolutionRequest,
+  CreateFlashcardRequest,
   CreateLearningItemRequest,
   CreatePracticeSessionRequest,
   CreateSystemDesignProblemRequest,
@@ -13,14 +16,20 @@ import type {
   DsaSolution,
   ExecuteBasicExerciseRequest,
   ExecuteBasicExerciseResponse,
+  Flashcard,
+  FlashcardDeck,
   LearningDifficulty,
   LearningItem,
   LearningItemStatus,
   PracticeSession,
+  SaveFlashcardDeckRequest,
   SystemDesignProblem,
   SystemDesignProblemTemplate,
   ImportBackupResult,
+  PagedFlashcardDeckResponse,
+  PagedFlashcardResponse,
   UpdateDsaProblemRequest,
+  UpdateFlashcardRequest,
   UpdateSystemDesignProblemRequest
 } from "./types";
 
@@ -224,6 +233,187 @@ export async function deleteDsaProblem(id: string): Promise<void> {
  */
 export function createDsaSolution(id: string, request: CreateDsaSolutionRequest): Promise<DsaSolution> {
   return requestJson<DsaSolution>(`/api/dsa/${id}/solutions`, {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Loads flashcards with optional filters.
+ *
+ * @param filters - Optional flashcard list filters.
+ * @returns Flashcards sorted by review status and title.
+ */
+export function getFlashcards(filters: {
+  status?: LearningItemStatus | "";
+  difficulty?: LearningDifficulty | "";
+  search?: string;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<PagedFlashcardResponse> {
+  const query = new URLSearchParams();
+
+  if (filters.status) {
+    query.set("status", filters.status);
+  }
+
+  if (filters.difficulty) {
+    query.set("difficulty", filters.difficulty);
+  }
+
+  if (filters.search?.trim()) {
+    query.set("search", filters.search.trim());
+  }
+
+  if (filters.page) {
+    query.set("page", String(filters.page));
+  }
+
+  if (filters.pageSize) {
+    query.set("pageSize", String(filters.pageSize));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return requestJson<PagedFlashcardResponse>(`/api/flashcards${suffix}`);
+}
+
+/**
+ * Creates a flashcard.
+ *
+ * @param request - Flashcard creation payload.
+ * @returns The created flashcard.
+ */
+export function createFlashcard(request: CreateFlashcardRequest): Promise<Flashcard> {
+  return requestJson<Flashcard>("/api/flashcards", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Updates a flashcard.
+ *
+ * @param id - Flashcard identifier.
+ * @param request - Flashcard update payload.
+ * @returns The updated flashcard.
+ */
+export function updateFlashcard(id: string, request: UpdateFlashcardRequest): Promise<Flashcard> {
+  return requestJson<Flashcard>(`/api/flashcards/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Deletes a flashcard.
+ *
+ * @param id - Flashcard identifier.
+ * @returns A promise that resolves when deletion completes.
+ */
+export async function deleteFlashcard(id: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/flashcards/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+}
+
+/**
+ * Loads saved flashcard decks with optional search and pagination.
+ *
+ * @param filters - Optional saved session list filters.
+ * @returns Paged saved flashcard decks.
+ */
+export function getFlashcardDecks(filters: {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<PagedFlashcardDeckResponse> {
+  const query = new URLSearchParams();
+
+  if (filters.search?.trim()) {
+    query.set("search", filters.search.trim());
+  }
+
+  if (filters.page) {
+    query.set("page", String(filters.page));
+  }
+
+  if (filters.pageSize) {
+    query.set("pageSize", String(filters.pageSize));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return requestJson<PagedFlashcardDeckResponse>(`/api/flashcards/decks${suffix}`);
+}
+
+/**
+ * Loads one saved flashcard deck with selected flashcards.
+ *
+ * @param id - Deck identifier.
+ * @returns Saved flashcard deck.
+ */
+export function getFlashcardDeck(id: string): Promise<FlashcardDeck> {
+  return requestJson<FlashcardDeck>(`/api/flashcards/decks/${id}`);
+}
+
+/**
+ * Creates a saved flashcard deck.
+ *
+ * @param request - Deck creation payload.
+ * @returns The created flashcard deck.
+ */
+export function createFlashcardDeck(request: SaveFlashcardDeckRequest): Promise<FlashcardDeck> {
+  return requestJson<FlashcardDeck>("/api/flashcards/decks", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Updates a saved flashcard deck.
+ *
+ * @param id - Deck identifier.
+ * @param request - Deck update payload.
+ * @returns The updated flashcard deck.
+ */
+export function updateFlashcardDeck(id: string, request: SaveFlashcardDeckRequest): Promise<FlashcardDeck> {
+  return requestJson<FlashcardDeck>(`/api/flashcards/decks/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Deletes a saved flashcard deck.
+ *
+ * @param id - Deck identifier.
+ * @returns A promise that resolves when deletion completes.
+ */
+export async function deleteFlashcardDeck(id: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/flashcards/decks/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+}
+
+/**
+ * Saves completed flashcard review results.
+ *
+ * @param request - Completed flashcard session payload.
+ * @returns Saved session summary.
+ */
+export function completeFlashcardSession(
+  request: CompleteFlashcardSessionRequest
+): Promise<CompleteFlashcardSessionResponse> {
+  return requestJson<CompleteFlashcardSessionResponse>("/api/flashcards/sessions/complete", {
     method: "POST",
     body: JSON.stringify(request)
   });

@@ -9,7 +9,7 @@ namespace Repetitio.UnitTests.LearningItems;
 public sealed class LearningItemRulesTests
 {
     /// <summary>
-    /// Verifies that users can create only DSA and System Design items.
+    /// Verifies that users can create only user-managed learning items.
     /// </summary>
     /// <param name="type">The learning item type.</param>
     /// <param name="expected">The expected rule result.</param>
@@ -17,6 +17,7 @@ public sealed class LearningItemRulesTests
     [InlineData(LearningItemType.Basics, false)]
     [InlineData(LearningItemType.Dsa, true)]
     [InlineData(LearningItemType.SystemDesign, true)]
+    [InlineData(LearningItemType.Flashcard, true)]
     public void CanBeCreatedByUser_ReturnsExpectedResult(LearningItemType type, bool expected)
     {
         var result = LearningItemRules.CanBeCreatedByUser(type);
