@@ -26,10 +26,14 @@ import type {
   SystemDesignProblem,
   SystemDesignProblemTemplate,
   ImportBackupResult,
+  CreateNotePageRequest,
   PagedFlashcardDeckResponse,
   PagedFlashcardResponse,
+  NoteArea,
+  NotePage,
   UpdateDsaProblemRequest,
   UpdateFlashcardRequest,
+  UpdateNotePageRequest,
   UpdateSystemDesignProblemRequest
 } from "./types";
 
@@ -395,6 +399,71 @@ export function updateFlashcardDeck(id: string, request: SaveFlashcardDeckReques
  */
 export async function deleteFlashcardDeck(id: string): Promise<void> {
   const response = await fetch(`${apiBaseUrl}/api/flashcards/decks/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+}
+
+/**
+ * Loads note pages with optional filters.
+ *
+ * @param filters - Optional note page filters.
+ * @returns Matching note pages.
+ */
+export function getNotePages(filters: { area?: NoteArea | ""; search?: string } = {}): Promise<NotePage[]> {
+  const query = new URLSearchParams();
+
+  if (filters.area) {
+    query.set("area", filters.area);
+  }
+
+  if (filters.search?.trim()) {
+    query.set("search", filters.search.trim());
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return requestJson<NotePage[]>(`/api/notes${suffix}`);
+}
+
+/**
+ * Creates a note page.
+ *
+ * @param request - Note page creation payload.
+ * @returns The created note page.
+ */
+export function createNotePage(request: CreateNotePageRequest): Promise<NotePage> {
+  return requestJson<NotePage>("/api/notes", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Updates a note page.
+ *
+ * @param id - Note page identifier.
+ * @param request - Note page update payload.
+ * @returns The updated note page.
+ */
+export function updateNotePage(id: string, request: UpdateNotePageRequest): Promise<NotePage> {
+  return requestJson<NotePage>(`/api/notes/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Deletes a note page.
+ *
+ * @param id - Note page identifier.
+ * @returns A promise that resolves when deletion completes.
+ */
+export async function deleteNotePage(id: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/notes/${id}`, {
     method: "DELETE"
   });
 

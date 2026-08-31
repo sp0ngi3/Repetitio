@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Repetitio.Domain.Dsa;
 using Repetitio.Domain.Flashcards;
 using Repetitio.Domain.LearningItems;
+using Repetitio.Domain.Notes;
 using Repetitio.Domain.Practice;
 using Repetitio.Domain.SystemDesign;
 using Repetitio.Domain.Tags;
@@ -76,6 +77,11 @@ public sealed class RepetitioDbContext : DbContext
     /// Gets the flashcard review records table.
     /// </summary>
     public DbSet<FlashcardReview> FlashcardReviews => Set<FlashcardReview>();
+
+    /// <summary>
+    /// Gets the note pages table.
+    /// </summary>
+    public DbSet<NotePage> NotePages => Set<NotePage>();
 
     /// <summary>
     /// Configures the database model.
@@ -271,6 +277,19 @@ public sealed class RepetitioDbContext : DbContext
                 .WithOne()
                 .HasForeignKey<FlashcardReview>(review => review.PracticeSessionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NotePage>(entity =>
+        {
+            entity.HasKey(notePage => notePage.Id);
+            entity.Property(notePage => notePage.Area).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(notePage => notePage.Title).HasMaxLength(200).IsRequired();
+            entity.Property(notePage => notePage.ContentMarkdown).HasMaxLength(50000).IsRequired();
+            entity.Property(notePage => notePage.SortOrder).IsRequired();
+            entity.Property(notePage => notePage.CreatedAt).IsRequired();
+            entity.Property(notePage => notePage.UpdatedAt).IsRequired();
+            entity.HasIndex(notePage => notePage.Area);
+            entity.HasIndex(notePage => new { notePage.Area, notePage.SortOrder });
         });
     }
 }

@@ -4,6 +4,11 @@
 export type LearningItemType = "Basics" | "Dsa" | "SystemDesign" | "Flashcard";
 
 /**
+ * Notebook areas supported by the notes module.
+ */
+export type NoteArea = "Dsa" | "SystemDesign" | "Other";
+
+/**
  * Progress states supported by the backend.
  */
 export type LearningItemStatus = "NotStarted" | "InProgress" | "Completed" | "Mastered";
@@ -820,4 +825,44 @@ export interface ImportBackupResult {
   preImportBackupFileName?: string | null;
   /** Validation result created before import. */
   validation: BackupValidation;
+}
+
+/**
+ * Represents an editable note page returned by the API.
+ */
+export interface NotePage {
+  /** Unique note page identifier. */
+  id: string;
+  /** Notebook area the page belongs to. */
+  area: NoteArea;
+  /** Note page title. */
+  title: string;
+  /** Editable markdown content. */
+  contentMarkdown: string;
+  /** Manual display order inside the notebook area. */
+  sortOrder: number;
+  /** Creation date and time. */
+  createdAt: string;
+  /** Last update date and time. */
+  updatedAt: string;
+}
+
+/**
+ * Represents the payload used to create a note page.
+ */
+export interface CreateNotePageRequest {
+  /** Notebook area the page belongs to. */
+  area: NoteArea;
+  /** Note page title. */
+  title: string;
+  /** Editable markdown content. */
+  contentMarkdown?: string;
+}
+
+/**
+ * Represents the payload used to update a note page.
+ */
+export interface UpdateNotePageRequest extends CreateNotePageRequest {
+  /** Manual display order inside the notebook area. */
+  sortOrder: number;
 }

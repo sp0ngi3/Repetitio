@@ -3,6 +3,7 @@ using Repetitio.Api.Endpoints;
 using Repetitio.Api.Execution;
 using Repetitio.Api.Execution.Harnesses;
 using Repetitio.Domain.LearningItems;
+using Repetitio.Domain.Notes;
 using Repetitio.Domain.Practice;
 using Repetitio.Infrastructure;
 using Repetitio.Infrastructure.Persistence;
@@ -15,6 +16,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<LearningDifficulty>());
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<LearningItemStatus>());
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<LearningItemType>());
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<NoteArea>());
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<PracticeOutcome>());
 });
 builder.Services.AddCors(options =>
@@ -51,6 +53,7 @@ app.MapBasicExerciseEndpoints();
 app.MapDsaEndpoints();
 app.MapSystemDesignEndpoints();
 app.MapFlashcardEndpoints();
+app.MapNoteEndpoints();
 app.MapLearningItemEndpoints();
 app.MapTagEndpoints();
 app.MapPracticeSessionEndpoints();

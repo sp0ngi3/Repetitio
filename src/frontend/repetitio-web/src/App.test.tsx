@@ -5,8 +5,10 @@ import {
   completeFlashcardSession,
   createFlashcard,
   createFlashcardDeck,
+  createNotePage,
   deleteFlashcard,
   deleteFlashcardDeck,
+  deleteNotePage,
   exportBackup,
   executeBasicExercise,
   getBackupStatus,
@@ -18,11 +20,13 @@ import {
   getFlashcardDecks,
   getFlashcards,
   getLearningItems,
+  getNotePages,
   getSystemDesignProblemTemplate,
   getSystemDesignProblems,
   importBackup,
   updateFlashcard,
   updateFlashcardDeck,
+  updateNotePage,
   validateBackup
 } from "./api";
 import type {
@@ -34,6 +38,7 @@ import type {
   FlashcardDeck,
   FlashcardDeckSummary,
   LearningItem,
+  NotePage,
   SystemDesignProblem,
   SystemDesignProblemTemplate
 } from "./types";
@@ -42,6 +47,7 @@ vi.mock("./api", () => ({
   completeFlashcardSession: vi.fn(),
   createFlashcard: vi.fn(),
   createFlashcardDeck: vi.fn(),
+  createNotePage: vi.fn(),
   createDsaProblem: vi.fn(),
   createDsaSolution: vi.fn(),
   createLearningItem: vi.fn(),
@@ -49,6 +55,7 @@ vi.mock("./api", () => ({
   createSystemDesignProblem: vi.fn(),
   deleteFlashcard: vi.fn(),
   deleteFlashcardDeck: vi.fn(),
+  deleteNotePage: vi.fn(),
   deleteDsaProblem: vi.fn(),
   deleteSystemDesignProblem: vi.fn(),
   exportBackup: vi.fn(),
@@ -62,11 +69,13 @@ vi.mock("./api", () => ({
   getFlashcardDecks: vi.fn(),
   getFlashcards: vi.fn(),
   getLearningItems: vi.fn(),
+  getNotePages: vi.fn(),
   getSystemDesignProblemTemplate: vi.fn(),
   getSystemDesignProblems: vi.fn(),
   updateDsaProblem: vi.fn(),
   updateFlashcard: vi.fn(),
   updateFlashcardDeck: vi.fn(),
+  updateNotePage: vi.fn(),
   updateSystemDesignProblem: vi.fn(),
   importBackup: vi.fn(),
   validateBackup: vi.fn()
@@ -382,6 +391,39 @@ const systemDesignTemplate: SystemDesignProblemTemplate = {
 };
 
 /**
+ * Mocked note pages used by component tests.
+ */
+const notePages: NotePage[] = [
+  {
+    id: "note-dsa",
+    area: "Dsa",
+    title: "DSA Notes",
+    contentMarkdown: "## DSA Notes\n\nRemember invariants.",
+    sortOrder: 0,
+    createdAt: "2026-08-30T12:00:00Z",
+    updatedAt: "2026-08-30T12:00:00Z"
+  },
+  {
+    id: "note-system-design",
+    area: "SystemDesign",
+    title: "System Design Notes",
+    contentMarkdown: "## System Design Notes\n\nClarify requirements first.",
+    sortOrder: 0,
+    createdAt: "2026-08-30T12:00:00Z",
+    updatedAt: "2026-08-30T12:00:00Z"
+  },
+  {
+    id: "note-other",
+    area: "Other",
+    title: "Other Notes",
+    contentMarkdown: "## Other Notes",
+    sortOrder: 0,
+    createdAt: "2026-08-30T12:00:00Z",
+    updatedAt: "2026-08-30T12:00:00Z"
+  }
+];
+
+/**
  * Mocked backup status response used by component tests.
  */
 const backupStatus = {
@@ -442,6 +484,26 @@ beforeEach(() => {
   });
   vi.mocked(getSystemDesignProblems).mockResolvedValue(systemDesignProblems);
   vi.mocked(getSystemDesignProblemTemplate).mockResolvedValue(systemDesignTemplate);
+  vi.mocked(getNotePages).mockResolvedValue(notePages);
+  vi.mocked(createNotePage).mockResolvedValue({
+    id: "note-new",
+    area: "Dsa",
+    title: "Two pointers",
+    contentMarkdown: "Fast and slow pointer reminders.",
+    sortOrder: 1,
+    createdAt: "2026-08-30T13:00:00Z",
+    updatedAt: "2026-08-30T13:00:00Z"
+  });
+  vi.mocked(updateNotePage).mockImplementation(async (id, request) => ({
+    id,
+    area: request.area,
+    title: request.title,
+    contentMarkdown: request.contentMarkdown ?? "",
+    sortOrder: request.sortOrder,
+    createdAt: "2026-08-30T12:00:00Z",
+    updatedAt: "2026-08-30T13:00:00Z"
+  }));
+  vi.mocked(deleteNotePage).mockResolvedValue();
   vi.mocked(getBackupStatus).mockResolvedValue(backupStatus);
   vi.mocked(exportBackup).mockResolvedValue({
     blob: new Blob(["backup"], { type: "application/zip" }),
@@ -604,6 +666,42 @@ describe("App", () => {
         }
       ]
     });
+  });
+
+  /**
+   * Verifies that the Notes page supports notebook pages.
+   */
+  it("renders and creates notebook pages", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Notes" }));
+
+    expect(await screen.findByRole("heading", { name: "Notebook" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "DSA Notes" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Remember invariants/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "New page" }));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Two pointers" } });
+    fireEvent.change(screen.getByLabelText("Page"), { target: { value: "Fast and slow pointer reminders." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save page" }));
+
+    expect(createNotePage).toHaveBeenCalledWith({
+      area: "Dsa",
+      title: "Two pointers",
+      contentMarkdown: "Fast and slow pointer reminders."
+    });
+  });
+
+  /**
+   * Verifies that the global Notes companion can be opened from any page.
+   */
+  it("opens the global notes companion", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open notes companion" }));
+
+    expect(await screen.findByRole("complementary", { name: "Global notes" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Remember invariants/i)).toBeInTheDocument();
   });
 
   /**

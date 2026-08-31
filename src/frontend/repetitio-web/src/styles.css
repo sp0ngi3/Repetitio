@@ -881,6 +881,130 @@ textarea {
   line-height: 1.6;
 }
 
+.notes-page {
+  display: grid;
+  gap: 16px;
+}
+
+.notes-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.notes-sidebar,
+.notes-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.notes-sidebar {
+  position: sticky;
+  top: 16px;
+}
+
+.note-area-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.note-area-tabs button {
+  min-height: 34px;
+  border: 1px solid #ccd6df;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #25313a;
+  background: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.note-area-tabs button.active {
+  border-color: #3478c7;
+  color: #ffffff;
+  background: #3478c7;
+}
+
+.notes-document-textarea {
+  min-height: 680px;
+  color: #24313a;
+  background: #fbfcfe;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.notes-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  min-height: 44px;
+  border: 1px solid #1c7a5a;
+  border-radius: 8px;
+  padding: 0 16px;
+  color: #ffffff;
+  background: #1c7a5a;
+  box-shadow: 0 14px 28px rgba(31, 36, 40, 0.18);
+  font-weight: 900;
+}
+
+.notes-companion {
+  position: fixed;
+  right: 18px;
+  bottom: 74px;
+  z-index: 31;
+  display: grid;
+  width: min(420px, calc(100vw - 28px));
+  max-height: calc(100vh - 98px);
+  gap: 12px;
+  border: 1px solid #d9e0e6;
+  border-radius: 8px;
+  padding: 16px;
+  overflow: auto;
+  background: #ffffff;
+  box-shadow: 0 24px 56px rgba(31, 36, 40, 0.2);
+}
+
+.notes-companion .panel-heading {
+  margin-bottom: 0;
+}
+
+.notes-companion-textarea {
+  min-height: 380px;
+  color: #24313a;
+  background: #fbfcfe;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.autosave-state {
+  justify-self: start;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: #52616c;
+  background: #fbfcfe;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.autosave-state.saved {
+  border-color: #b8ddc7;
+  color: #1c7a5a;
+  background: #f1fbf5;
+}
+
+.autosave-state.error {
+  border-color: #efc5bd;
+  color: #8b2d22;
+  background: #fff7f5;
+}
+
 .backup-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1229,6 +1353,7 @@ textarea {
   .item-grid,
   .tracker-toolbar,
   .dsa-layout,
+  .notes-layout,
   .backup-grid,
   .reflection-grid,
   .coding-layout,
@@ -1241,7 +1366,8 @@ textarea {
     align-items: stretch;
   }
 
-  .dsa-sidebar {
+  .dsa-sidebar,
+  .notes-sidebar {
     position: static;
   }
 }
@@ -1264,9 +1390,10 @@ textarea {
   .item-meta,
   .tracker-toolbar,
   .card-picker-toolbar,
-  .session-filter-panel,
-  .dsa-layout,
-  .backup-grid,
+    .session-filter-panel,
+    .dsa-layout,
+    .notes-layout,
+    .backup-grid,
   .reflection-grid,
   .two-columns,
   .coding-layout,

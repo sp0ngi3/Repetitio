@@ -134,6 +134,7 @@ public sealed class BackupArchiveValidatorTests
             "CREATE TABLE FlashcardDecks (Id TEXT NOT NULL PRIMARY KEY);",
             "CREATE TABLE FlashcardDeckCards (DeckId TEXT NOT NULL, FlashcardLearningItemId TEXT NOT NULL);",
             "CREATE TABLE FlashcardReviews (Id TEXT NOT NULL PRIMARY KEY);",
+            "CREATE TABLE NotePages (Id TEXT NOT NULL PRIMARY KEY);",
             $"INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('{schemaVersion}', '10.0.11');"
         };
 

@@ -4,13 +4,14 @@ import { BackupPage } from "./BackupPage";
 import { BasicsPage } from "./BasicsPage";
 import { DsaPage } from "./DsaPage";
 import { FlashcardsPage } from "./FlashcardsPage";
+import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
 import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from "./types";
 
 /**
  * Application page identifiers.
  */
-type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "settings";
+type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "notes" | "settings";
 
 /**
  * Renders the Repetitio application shell.
@@ -95,6 +96,9 @@ export function App() {
           >
             Flashcards
           </button>
+          <button className={activePage === "notes" ? "active" : ""} type="button" onClick={() => setActivePage("notes")}>
+            Notes
+          </button>
           <button
             className={activePage === "settings" ? "active" : ""}
             type="button"
@@ -119,7 +123,11 @@ export function App() {
 
       {activePage === "flashcards" ? <FlashcardsPage onChanged={refreshData} /> : null}
 
+      {activePage === "notes" ? <NotesPage /> : null}
+
       {activePage === "settings" ? <BackupPage /> : null}
+
+      <NotesCompanion />
     </main>
   );
 }
