@@ -18,6 +18,8 @@ import type {
   ExecuteBasicExerciseResponse,
   Flashcard,
   FlashcardDeck,
+  ImportFlashcardBatchRequest,
+  ImportFlashcardBatchResponse,
   LearningDifficulty,
   LearningItem,
   LearningItemStatus,
@@ -289,6 +291,19 @@ export function getFlashcards(filters: {
  */
 export function createFlashcard(request: CreateFlashcardRequest): Promise<Flashcard> {
   return requestJson<Flashcard>("/api/flashcards", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Imports many flashcards from one JSON payload.
+ *
+ * @param request - Batch import payload.
+ * @returns Batch import summary.
+ */
+export function importFlashcardsBatch(request: ImportFlashcardBatchRequest): Promise<ImportFlashcardBatchResponse> {
+  return requestJson<ImportFlashcardBatchResponse>("/api/flashcards/batch", {
     method: "POST",
     body: JSON.stringify(request)
   });

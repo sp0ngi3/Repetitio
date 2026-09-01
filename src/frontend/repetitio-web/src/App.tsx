@@ -83,44 +83,55 @@ export function App() {
           <p className="eyebrow">Local learning system</p>
           <h1 id="page-title">Repetitio</h1>
         </div>
-        <nav className="app-nav" aria-label="Primary navigation">
-          <button className={activePage === "overview" ? "active" : ""} type="button" onClick={() => setActivePage("overview")}>
-            Overview
-          </button>
-          <button className={activePage === "dsa" ? "active" : ""} type="button" onClick={() => setActivePage("dsa")}>
-            DSA
-          </button>
+        <div className="top-bar-actions">
           <button
-            className={activePage === "system-design" ? "active" : ""}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className={`theme-toggle ${theme}`}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             type="button"
-            onClick={() => setActivePage("system-design")}
+            onClick={() => setTheme(toggleTheme)}
           >
-            System Design
+            <span className="theme-toggle-track" aria-hidden="true">
+              <span className="theme-toggle-thumb" />
+            </span>
+            <span>{theme === "dark" ? "Dark" : "Light"}</span>
           </button>
-          <button className={activePage === "basics" ? "active" : ""} type="button" onClick={() => setActivePage("basics")}>
-            Basics
-          </button>
-          <button
-            className={activePage === "flashcards" ? "active" : ""}
-            type="button"
-            onClick={() => setActivePage("flashcards")}
-          >
-            Flashcards
-          </button>
-          <button className={activePage === "notes" ? "active" : ""} type="button" onClick={() => setActivePage("notes")}>
-            Notes
-          </button>
-          <button
-            className={activePage === "settings" ? "active" : ""}
-            type="button"
-            onClick={() => setActivePage("settings")}
-          >
-            Settings
-          </button>
-          <button className="theme-toggle" type="button" onClick={() => setTheme(toggleTheme)}>
-            {theme === "dark" ? "Light mode" : "Dark mode"}
-          </button>
-        </nav>
+          <nav className="app-nav" aria-label="Primary navigation">
+            <button className={activePage === "overview" ? "active" : ""} type="button" onClick={() => setActivePage("overview")}>
+              Overview
+            </button>
+            <button className={activePage === "dsa" ? "active" : ""} type="button" onClick={() => setActivePage("dsa")}>
+              DSA
+            </button>
+            <button
+              className={activePage === "system-design" ? "active" : ""}
+              type="button"
+              onClick={() => setActivePage("system-design")}
+            >
+              System Design
+            </button>
+            <button className={activePage === "basics" ? "active" : ""} type="button" onClick={() => setActivePage("basics")}>
+              Basics
+            </button>
+            <button
+              className={activePage === "flashcards" ? "active" : ""}
+              type="button"
+              onClick={() => setActivePage("flashcards")}
+            >
+              Flashcards
+            </button>
+            <button className={activePage === "notes" ? "active" : ""} type="button" onClick={() => setActivePage("notes")}>
+              Notes
+            </button>
+            <button
+              className={activePage === "settings" ? "active" : ""}
+              type="button"
+              onClick={() => setActivePage("settings")}
+            >
+              Settings
+            </button>
+          </nav>
+        </div>
       </section>
 
       {error ? <p className="error-banner">{error}</p> : null}

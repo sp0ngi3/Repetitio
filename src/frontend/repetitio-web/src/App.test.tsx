@@ -23,6 +23,7 @@ import {
   getNotePages,
   getSystemDesignProblemTemplate,
   getSystemDesignProblems,
+  importFlashcardsBatch,
   importBackup,
   updateFlashcard,
   updateFlashcardDeck,
@@ -72,6 +73,7 @@ vi.mock("./api", () => ({
   getNotePages: vi.fn(),
   getSystemDesignProblemTemplate: vi.fn(),
   getSystemDesignProblems: vi.fn(),
+  importFlashcardsBatch: vi.fn(),
   updateDsaProblem: vi.fn(),
   updateFlashcard: vi.fn(),
   updateFlashcardDeck: vi.fn(),
@@ -530,6 +532,11 @@ beforeEach(() => {
     }
   });
   vi.mocked(createFlashcard).mockResolvedValue(flashcards[0]);
+  vi.mocked(importFlashcardsBatch).mockResolvedValue({
+    requestedCount: 1,
+    importedCount: 1,
+    flashcardIds: ["flashcard-imported-1"]
+  });
   vi.mocked(updateFlashcard).mockResolvedValue(flashcards[0]);
   vi.mocked(deleteFlashcard).mockResolvedValue();
   vi.mocked(createFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
@@ -589,11 +596,11 @@ describe("App", () => {
   it("toggles dark mode", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Dark mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }));
 
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(localStorage.getItem("repetitio-theme")).toBe("dark");
-    expect(screen.getByRole("button", { name: "Light mode" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch to light mode" })).toBeInTheDocument();
   });
 
   /**
@@ -654,32 +661,38 @@ describe("App", () => {
    * Verifies that the Flashcards page exposes cards and saved learning sessions.
    */
   it("renders flashcards and starts a learning session", async () => {
-    render(<App />);
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+    try {
+      render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Cards" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /CAP theorem/i })).toBeInTheDocument();
-    expect(screen.getByText("Interview flashcards")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
 
-    fireEvent.change(screen.getByDisplayValue("25"), { target: { value: "1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Flip" }));
+      expect(await screen.findByRole("heading", { name: "Cards" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /CAP theorem/i })).toBeInTheDocument();
+      expect(screen.getByText("Interview flashcards")).toBeInTheDocument();
 
-    expect(screen.getByText(/low-high search interval/i)).toBeInTheDocument();
+      fireEvent.change(screen.getByDisplayValue("25"), { target: { value: "1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Flip" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
+      expect(screen.getByText(/low-high search interval/i)).toBeInTheDocument();
 
-    expect(completeFlashcardSession).toHaveBeenCalledWith({
-      deckId: "deck-1",
-      reviews: [
-        {
-          flashcardId: "flashcard-2",
-          knewAnswer: true,
-          confidence: 4
-        }
-      ]
-    });
+      fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
+
+      expect(completeFlashcardSession).toHaveBeenCalledWith({
+        deckId: "deck-1",
+        reviews: [
+          {
+            flashcardId: "flashcard-2",
+            knewAnswer: true,
+            confidence: 4
+          }
+        ]
+      });
+    } finally {
+      randomSpy.mockRestore();
+    }
   });
 
   /**
@@ -750,6 +763,70 @@ describe("App", () => {
       description: "",
       defaultSessionSize: 25,
       flashcardIds: ["flashcard-1"]
+    });
+  });
+
+  /**
+   * Verifies that Flashcards can import a batch JSON file.
+   */
+  it("imports flashcards from a JSON file", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+    fireEvent.click(await screen.findByRole("button", { name: "JSON structure" }));
+
+    expect(screen.getByRole("heading", { name: "JSON structure" })).toBeInTheDocument();
+    expect(screen.getByText(/"flashcards"/i)).toBeInTheDocument();
+
+    const file = new File(
+      [
+        JSON.stringify({
+          flashcards: [
+            {
+              title: "TCP handshake",
+              question: "What are the TCP handshake steps?",
+              explanation: "SYN, SYN-ACK, ACK.",
+              source: "Networking",
+              difficulty: "Medium",
+              tags: ["networking", "tcp"]
+            },
+            {
+              title: "Throwaway card",
+              question: "Should this be imported?",
+              explanation: "No.",
+              difficulty: "Easy",
+              tags: ["scratch"]
+            }
+          ]
+        })
+      ],
+      "flashcards.json",
+      { type: "application/json" }
+    );
+
+    fireEvent.change(screen.getByLabelText("Batch import"), { target: { files: [file] } });
+
+    expect(await screen.findByText(/Loaded 2 flashcards/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue("TCP handshake"), {
+      target: { value: "TCP three-way handshake" }
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Import reviewed flashcards" }));
+
+    expect(await screen.findByText(/Imported 1 flashcard/i)).toBeInTheDocument();
+    expect(importFlashcardsBatch).toHaveBeenCalledWith({
+      flashcards: [
+        {
+          title: "TCP three-way handshake",
+          question: "What are the TCP handshake steps?",
+          explanation: "SYN, SYN-ACK, ACK.",
+          source: "Networking",
+          description: "",
+          difficulty: "Medium",
+          tags: ["networking", "tcp"]
+        }
+      ]
     });
   });
 

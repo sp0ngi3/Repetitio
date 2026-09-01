@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   completeFlashcardSession,
   createFlashcard,
@@ -8,6 +8,7 @@ import {
   getFlashcardDeck,
   getFlashcardDecks,
   getFlashcards,
+  importFlashcardsBatch,
   updateFlashcard,
   updateFlashcardDeck
 } from "./api";
@@ -17,6 +18,7 @@ import type {
   Flashcard,
   FlashcardDeck,
   FlashcardDeckSummary,
+  ImportFlashcardBatchRequest,
   LearningDifficulty,
   LearningItemStatus,
   UpdateFlashcardRequest
@@ -94,6 +96,14 @@ interface FlashcardFilters {
 }
 
 /**
+ * Editable imported flashcard draft.
+ */
+interface FlashcardImportDraft extends FlashcardForm {
+  /** Stable local identifier used before the flashcard is saved. */
+  id: string;
+}
+
+/**
  * Active study session state.
  */
 interface StudySession {
@@ -143,6 +153,27 @@ const statuses: LearningItemStatus[] = ["NotStarted", "InProgress", "Completed",
 const difficulties: LearningDifficulty[] = ["Unknown", "Easy", "Medium", "Hard"];
 
 /**
+ * Example JSON shown in the batch import helper panel.
+ */
+const flashcardImportExample = JSON.stringify(
+  {
+    flashcards: [
+      {
+        title: "Binary search invariant",
+        question: "What invariant should binary search preserve?",
+        explanation: "The answer stays inside the current low-high search interval.",
+        source: "Basics",
+        description: "Short reminder shown in the dashboard.",
+        difficulty: "Easy",
+        tags: ["binary-search", "invariants"]
+      }
+    ]
+  },
+  null,
+  2
+);
+
+/**
  * Props accepted by the Flashcards page.
  */
 interface FlashcardsPageProps {
@@ -181,6 +212,11 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   const [isLoadingDecks, setIsLoadingDecks] = useState(true);
   const [isLoadingPicker, setIsLoadingPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importDrafts, setImportDrafts] = useState<FlashcardImportDraft[]>([]);
+  const [showImportExample, setShowImportExample] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debouncedCardSearch = useDebouncedValue(filters.search, searchDebounceMs);
   const debouncedDeckSearch = useDebouncedValue(deckSearch, searchDebounceMs);
@@ -192,6 +228,12 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   const selectedPickerCards = useMemo(
     () => deckForm.selectedCardIds.map((id) => selectedCardLookup[id]).filter(Boolean),
     [deckForm.selectedCardIds, selectedCardLookup]
+  );
+  const visibleDueCount = useMemo(() => flashcards.filter(isDueForReview).length, [flashcards]);
+  const visibleKnownRate = useMemo(() => calculateKnownRate(flashcards), [flashcards]);
+  const visibleDeckRunCount = useMemo(
+    () => decks.reduce((totalRuns, deck) => totalRuns + deck.totalRuns, 0),
+    [decks]
   );
 
   /**
@@ -488,6 +530,97 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   }
 
   /**
+   * Parses a JSON file into editable imported flashcard drafts.
+   *
+   * @param event - File input change event.
+   */
+  async function handleFlashcardImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setImportFileName(file.name);
+    setImportMessage(null);
+    setError(null);
+
+    try {
+      const payload = parseFlashcardImport(await file.text());
+      setImportDrafts(payload.flashcards.map((flashcard, index) => createImportDraft(flashcard, index)));
+      setImportMessage(`Loaded ${formatCardCount(payload.flashcards.length)} from ${file.name}. Review before importing.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to import flashcards.");
+    }
+  }
+
+  /**
+   * Updates one imported flashcard draft field.
+   *
+   * @param draftId - Local draft identifier.
+   * @param key - Field to update.
+   * @param value - New field value.
+   */
+  function updateImportDraft<K extends keyof FlashcardForm>(
+    draftId: string,
+    key: K,
+    value: FlashcardForm[K]
+  ) {
+    setImportDrafts((current) =>
+      current.map((draft) => (draft.id === draftId ? { ...draft, [key]: value } : draft))
+    );
+  }
+
+  /**
+   * Removes one imported flashcard draft from the review queue.
+   *
+   * @param draftId - Local draft identifier.
+   */
+  function removeImportDraft(draftId: string) {
+    setImportDrafts((current) => current.filter((draft) => draft.id !== draftId));
+  }
+
+  /**
+   * Clears the current import review queue.
+   */
+  function clearImportDrafts() {
+    setImportDrafts([]);
+    setImportFileName(null);
+    setImportMessage(null);
+    setError(null);
+  }
+
+  /**
+   * Saves reviewed imported flashcards.
+   */
+  async function saveImportDrafts() {
+    if (importDrafts.length === 0) {
+      setError("No flashcards are ready to import.");
+      return;
+    }
+
+    setIsImporting(true);
+    setImportMessage(null);
+    setError(null);
+
+    try {
+      const result = await importFlashcardsBatch({
+        flashcards: importDrafts.map(toCreateFlashcardRequest)
+      });
+      setImportMessage(formatImportMessage(result.importedCount));
+      setImportDrafts([]);
+      setCurrentPage(1);
+      await loadFlashcards();
+      await props.onChanged();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to import flashcards.");
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
+  /**
    * Saves a selected-card learning session deck.
    *
    * @param event - Form submit event.
@@ -695,140 +828,215 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   }
 
   return (
-    <section className="tracker-page" aria-labelledby="flashcards-title">
-      <div className="section-heading">
-        <div>
+    <section className="flashcards-page" aria-labelledby="flashcards-title">
+      <section className="flashcards-hero panel">
+        <div className="flashcards-hero-copy">
           <p className="eyebrow">Flashcards</p>
           <h2 id="flashcards-title">Cards</h2>
+          <p>Review cards, manage saved sessions, and keep the next repetition close to the surface.</p>
         </div>
-        <div className="editor-actions">
+        <div className="flashcards-hero-actions">
           <button className="secondary-button" type="button" onClick={openNewCard}>
             Add flashcard
+          </button>
+          <label className="secondary-button file-action-button">
+            Batch import
+            <input accept="application/json,.json" type="file" disabled={isImporting} onChange={handleFlashcardImport} />
+          </label>
+          <button className="secondary-button" type="button" onClick={() => setShowImportExample((isShown) => !isShown)}>
+            JSON structure
           </button>
           <button className="secondary-button" type="button" onClick={openNewDeck} disabled={flashcardTotalCount === 0}>
             Create learning session
           </button>
         </div>
-      </div>
-
-      {error ? <p className="error-banner">{error}</p> : null}
-
-      <div className="panel tracker-toolbar" aria-label="Flashcard filters">
-        <label>
-          Search cards
-          <input
-            value={filters.search}
-            onChange={(event) => updateFilters({ search: event.target.value })}
-            placeholder="question, explanation, tag..."
-          />
-        </label>
-
-        <label>
-          Status
-          <select
-            value={filters.status}
-            onChange={(event) => updateFilters({ status: event.target.value as LearningItemStatus | "" })}
-          >
-            <option value="">All</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {formatStatus(status)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Difficulty
-          <select
-            value={filters.difficulty}
-            onChange={(event) => updateFilters({ difficulty: event.target.value as LearningDifficulty | "" })}
-          >
-            <option value="">All</option>
-            {difficulties.map((difficulty) => (
-              <option key={difficulty} value={difficulty}>
-                {difficulty}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <section className="panel data-panel" aria-label="Flashcard records">
-        {isLoadingCards ? (
-          <p className="empty-state">Loading flashcards...</p>
-        ) : flashcards.length ? (
-          <div className="record-table flashcard-table">
-            <div className="record-header">
-              <span>Flashcard</span>
-              <span>Tags</span>
-              <span>Status</span>
-              <span>Difficulty</span>
-              <span>Known</span>
-            </div>
-            {flashcards.map((flashcard) => (
-              <button className="record-row" type="button" key={flashcard.id} onClick={() => openEditCard(flashcard)}>
-                <span>
-                  <strong>{flashcard.title}</strong>
-                  <small>{flashcard.source || "Personal"}</small>
-                </span>
-                <span className="tag-row compact">
-                  {flashcard.tags.length ? flashcard.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
-                </span>
-                <span>{formatStatus(flashcard.status)}</span>
-                <span>{flashcard.difficulty}</span>
-                <span>
-                  {flashcard.knownReviews}/{flashcard.totalReviews}
-                </span>
-              </button>
-            ))}
-            <PaginationBar
-              currentPage={currentPage}
-              label="Flashcards pagination"
-              pageCount={flashcardPageCount}
-              totalCount={flashcardTotalCount}
-              pageSize={flashcardsPageSize}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        ) : (
-          <p className="empty-state">No flashcards match the current filters.</p>
-        )}
+        <div className="flashcards-metric-strip" aria-label="Flashcard metrics">
+          <FlashcardMetric label="Library" value={flashcardTotalCount} detail="cards" />
+          <FlashcardMetric label="Due now" value={visibleDueCount} detail="visible" />
+          <FlashcardMetric label="Saved sessions" value={deckTotalCount} detail="sets" />
+          <FlashcardMetric label="Known rate" value={visibleKnownRate} detail="visible" />
+          <FlashcardMetric label="Runs" value={visibleDeckRunCount} detail="visible sessions" />
+        </div>
       </section>
 
-      <section className="panel data-panel" aria-labelledby="flashcard-decks-title">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Saved sessions</p>
-            <h3 id="flashcard-decks-title">Learning sessions</h3>
+      {error ? <p className="error-banner">{error}</p> : null}
+      {importMessage ? (
+        <p className="success-banner">
+          {importMessage}
+          {importFileName ? ` File: ${importFileName}.` : ""}
+        </p>
+      ) : null}
+      {showImportExample ? (
+        <section className="panel flashcard-import-panel" aria-labelledby="flashcard-import-structure-title">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Batch import</p>
+              <h3 id="flashcard-import-structure-title">JSON structure</h3>
+            </div>
+            <span className="flashcard-count-badge">max 1000 cards</span>
           </div>
-        </div>
+          <pre>
+            <code>{flashcardImportExample}</code>
+          </pre>
+        </section>
+      ) : null}
+      {importDrafts.length ? (
+        <FlashcardImportReviewPanel
+          drafts={importDrafts}
+          fileName={importFileName}
+          isImporting={isImporting}
+          onClear={clearImportDrafts}
+          onImport={() => void saveImportDrafts()}
+          onRemove={removeImportDraft}
+          onUpdate={updateImportDraft}
+        />
+      ) : null}
 
-        <div className="session-filter-panel">
-          <label>
-            Search sessions
-            <input
-              value={deckSearch}
-              onChange={(event) => updateDeckSearch(event.target.value)}
-              placeholder="session name, description, card, tag..."
-            />
-          </label>
-        </div>
+      <div className="flashcards-dashboard-grid">
+        <section className="panel flashcard-board" aria-label="Flashcard records">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Library</p>
+              <h3>Card library</h3>
+            </div>
+            <span className="flashcard-count-badge">{flashcardTotalCount} total</span>
+          </div>
 
-        {isLoadingDecks ? (
-          <p className="empty-state">Loading learning sessions...</p>
-        ) : decks.length ? (
-          <>
-            <ul className="stack-list">
-              {decks.map((deck) => (
-                <li className="list-row flashcard-deck-row" key={deck.id}>
-                  <div>
-                    <strong>{deck.name}</strong>
+          <div className="flashcard-filter-grid" aria-label="Flashcard filters">
+            <label>
+              Search cards
+              <input
+                value={filters.search}
+                onChange={(event) => updateFilters({ search: event.target.value })}
+                placeholder="question, explanation, tag..."
+              />
+            </label>
+
+            <label>
+              Status
+              <select
+                value={filters.status}
+                onChange={(event) => updateFilters({ status: event.target.value as LearningItemStatus | "" })}
+              >
+                <option value="">All</option>
+                {statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {formatStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Difficulty
+              <select
+                value={filters.difficulty}
+                onChange={(event) => updateFilters({ difficulty: event.target.value as LearningDifficulty | "" })}
+              >
+                <option value="">All</option>
+                {difficulties.map((difficulty) => (
+                  <option key={difficulty} value={difficulty}>
+                    {difficulty}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {isLoadingCards ? (
+            <p className="empty-state">Loading flashcards...</p>
+          ) : flashcards.length ? (
+            <div className="flashcard-library">
+              {flashcards.map((flashcard, index) => (
+                <button
+                  className="flashcard-record"
+                  style={{ animationDelay: `${Math.min(index * 28, 220)}ms` }}
+                  type="button"
+                  key={flashcard.id}
+                  onClick={() => openEditCard(flashcard)}
+                >
+                  <span className="flashcard-record-main">
+                    <span className="flashcard-record-title">
+                      <strong>{flashcard.title}</strong>
+                      <span className={`difficulty-pill ${getDifficultyClass(flashcard.difficulty)}`}>
+                        {flashcard.difficulty}
+                      </span>
+                    </span>
+                    <small>{flashcard.source || "Personal"}</small>
+                    <span className="flashcard-question-preview">{flashcard.question}</span>
+                    <span className="tag-row compact">
+                      {flashcard.tags.length ? flashcard.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
+                    </span>
+                  </span>
+                  <span className="flashcard-record-side">
+                    <span className={`status-pill ${getStatusClass(flashcard.status)}`}>{formatStatus(flashcard.status)}</span>
+                    <span className="flashcard-known-meter" aria-label={`${flashcard.title} known review rate`}>
+                      <span style={{ width: calculateKnownRate([flashcard]) }} />
+                    </span>
+                    <small>
+                      {flashcard.knownReviews}/{flashcard.totalReviews} known
+                    </small>
+                  </span>
+                </button>
+              ))}
+              <PaginationBar
+                currentPage={currentPage}
+                label="Flashcards pagination"
+                pageCount={flashcardPageCount}
+                totalCount={flashcardTotalCount}
+                pageSize={flashcardsPageSize}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          ) : (
+            <p className="empty-state">No flashcards match the current filters.</p>
+          )}
+        </section>
+
+        <section className="panel flashcard-session-board" aria-labelledby="flashcard-decks-title">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Saved sessions</p>
+              <h3 id="flashcard-decks-title">Learning sessions</h3>
+            </div>
+          </div>
+
+          <div className="session-filter-panel">
+            <label>
+              Search sessions
+              <input
+                value={deckSearch}
+                onChange={(event) => updateDeckSearch(event.target.value)}
+                placeholder="session name, description, card, tag..."
+              />
+            </label>
+          </div>
+
+          {isLoadingDecks ? (
+            <p className="empty-state">Loading learning sessions...</p>
+          ) : decks.length ? (
+            <>
+              <ul className="flashcard-session-list">
+                {decks.map((deck, index) => (
+                  <li
+                    className="flashcard-session-card"
+                    style={{ animationDelay: `${Math.min(index * 36, 220)}ms` }}
+                    key={deck.id}
+                  >
+                    <div className="flashcard-session-card-header">
+                      <div>
+                        <strong>{deck.name}</strong>
+                        {deck.description ? <small>{deck.description}</small> : null}
+                      </div>
+                      <span className="flashcard-count-badge">{deck.cardCount} cards</span>
+                    </div>
+
                     <div className="session-metrics" aria-label={`${deck.name} session metrics`}>
-                      <span>{deck.cardCount} cards</span>
                       <span>{deck.totalRuns} runs</span>
                       <span>{deck.knownReviews}/{deck.totalReviews} known</span>
+                      <span>{calculateDeckKnownRate(deck)}</span>
                     </div>
+
                     <div className="date-metrics">
                       <span className="date-chip strong-date">
                         Last practiced {deck.lastPracticedAt ? formatDate(deck.lastPracticedAt) : "never"}
@@ -837,42 +1045,44 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                         Next review {deck.nextReviewAt ? formatDate(deck.nextReviewAt) : "not scheduled"}
                       </span>
                     </div>
-                    {deck.description ? <small>{deck.description}</small> : null}
-                  </div>
-                  <label>
-                    Cards
-                    <input
-                      inputMode="numeric"
-                      value={sessionSizes[deck.id] ?? String(deck.defaultSessionSize || 25)}
-                      onChange={(event) => setSessionSizes({ ...sessionSizes, [deck.id]: event.target.value })}
-                    />
-                  </label>
-                  <div className="editor-actions compact-actions">
-                    <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void startStudy(deck)}>
-                      Start
-                    </button>
-                    <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void openEditDeck(deck)}>
-                      Edit
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <PaginationBar
-              currentPage={deckPage}
-              label="Learning sessions pagination"
-              pageCount={deckPageCount}
-              totalCount={deckTotalCount}
-              pageSize={decksPageSize}
-              onPageChange={setDeckPage}
-            />
-          </>
-        ) : flashcardTotalCount ? (
-          <p className="empty-state">No saved learning sessions match the current search.</p>
-        ) : (
-          <p className="empty-state">Create flashcards before saving a learning session.</p>
-        )}
-      </section>
+
+                    <div className="flashcard-session-actions">
+                      <label>
+                        Cards
+                        <input
+                          inputMode="numeric"
+                          value={sessionSizes[deck.id] ?? String(deck.defaultSessionSize || 25)}
+                          onChange={(event) => setSessionSizes({ ...sessionSizes, [deck.id]: event.target.value })}
+                        />
+                      </label>
+                      <div className="editor-actions compact-actions">
+                        <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void startStudy(deck)}>
+                          Start
+                        </button>
+                        <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void openEditDeck(deck)}>
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <PaginationBar
+                currentPage={deckPage}
+                label="Learning sessions pagination"
+                pageCount={deckPageCount}
+                totalCount={deckTotalCount}
+                pageSize={decksPageSize}
+                onPageChange={setDeckPage}
+              />
+            </>
+          ) : flashcardTotalCount ? (
+            <p className="empty-state">No saved learning sessions match the current search.</p>
+          ) : (
+            <p className="empty-state">Create flashcards before saving a learning session.</p>
+          )}
+        </section>
+      </div>
     </section>
   );
 }
@@ -904,6 +1114,178 @@ function PageHeading(props: PageHeadingProps) {
         Back
       </button>
     </div>
+  );
+}
+
+/**
+ * Props accepted by a Flashcard dashboard metric.
+ */
+interface FlashcardMetricProps {
+  /** Metric label. */
+  label: string;
+  /** Primary metric value. */
+  value: number | string;
+  /** Supporting metric detail. */
+  detail: string;
+}
+
+/**
+ * Renders one compact Flashcard dashboard metric.
+ *
+ * @param props - Component props.
+ * @returns A Flashcard metric.
+ */
+function FlashcardMetric(props: FlashcardMetricProps) {
+  return (
+    <article className="flashcards-metric">
+      <span>{props.label}</span>
+      <strong>{props.value}</strong>
+      <small>{props.detail}</small>
+    </article>
+  );
+}
+
+/**
+ * Props accepted by the flashcard import review panel.
+ */
+interface FlashcardImportReviewPanelProps {
+  /** Imported flashcards waiting for review. */
+  drafts: FlashcardImportDraft[];
+  /** Source file name. */
+  fileName: string | null;
+  /** Whether the import is being saved. */
+  isImporting: boolean;
+  /** Clears the review queue. */
+  onClear: () => void;
+  /** Saves all reviewed flashcards. */
+  onImport: () => void;
+  /** Removes one draft. */
+  onRemove: (draftId: string) => void;
+  /** Updates one draft field. */
+  onUpdate: <K extends keyof FlashcardForm>(draftId: string, key: K, value: FlashcardForm[K]) => void;
+}
+
+/**
+ * Renders editable flashcards parsed from a JSON file before saving them.
+ *
+ * @param props - Component props.
+ * @returns The import review panel.
+ */
+function FlashcardImportReviewPanel(props: FlashcardImportReviewPanelProps) {
+  return (
+    <section className="panel flashcard-import-review" aria-labelledby="flashcard-import-review-title">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Review import</p>
+          <h3 id="flashcard-import-review-title">{formatCardCount(props.drafts.length)} ready</h3>
+        </div>
+        <span className="flashcard-count-badge">{props.fileName ?? "JSON file"}</span>
+      </div>
+
+      <div className="flashcard-import-review-actions">
+        <button className="primary-button" type="button" disabled={props.isImporting} onClick={props.onImport}>
+          {props.isImporting ? "Importing..." : "Import reviewed flashcards"}
+        </button>
+        <button className="secondary-button" type="button" disabled={props.isImporting} onClick={props.onClear}>
+          Clear import
+        </button>
+      </div>
+
+      <div className="flashcard-import-draft-list">
+        {props.drafts.map((draft, index) => (
+          <article className="flashcard-import-draft" key={draft.id}>
+            <div className="flashcard-import-draft-heading">
+              <strong>
+                {index + 1}. {draft.title || "Untitled flashcard"}
+              </strong>
+              <button
+                className="danger-button"
+                type="button"
+                disabled={props.isImporting}
+                onClick={() => props.onRemove(draft.id)}
+              >
+                Remove
+              </button>
+            </div>
+
+            <div className="form-grid two-columns">
+              <label>
+                Title
+                <input
+                  value={draft.title}
+                  onChange={(event) => props.onUpdate(draft.id, "title", event.target.value)}
+                  placeholder="Flashcard title"
+                />
+              </label>
+
+              <label>
+                Difficulty
+                <select
+                  value={draft.difficulty}
+                  onChange={(event) => props.onUpdate(draft.id, "difficulty", event.target.value as LearningDifficulty)}
+                >
+                  {difficulties.map((difficulty) => (
+                    <option key={difficulty} value={difficulty}>
+                      {difficulty}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Question
+              <textarea
+                className="medium-textarea expanding-textarea"
+                value={draft.question}
+                onChange={(event) => props.onUpdate(draft.id, "question", event.target.value)}
+                placeholder="Question shown on the front side"
+              />
+            </label>
+
+            <label>
+              Explanation
+              <textarea
+                className="medium-textarea expanding-textarea"
+                value={draft.explanation}
+                onChange={(event) => props.onUpdate(draft.id, "explanation", event.target.value)}
+                placeholder="Explanation shown after flipping"
+              />
+            </label>
+
+            <div className="form-grid two-columns">
+              <label>
+                Source
+                <input
+                  value={draft.source}
+                  onChange={(event) => props.onUpdate(draft.id, "source", event.target.value)}
+                  placeholder="Book, course, article..."
+                />
+              </label>
+
+              <label>
+                Tags
+                <input
+                  value={draft.tagsText}
+                  onChange={(event) => props.onUpdate(draft.id, "tagsText", event.target.value)}
+                  placeholder="tag-one, tag-two"
+                />
+              </label>
+            </div>
+
+            <label>
+              Description
+              <textarea
+                className="medium-textarea expanding-textarea"
+                value={draft.description}
+                onChange={(event) => props.onUpdate(draft.id, "description", event.target.value)}
+                placeholder="Optional short dashboard reminder"
+              />
+            </label>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1209,27 +1591,52 @@ interface StudySessionPageProps {
  */
 function StudySessionPage(props: StudySessionPageProps) {
   const card = props.session.cards[props.session.index];
+  const progress = ((props.session.index + 1) / props.session.cards.length) * 100;
+  const knownCount = props.session.reviews.filter((review) => review.knewAnswer).length;
 
   return (
-    <section className="tracker-page" aria-labelledby="flashcard-study-title">
-      <PageHeading title={props.session.deck.name} onBack={props.onBack} />
+    <section className="flashcard-study-shell" aria-labelledby="flashcard-study-title">
+      <div className="flashcard-study-topbar">
+        <PageHeading title={props.session.deck.name} onBack={props.onBack} />
+        <div className="study-progress" aria-label="Study progress">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+      </div>
 
       <section className="panel flashcard-study-panel">
-        <div className="panel-heading">
+        <div className="flashcard-study-meta">
           <div>
             <p className="eyebrow">
               Card {props.session.index + 1}/{props.session.cards.length}
             </p>
             <h3 id="flashcard-study-title">{card.title}</h3>
           </div>
+          <div className="study-score-strip" aria-label="Current session score">
+            <span>{knownCount} known</span>
+            <span>{props.session.reviews.length - knownCount} missed</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
         </div>
 
-        <button className="flashcard-card" type="button" onClick={props.onFlip}>
-          <span>{props.session.isFlipped ? "Explanation" : "Question"}</span>
-          <strong>{props.session.isFlipped ? card.explanation : card.question}</strong>
+        <button
+          aria-pressed={props.session.isFlipped}
+          className={props.session.isFlipped ? "flashcard-card is-flipped" : "flashcard-card"}
+          type="button"
+          onClick={props.onFlip}
+        >
+          <span className="flashcard-card-inner">
+            <span className="flashcard-card-face flashcard-card-front">
+              <span>Question</span>
+              <strong>{card.question}</strong>
+            </span>
+            <span className="flashcard-card-face flashcard-card-back">
+              <span>Explanation</span>
+              <strong>{card.explanation}</strong>
+            </span>
+          </span>
         </button>
 
-        <div className="editor-actions">
+        <div className="flashcard-study-actions">
           <button className="secondary-button" type="button" onClick={props.onFlip}>
             Flip
           </button>
@@ -1322,6 +1729,26 @@ function toUpdateFlashcardRequest(form: FlashcardForm, flashcard: Flashcard): Up
 }
 
 /**
+ * Creates an editable import draft from a normalized flashcard request.
+ *
+ * @param flashcard - Normalized imported flashcard.
+ * @param index - Zero-based import index.
+ * @returns Editable import draft.
+ */
+function createImportDraft(flashcard: CreateFlashcardRequest, index: number): FlashcardImportDraft {
+  return {
+    id: `import-${Date.now()}-${index}`,
+    title: flashcard.title,
+    question: flashcard.question,
+    explanation: flashcard.explanation,
+    source: flashcard.source ?? "",
+    description: flashcard.description ?? "",
+    difficulty: flashcard.difficulty,
+    tagsText: flashcard.tags.join(", ")
+  };
+}
+
+/**
  * Converts the saved learning session form into an API request.
  *
  * @param form - Editable saved learning session form.
@@ -1339,20 +1766,184 @@ function toSaveFlashcardDeckRequest(form: FlashcardDeckForm) {
 }
 
 /**
- * Selects a due-first subset for one study run.
+ * Parses a flashcard batch import file.
+ *
+ * @param contents - Raw JSON file contents.
+ * @returns A normalized batch import request.
+ */
+function parseFlashcardImport(contents: string): ImportFlashcardBatchRequest {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(contents);
+  } catch {
+    throw new Error("Import file must contain valid JSON.");
+  }
+
+  const rawCards = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed) && Array.isArray(parsed.flashcards)
+      ? parsed.flashcards
+      : null;
+
+  if (!rawCards) {
+    throw new Error("JSON must be an array of flashcards or an object with a flashcards array.");
+  }
+
+  if (rawCards.length === 0) {
+    throw new Error("Import file must include at least one flashcard.");
+  }
+
+  return {
+    flashcards: rawCards.map((card, index) => normalizeImportedFlashcard(card, index + 1))
+  };
+}
+
+/**
+ * Normalizes one imported flashcard.
+ *
+ * @param value - Raw parsed JSON value.
+ * @param index - One-based item index.
+ * @returns A create-flashcard request.
+ */
+function normalizeImportedFlashcard(value: unknown, index: number): CreateFlashcardRequest {
+  if (!isRecord(value)) {
+    throw new Error(`Flashcard ${index} must be a JSON object.`);
+  }
+
+  return {
+    title: readRequiredImportString(value, "title", index),
+    question: readRequiredImportString(value, "question", index),
+    explanation: readRequiredImportString(value, "explanation", index),
+    source: readOptionalImportString(value.source),
+    description: readOptionalImportString(value.description),
+    difficulty: readImportDifficulty(value.difficulty, index),
+    tags: readImportTags(value.tags, index)
+  };
+}
+
+/**
+ * Reads a required string from an imported flashcard.
+ *
+ * @param value - Imported flashcard object.
+ * @param field - Field name to read.
+ * @param index - One-based item index.
+ * @returns The trimmed string value.
+ */
+function readRequiredImportString(value: Record<string, unknown>, field: string, index: number) {
+  const fieldValue = value[field];
+
+  if (typeof fieldValue !== "string" || !fieldValue.trim()) {
+    throw new Error(`Flashcard ${index} requires a non-empty ${field} field.`);
+  }
+
+  return fieldValue.trim();
+}
+
+/**
+ * Reads an optional string from an imported flashcard.
+ *
+ * @param value - Imported value.
+ * @returns The trimmed string or an empty string.
+ */
+function readOptionalImportString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Reads the difficulty from an imported flashcard.
+ *
+ * @param value - Imported difficulty value.
+ * @param index - One-based item index.
+ * @returns The normalized difficulty.
+ */
+function readImportDifficulty(value: unknown, index: number): LearningDifficulty {
+  if (value === undefined || value === null || value === "") {
+    return "Unknown";
+  }
+
+  if (typeof value === "string" && difficulties.includes(value as LearningDifficulty)) {
+    return value as LearningDifficulty;
+  }
+
+  throw new Error(`Flashcard ${index} difficulty must be Unknown, Easy, Medium, or Hard.`);
+}
+
+/**
+ * Reads tags from an imported flashcard.
+ *
+ * @param value - Imported tag value.
+ * @param index - One-based item index.
+ * @returns The normalized tag names.
+ */
+function readImportTags(value: unknown, index: number) {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (!Array.isArray(value) || value.some((tag) => typeof tag !== "string")) {
+    throw new Error(`Flashcard ${index} tags must be an array of strings.`);
+  }
+
+  return value.map((tag) => tag.trim()).filter(Boolean);
+}
+
+/**
+ * Returns whether a parsed JSON value is an object.
+ *
+ * @param value - Parsed JSON value.
+ * @returns True when the value is a record.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Formats a batch import result message.
+ *
+ * @param importedCount - Number of imported cards.
+ * @returns A friendly import message.
+ */
+function formatImportMessage(importedCount: number) {
+  return `Imported ${formatCardCount(importedCount)}.`;
+}
+
+/**
+ * Formats a flashcard count.
+ *
+ * @param count - Number of flashcards.
+ * @returns Human-readable flashcard count.
+ */
+function formatCardCount(count: number) {
+  return count === 1 ? "1 flashcard" : `${count} flashcards`;
+}
+
+/**
+ * Selects a randomized subset for one study run.
  *
  * @param cards - Available deck cards.
  * @param size - Requested study run size.
  * @returns Selected cards for this run.
  */
 function selectStudyCards(cards: Flashcard[], size: number) {
-  return [...cards]
-    .sort((left, right) => {
-      const leftDue = left.nextReviewAt ? new Date(left.nextReviewAt).getTime() : 0;
-      const rightDue = right.nextReviewAt ? new Date(right.nextReviewAt).getTime() : 0;
-      return leftDue - rightDue || left.title.localeCompare(right.title);
-    })
-    .slice(0, size);
+  return shuffleFlashcards(cards).slice(0, size);
+}
+
+/**
+ * Randomizes flashcards using the Fisher-Yates shuffle.
+ *
+ * @param cards - Cards to randomize.
+ * @returns A shuffled copy of the cards.
+ */
+function shuffleFlashcards(cards: Flashcard[]) {
+  const shuffledCards = [...cards];
+
+  for (let index = shuffledCards.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledCards[index], shuffledCards[swapIndex]] = [shuffledCards[swapIndex], shuffledCards[index]];
+  }
+
+  return shuffledCards;
 }
 
 /**
@@ -1465,6 +2056,64 @@ function onlyUnique(value: string, index: number, values: string[]) {
  */
 function formatStatus(status: string) {
   return status.replace(/([A-Z])/g, " $1").trim();
+}
+
+/**
+ * Returns whether a flashcard is due for review.
+ *
+ * @param flashcard - Flashcard to inspect.
+ * @returns True when the card has a due review date in the past.
+ */
+function isDueForReview(flashcard: Flashcard) {
+  return flashcard.nextReviewAt ? new Date(flashcard.nextReviewAt).getTime() <= Date.now() : false;
+}
+
+/**
+ * Calculates a formatted known-answer rate for flashcards.
+ *
+ * @param flashcards - Flashcards to summarize.
+ * @returns A percentage string.
+ */
+function calculateKnownRate(flashcards: Flashcard[]) {
+  const totalReviews = flashcards.reduce((total, flashcard) => total + flashcard.totalReviews, 0);
+
+  if (totalReviews === 0) {
+    return "0%";
+  }
+
+  const knownReviews = flashcards.reduce((total, flashcard) => total + flashcard.knownReviews, 0);
+
+  return `${Math.round((knownReviews / totalReviews) * 100)}%`;
+}
+
+/**
+ * Calculates a formatted known-answer rate for one saved learning session.
+ *
+ * @param deck - Saved learning session summary.
+ * @returns A percentage string.
+ */
+function calculateDeckKnownRate(deck: FlashcardDeckSummary) {
+  return deck.totalReviews === 0 ? "0%" : `${Math.round((deck.knownReviews / deck.totalReviews) * 100)}%`;
+}
+
+/**
+ * Gets the CSS class for a learning item status.
+ *
+ * @param status - Learning item status.
+ * @returns CSS class suffix.
+ */
+function getStatusClass(status: LearningItemStatus) {
+  return `status-${status.toLowerCase()}`;
+}
+
+/**
+ * Gets the CSS class for a learning difficulty.
+ *
+ * @param difficulty - Learning difficulty.
+ * @returns CSS class suffix.
+ */
+function getDifficultyClass(difficulty: LearningDifficulty) {
+  return `difficulty-${difficulty.toLowerCase()}`;
 }
 
 /**

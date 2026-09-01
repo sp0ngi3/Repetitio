@@ -14,6 +14,8 @@ namespace Repetitio.Api.Endpoints;
 /// </summary>
 public static class FlashcardEndpoints
 {
+    private const int MaxBatchImportSize = 1000;
+
     /// <summary>
     /// Adds flashcard endpoints to the application.
     /// </summary>
@@ -28,6 +30,7 @@ public static class FlashcardEndpoints
         group.MapGet("/", GetFlashcardsAsync).WithName("GetFlashcards");
         group.MapGet("/{id:guid}", GetFlashcardAsync).WithName("GetFlashcard");
         group.MapPost("/", CreateFlashcardAsync).WithName("CreateFlashcard");
+        group.MapPost("/batch", ImportFlashcardsBatchAsync).WithName("ImportFlashcardsBatch");
         group.MapPut("/{id:guid}", UpdateFlashcardAsync).WithName("UpdateFlashcard");
         group.MapDelete("/{id:guid}", DeleteFlashcardAsync).WithName("DeleteFlashcard");
         group.MapGet("/decks", GetDecksAsync).WithName("GetFlashcardDecks");
@@ -131,35 +134,70 @@ public static class FlashcardEndpoints
         }
 
         var now = DateTime.UtcNow;
-        var item = new LearningItem
-        {
-            Id = Guid.NewGuid(),
-            Type = LearningItemType.Flashcard,
-            Title = request.Title.Trim(),
-            Description = TrimOptional(request.Description),
-            Status = LearningItemStatus.NotStarted,
-            Difficulty = request.Difficulty,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
+        var flashcard = CreateFlashcardEntity(request, now);
 
-        var flashcard = new Flashcard
-        {
-            LearningItemId = item.Id,
-            LearningItem = item,
-            Question = request.Question.Trim(),
-            Explanation = request.Explanation.Trim(),
-            Source = TrimOptional(request.Source),
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        await TagAttachment.AttachTagsAsync(dbContext, item, request.Tags, now);
-        dbContext.LearningItems.Add(item);
+        await TagAttachment.AttachTagsAsync(dbContext, flashcard.LearningItem, request.Tags, now);
+        dbContext.LearningItems.Add(flashcard.LearningItem);
         dbContext.Flashcards.Add(flashcard);
         await dbContext.SaveChangesAsync();
 
-        return Results.Created($"/api/flashcards/{item.Id}", ToResponse(flashcard));
+        return Results.Created($"/api/flashcards/{flashcard.LearningItemId}", ToResponse(flashcard));
+    }
+
+    /// <summary>
+    /// Imports many flashcards from a JSON payload.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="request">The batch import request.</param>
+    /// <returns>The batch import summary.</returns>
+    private static async Task<IResult> ImportFlashcardsBatchAsync(
+        RepetitioDbContext dbContext,
+        ImportFlashcardBatchRequest request)
+    {
+        var requestedFlashcards = request.Flashcards ?? [];
+        var requestedCount = requestedFlashcards.Count;
+
+        if (requestedCount == 0)
+        {
+            return Results.BadRequest("At least one flashcard is required.");
+        }
+
+        if (requestedCount > MaxBatchImportSize)
+        {
+            return Results.BadRequest($"A single import can contain at most {MaxBatchImportSize} flashcards.");
+        }
+
+        var validation = ValidateFlashcardBatchRequest(requestedFlashcards);
+
+        if (validation is not null)
+        {
+            return Results.BadRequest(validation);
+        }
+
+        var now = DateTime.UtcNow;
+        var importedIds = new List<Guid>(requestedCount);
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+        foreach (var importCard in requestedFlashcards)
+        {
+            var flashcard = CreateFlashcardEntity(importCard, now);
+
+            await TagAttachment.AttachTagsAsync(dbContext, flashcard.LearningItem, importCard.Tags, now);
+            dbContext.LearningItems.Add(flashcard.LearningItem);
+            dbContext.Flashcards.Add(flashcard);
+            importedIds.Add(flashcard.LearningItemId);
+        }
+
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Results.Ok(new ImportFlashcardBatchResponse
+        {
+            RequestedCount = requestedCount,
+            ImportedCount = importedIds.Count,
+            FlashcardIds = importedIds
+        });
     }
 
     /// <summary>
@@ -783,6 +821,60 @@ public static class FlashcardEndpoints
         }
 
         return EndpointValidation.HasText(explanation) ? null : "Explanation is required.";
+    }
+
+    /// <summary>
+    /// Validates all cards in a flashcard batch import.
+    /// </summary>
+    /// <param name="flashcards">The requested flashcards.</param>
+    /// <returns>A validation message when invalid; otherwise, <see langword="null"/>.</returns>
+    private static string? ValidateFlashcardBatchRequest(IEnumerable<CreateFlashcardRequest?> flashcards)
+    {
+        var errors = flashcards
+            .Select((flashcard, index) => new
+            {
+                Index = index + 1,
+                Message = flashcard is null
+                    ? "Flashcard object is required."
+                    : ValidateFlashcardRequest(flashcard.Title, flashcard.Question, flashcard.Explanation)
+            })
+            .Where(result => result.Message is not null)
+            .Select(result => $"Flashcard {result.Index}: {result.Message}")
+            .ToArray();
+
+        return errors.Length == 0 ? null : string.Join(Environment.NewLine, errors);
+    }
+
+    /// <summary>
+    /// Creates a flashcard aggregate from an incoming create request.
+    /// </summary>
+    /// <param name="request">The create request.</param>
+    /// <param name="createdAt">The creation timestamp.</param>
+    /// <returns>The untracked flashcard entity.</returns>
+    private static Flashcard CreateFlashcardEntity(CreateFlashcardRequest request, DateTime createdAt)
+    {
+        var item = new LearningItem
+        {
+            Id = Guid.NewGuid(),
+            Type = LearningItemType.Flashcard,
+            Title = request.Title.Trim(),
+            Description = TrimOptional(request.Description),
+            Status = LearningItemStatus.NotStarted,
+            Difficulty = request.Difficulty,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+
+        return new Flashcard
+        {
+            LearningItemId = item.Id,
+            LearningItem = item,
+            Question = request.Question.Trim(),
+            Explanation = request.Explanation.Trim(),
+            Source = TrimOptional(request.Source),
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
     }
 
     /// <summary>

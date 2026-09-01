@@ -590,6 +590,26 @@ export interface CreateFlashcardRequest {
 }
 
 /**
+ * Represents the payload used to import many flashcards.
+ */
+export interface ImportFlashcardBatchRequest {
+  /** Flashcards to import. */
+  flashcards: CreateFlashcardRequest[];
+}
+
+/**
+ * Represents the result of importing many flashcards.
+ */
+export interface ImportFlashcardBatchResponse {
+  /** Number of flashcards requested by the import. */
+  requestedCount: number;
+  /** Number of flashcards created by the import. */
+  importedCount: number;
+  /** Imported flashcard identifiers. */
+  flashcardIds: string[];
+}
+
+/**
  * Represents the payload used to update a flashcard.
  */
 export interface UpdateFlashcardRequest extends CreateFlashcardRequest {

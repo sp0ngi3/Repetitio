@@ -45,6 +45,38 @@ public record CreateFlashcardRequest
 }
 
 /// <summary>
+/// Represents a batch flashcard import request.
+/// </summary>
+public sealed record ImportFlashcardBatchRequest
+{
+    /// <summary>
+    /// Gets the flashcards to import.
+    /// </summary>
+    public IReadOnlyCollection<CreateFlashcardRequest> Flashcards { get; init; } = [];
+}
+
+/// <summary>
+/// Represents the result of importing flashcards in bulk.
+/// </summary>
+public sealed record ImportFlashcardBatchResponse
+{
+    /// <summary>
+    /// Gets the number of flashcards requested by the import.
+    /// </summary>
+    public required int RequestedCount { get; init; }
+
+    /// <summary>
+    /// Gets the number of flashcards created by the import.
+    /// </summary>
+    public required int ImportedCount { get; init; }
+
+    /// <summary>
+    /// Gets the imported flashcard learning item identifiers.
+    /// </summary>
+    public required IReadOnlyCollection<Guid> FlashcardIds { get; init; }
+}
+
+/// <summary>
 /// Represents the request payload for updating a flashcard.
 /// </summary>
 public sealed record UpdateFlashcardRequest : CreateFlashcardRequest
