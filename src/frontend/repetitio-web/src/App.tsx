@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getBasicExercises, getDashboard, getLearningItems } from "./api";
+import { getBasicExercises, getDashboard, getHealthStatus, getLearningItems } from "./api";
 import { BackupPage } from "./BackupPage";
 import { BasicsPage } from "./BasicsPage";
 import { DsaPage } from "./DsaPage";
@@ -19,6 +19,16 @@ type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | 
 type AppTheme = "light" | "dark";
 
 /**
+ * Database connection states shown in the app shell.
+ */
+type DatabaseConnectionState = "checking" | "connected" | "disconnected";
+
+/**
+ * Interval used to refresh the database connection indicator.
+ */
+const databaseHealthPollMs = 10_000;
+
+/**
  * Renders the Repetitio application shell.
  *
  * @returns The root application component.
@@ -31,6 +41,8 @@ export function App() {
   const [items, setItems] = useState<LearningItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [databaseConnection, setDatabaseConnection] = useState<DatabaseConnectionState>("checking");
+  const [databaseCheckedAt, setDatabaseCheckedAt] = useState<string | null>(null);
 
   /**
    * Reloads dashboard metrics and learning items from the API.
@@ -59,6 +71,44 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
+
+    /**
+     * Refreshes the lightweight database connection status.
+     */
+    async function checkDatabaseConnection() {
+      try {
+        const health = await getHealthStatus();
+
+        if (!isActive) {
+          return;
+        }
+
+        setDatabaseConnection(health.databaseConnected ? "connected" : "disconnected");
+        setDatabaseCheckedAt(health.checkedAt ?? new Date().toISOString());
+      } catch {
+        if (!isActive) {
+          return;
+        }
+
+        setDatabaseConnection("disconnected");
+        setDatabaseCheckedAt(new Date().toISOString());
+      }
+    }
+
+    void checkDatabaseConnection();
+
+    const intervalId = window.setInterval(() => {
+      void checkDatabaseConnection();
+    }, databaseHealthPollMs);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("repetitio-theme", theme);
   }, [theme]);
@@ -84,18 +134,21 @@ export function App() {
           <h1 id="page-title">Repetitio</h1>
         </div>
         <div className="top-bar-actions">
-          <button
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className={`theme-toggle ${theme}`}
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            type="button"
-            onClick={() => setTheme(toggleTheme)}
-          >
-            <span className="theme-toggle-track" aria-hidden="true">
-              <span className="theme-toggle-thumb" />
-            </span>
-            <span>{theme === "dark" ? "Dark" : "Light"}</span>
-          </button>
+          <div className="top-bar-utility-row">
+            <DatabaseConnectionIndicator checkedAt={databaseCheckedAt} state={databaseConnection} />
+            <button
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              className={`theme-toggle ${theme}`}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              type="button"
+              onClick={() => setTheme(toggleTheme)}
+            >
+              <span className="theme-toggle-track" aria-hidden="true">
+                <span className="theme-toggle-thumb" />
+              </span>
+              <span>{theme === "dark" ? "Dark" : "Light"}</span>
+            </button>
+          </div>
           <nav className="app-nav" aria-label="Primary navigation">
             <button className={activePage === "overview" ? "active" : ""} type="button" onClick={() => setActivePage("overview")}>
               Overview
@@ -154,6 +207,45 @@ export function App() {
 
       <NotesCompanion />
     </main>
+  );
+}
+
+/**
+ * Props accepted by the database connection indicator.
+ */
+interface DatabaseConnectionIndicatorProps {
+  /** Current connection state. */
+  state: DatabaseConnectionState;
+  /** Last health check timestamp. */
+  checkedAt: string | null;
+}
+
+/**
+ * Renders a compact database connectivity signal.
+ *
+ * @param props - Component props.
+ * @returns The database connection indicator.
+ */
+function DatabaseConnectionIndicator(props: DatabaseConnectionIndicatorProps) {
+  const label =
+    props.state === "connected" ? "DB online" : props.state === "disconnected" ? "DB offline" : "Checking DB";
+  const ariaLabel =
+    props.state === "connected"
+      ? "Database connected"
+      : props.state === "disconnected"
+        ? "Database disconnected"
+        : "Checking database connection";
+
+  return (
+    <div
+      aria-label={ariaLabel}
+      className={`connection-indicator ${props.state}`}
+      role="status"
+      title={formatConnectionCheck(props.checkedAt)}
+    >
+      <span className="connection-dot" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
   );
 }
 
@@ -259,4 +351,22 @@ function readInitialTheme(): AppTheme {
  */
 function toggleTheme(currentTheme: AppTheme): AppTheme {
   return currentTheme === "dark" ? "light" : "dark";
+}
+
+/**
+ * Formats the last health check timestamp for a tooltip.
+ *
+ * @param checkedAt - Last health check timestamp.
+ * @returns Human-readable health check text.
+ */
+function formatConnectionCheck(checkedAt: string | null) {
+  if (!checkedAt) {
+    return "Database connection has not been checked yet.";
+  }
+
+  return `Last checked ${new Date(checkedAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  })}`;
 }

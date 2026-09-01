@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { createPracticeSession, executeBasicExercise } from "./api";
+import { getPracticeAgeClass } from "./practiceAge";
 import type {
   BasicExercise,
   CreatePracticeSessionRequest,
@@ -510,11 +511,21 @@ export function BasicsPage(props: BasicsPageProps) {
                 <div className="record-table basics-title-table">
                   <div className="record-header">
                     <span>Exercise</span>
+                    <span>Last practiced</span>
                   </div>
                   {pagedExercises.map((exercise) => (
-                    <button className="record-row" type="button" key={exercise.slug} onClick={() => openExercise(exercise)}>
+                    <button
+                      aria-label={exercise.title}
+                      className="record-row"
+                      type="button"
+                      key={exercise.slug}
+                      onClick={() => openExercise(exercise)}
+                    >
                       <span>
                         <strong>{exercise.title}</strong>
+                      </span>
+                      <span className={`date-chip ${getPracticeAgeClass(exercise.lastPracticedAt)}`}>
+                        {exercise.lastPracticedAt ? formatDate(exercise.lastPracticedAt) : "Never practiced"}
                       </span>
                     </button>
                   ))}

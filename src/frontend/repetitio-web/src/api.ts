@@ -18,6 +18,7 @@ import type {
   ExecuteBasicExerciseResponse,
   Flashcard,
   FlashcardDeck,
+  HealthStatus,
   ImportFlashcardBatchRequest,
   ImportFlashcardBatchResponse,
   LearningDifficulty,
@@ -93,6 +94,22 @@ export function getLearningItems(): Promise<LearningItem[]> {
  */
 export function getBasicExercises(): Promise<BasicExercise[]> {
   return requestJson<BasicExercise[]>("/api/basics");
+}
+
+/**
+ * Checks whether the API can reach the database.
+ *
+ * @returns Current API and database health status.
+ */
+export async function getHealthStatus(): Promise<HealthStatus> {
+  const response = await fetch(`${apiBaseUrl}/api/health`);
+
+  if (!response.ok && response.status !== 503) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<HealthStatus>;
 }
 
 /**

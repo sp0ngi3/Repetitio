@@ -24,6 +24,18 @@ export type LearningDifficulty = "Unknown" | "Easy" | "Medium" | "Hard";
 export type PracticeOutcome = "Failed" | "Partial" | "Completed" | "Passed";
 
 /**
+ * Represents the lightweight API health response.
+ */
+export interface HealthStatus {
+  /** Service status reported by the API. */
+  status: string;
+  /** UTC date and time when the health check was created. */
+  checkedAt: string;
+  /** Whether the database connection is reachable from the API. */
+  databaseConnected: boolean;
+}
+
+/**
  * Represents a learning item returned by the API.
  */
 export interface LearningItem {

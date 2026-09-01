@@ -12,6 +12,7 @@ import {
   updateFlashcard,
   updateFlashcardDeck
 } from "./api";
+import { getPracticeAgeClass } from "./practiceAge";
 import type {
   CompleteFlashcardReviewRequest,
   CreateFlashcardRequest,
@@ -1038,7 +1039,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                     </div>
 
                     <div className="date-metrics">
-                      <span className="date-chip strong-date">
+                      <span className={`date-chip strong-date ${getPracticeAgeClass(deck.lastPracticedAt)}`}>
                         Last practiced {deck.lastPracticedAt ? formatDate(deck.lastPracticedAt) : "never"}
                       </span>
                       <span className="date-chip">
@@ -1457,28 +1458,14 @@ function FlashcardDeckFormPanel(props: FlashcardDeckFormPanelProps) {
 
   return (
     <form className="panel flashcard-form" onSubmit={props.onSubmit}>
-      <div className="form-grid two-columns">
-        <label>
-          Session name
-          <input
-            value={props.form.name}
-            onChange={(event) => props.onChange("name", event.target.value)}
-            placeholder="System Design fundamentals"
-          />
-        </label>
-
-        <label>
-          Default cards per run
-          <input
-            inputMode="numeric"
-            min="1"
-            max="200"
-            type="number"
-            value={props.form.defaultSessionSize}
-            onChange={(event) => props.onChange("defaultSessionSize", event.target.value)}
-          />
-        </label>
-      </div>
+      <label>
+        Session name
+        <input
+          value={props.form.name}
+          onChange={(event) => props.onChange("name", event.target.value)}
+          placeholder="System Design fundamentals"
+        />
+      </label>
 
       <label>
         Description

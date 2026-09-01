@@ -19,6 +19,7 @@ import {
   getFlashcardDeck,
   getFlashcardDecks,
   getFlashcards,
+  getHealthStatus,
   getLearningItems,
   getNotePages,
   getSystemDesignProblemTemplate,
@@ -69,6 +70,7 @@ vi.mock("./api", () => ({
   getFlashcardDeck: vi.fn(),
   getFlashcardDecks: vi.fn(),
   getFlashcards: vi.fn(),
+  getHealthStatus: vi.fn(),
   getLearningItems: vi.fn(),
   getNotePages: vi.fn(),
   getSystemDesignProblemTemplate: vi.fn(),
@@ -442,6 +444,11 @@ beforeEach(() => {
   localStorage.clear();
   vi.mocked(getDashboard).mockResolvedValue(dashboard);
   vi.mocked(getBasicExercises).mockResolvedValue(basics);
+  vi.mocked(getHealthStatus).mockResolvedValue({
+    status: "ok",
+    checkedAt: "2026-08-31T12:00:00Z",
+    databaseConnected: true
+  });
   vi.mocked(getLearningItems).mockResolvedValue(learningItems);
   vi.mocked(getDsaProblems).mockResolvedValue(dsaProblems);
   vi.mocked(getDsaProblemTemplate).mockResolvedValue(dsaTemplate);
@@ -859,14 +866,13 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Edit learning session" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Session name"), { target: { value: "Core interview cards" } });
-    fireEvent.change(screen.getByLabelText("Default cards per run"), { target: { value: "30" } });
     fireEvent.click(screen.getByRole("button", { name: "Save learning session" }));
 
     expect(updateFlashcardDeck).toHaveBeenCalledWith(
       "deck-1",
       expect.objectContaining({
         name: "Core interview cards",
-        defaultSessionSize: 30,
+        defaultSessionSize: 25,
         flashcardIds: expect.arrayContaining(["flashcard-1", "flashcard-2"])
       })
     );

@@ -64,6 +64,47 @@ button:disabled {
   gap: 10px;
 }
 
+.top-bar-utility-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.connection-indicator {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d7e1ea;
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #25313a;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 10px 22px rgba(40, 52, 62, 0.08);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.connection-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d39b26;
+  box-shadow: 0 0 0 4px rgba(211, 155, 38, 0.16);
+}
+
+.connection-indicator.connected .connection-dot {
+  background: #1c7a5a;
+  box-shadow: 0 0 0 4px rgba(28, 122, 90, 0.16);
+}
+
+.connection-indicator.disconnected .connection-dot {
+  background: #c83d33;
+  box-shadow: 0 0 0 4px rgba(200, 61, 51, 0.16);
+}
+
 .app-nav {
   display: flex;
   flex-wrap: wrap;
@@ -531,11 +572,15 @@ textarea {
 
 .basics-title-table .record-header,
 .basics-title-table .record-row {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
 }
 
 .basics-title-table .record-row {
   min-height: 54px;
+}
+
+.basics-title-table .date-chip {
+  justify-self: end;
 }
 
 .pagination-bar {
@@ -1275,6 +1320,30 @@ textarea {
   border-color: #b9d5f0;
   color: #225f9f;
   background: #eef7ff;
+}
+
+.date-chip.practice-age-none {
+  border-color: #dfe6ec;
+  color: #65717b;
+  background: #f6f8fa;
+}
+
+.date-chip.practice-age-fresh {
+  border-color: #a8d6bd;
+  color: #176344;
+  background: #edf9f2;
+}
+
+.date-chip.practice-age-warm {
+  border-color: #efcf79;
+  color: #755315;
+  background: #fff7df;
+}
+
+.date-chip.practice-age-stale {
+  border-color: #e5a49d;
+  color: #87291f;
+  background: #fff0ed;
 }
 
 .status-notstarted {
@@ -2210,6 +2279,37 @@ textarea {
   background: #102c22;
 }
 
+[data-theme="dark"] .connection-indicator,
+[data-theme="dark"] .theme-toggle {
+  border-color: #2f3b45;
+  color: #e8edf2;
+  background: #111820;
+}
+
+[data-theme="dark"] .date-chip.practice-age-none {
+  border-color: #2f3b45;
+  color: #9ba8b4;
+  background: #111820;
+}
+
+[data-theme="dark"] .date-chip.practice-age-fresh {
+  border-color: #286144;
+  color: #a7f3cf;
+  background: #102c22;
+}
+
+[data-theme="dark"] .date-chip.practice-age-warm {
+  border-color: #76602b;
+  color: #ffd99a;
+  background: #302512;
+}
+
+[data-theme="dark"] .date-chip.practice-age-stale {
+  border-color: #7f3d38;
+  color: #ffd6d1;
+  background: #371b1d;
+}
+
 [data-theme="dark"] .problem-tabs {
   background: #111820;
 }
@@ -2315,6 +2415,24 @@ textarea {
   .theme-toggle {
     justify-content: space-between;
     width: 100%;
+  }
+
+  .top-bar-utility-row,
+  .connection-indicator {
+    width: 100%;
+  }
+
+  .connection-indicator {
+    justify-content: center;
+  }
+
+  .basics-title-table .record-row,
+  .basics-title-table .record-header {
+    grid-template-columns: 1fr;
+  }
+
+  .basics-title-table .date-chip {
+    justify-self: start;
   }
 
   .flashcard-deck-row {
