@@ -12,6 +12,10 @@ namespace Repetitio.Infrastructure.Backup;
 /// </summary>
 public sealed class RepetitioBackupService : IRepetitioBackupService
 {
+    private const string AutomaticShutdownBackupPrefix = "repetitio-auto-shutdown";
+    private const int AutomaticBackupRetentionCount = 3;
+    private static readonly TimeSpan AutomaticBackupRetentionWindow = TimeSpan.FromDays(3);
+
     private static readonly JsonSerializerOptions ManifestJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -88,6 +92,29 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
         {
             DeleteIfExists(tempDatabasePath);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomaticBackupResult> CreateAutomaticShutdownBackupAsync(CancellationToken cancellationToken = default)
+    {
+        var backup = await ExportAsync(cancellationToken);
+        var backupDirectory = GetBackupDirectoryPath();
+        Directory.CreateDirectory(backupDirectory);
+
+        var createdAt = DateTimeOffset.UtcNow;
+        var fileName = CreateBackupFileName(AutomaticShutdownBackupPrefix, createdAt);
+        var filePath = Path.Combine(backupDirectory, fileName);
+        await File.WriteAllBytesAsync(filePath, backup.Contents, cancellationToken);
+        File.SetLastWriteTimeUtc(filePath, createdAt.UtcDateTime);
+
+        var retainedCount = PruneAutomaticShutdownBackups(backupDirectory, createdAt.UtcDateTime);
+
+        return new AutomaticBackupResult
+        {
+            FileName = fileName,
+            FilePath = filePath,
+            RetainedAutomaticBackupCount = retainedCount
+        };
     }
 
     /// <inheritdoc />
@@ -181,6 +208,43 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
             SqliteConnection.ClearAllPools();
             File.Delete(path);
         }
+    }
+
+    /// <summary>
+    /// Deletes automatic shutdown backups outside the retention policy.
+    /// </summary>
+    /// <param name="backupDirectory">The directory containing backup files.</param>
+    /// <param name="nowUtc">The current UTC timestamp.</param>
+    /// <returns>The number of retained automatic shutdown backup files.</returns>
+    private static int PruneAutomaticShutdownBackups(string backupDirectory, DateTime nowUtc)
+    {
+        var cutoffUtc = nowUtc.Subtract(AutomaticBackupRetentionWindow);
+        var automaticBackups = Directory
+            .EnumerateFiles(backupDirectory, $"{AutomaticShutdownBackupPrefix}-*.zip", SearchOption.TopDirectoryOnly)
+            .Select(path => new FileInfo(path))
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .ToArray();
+
+        foreach (var backup in automaticBackups.Where(file => file.LastWriteTimeUtc < cutoffUtc))
+        {
+            DeleteIfExists(backup.FullName);
+        }
+
+        var retainedBackups = Directory
+            .EnumerateFiles(backupDirectory, $"{AutomaticShutdownBackupPrefix}-*.zip", SearchOption.TopDirectoryOnly)
+            .Select(path => new FileInfo(path))
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .ToArray();
+
+        foreach (var backup in retainedBackups.Skip(AutomaticBackupRetentionCount))
+        {
+            DeleteIfExists(backup.FullName);
+        }
+
+        return Directory.EnumerateFiles(
+            backupDirectory,
+            $"{AutomaticShutdownBackupPrefix}-*.zip",
+            SearchOption.TopDirectoryOnly).Count();
     }
 
     /// <summary>

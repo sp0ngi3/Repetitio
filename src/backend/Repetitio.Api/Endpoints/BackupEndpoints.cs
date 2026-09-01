@@ -21,6 +21,7 @@ public static class BackupEndpoints
 
         group.MapGet("/status", GetStatusAsync).WithName("GetBackupStatus");
         group.MapGet("/export", ExportAsync).WithName("ExportBackup");
+        group.MapPost("/automatic-shutdown", CreateAutomaticShutdownBackupAsync).WithName("CreateAutomaticShutdownBackup");
         group.MapPost("/validate", ValidateAsync).WithName("ValidateBackup").DisableAntiforgery();
         group.MapPost("/import", ImportAsync).WithName("ImportBackup").DisableAntiforgery();
 
@@ -61,6 +62,26 @@ public static class BackupEndpoints
         var backup = await backupService.ExportAsync(cancellationToken);
 
         return Results.File(backup.Contents, "application/zip", backup.FileName);
+    }
+
+    /// <summary>
+    /// Creates an automatic shutdown backup and applies automatic backup retention.
+    /// </summary>
+    /// <param name="backupService">The backup service.</param>
+    /// <param name="cancellationToken">A token used to cancel the request.</param>
+    /// <returns>The automatic backup response.</returns>
+    private static async Task<IResult> CreateAutomaticShutdownBackupAsync(
+        IRepetitioBackupService backupService,
+        CancellationToken cancellationToken)
+    {
+        var backup = await backupService.CreateAutomaticShutdownBackupAsync(cancellationToken);
+
+        return Results.Ok(new AutomaticBackupResponse
+        {
+            FileName = backup.FileName,
+            FilePath = backup.FilePath,
+            RetainedAutomaticBackupCount = backup.RetainedAutomaticBackupCount
+        });
     }
 
     /// <summary>

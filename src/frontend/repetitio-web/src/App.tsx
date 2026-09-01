@@ -14,12 +14,18 @@ import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from ".
 type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "notes" | "settings";
 
 /**
+ * Visual themes supported by the application shell.
+ */
+type AppTheme = "light" | "dark";
+
+/**
  * Renders the Repetitio application shell.
  *
  * @returns The root application component.
  */
 export function App() {
   const [activePage, setActivePage] = useState<AppPage>("overview");
+  const [theme, setTheme] = useState<AppTheme>(readInitialTheme);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [basicExercises, setBasicExercises] = useState<BasicExercise[]>([]);
   const [items, setItems] = useState<LearningItem[]>([]);
@@ -51,6 +57,11 @@ export function App() {
   useEffect(() => {
     void refreshData();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("repetitio-theme", theme);
+  }, [theme]);
 
   const groupedCounts = useMemo(() => {
     return items.reduce<Record<LearningItemType, number>>(
@@ -105,6 +116,9 @@ export function App() {
             onClick={() => setActivePage("settings")}
           >
             Settings
+          </button>
+          <button className="theme-toggle" type="button" onClick={() => setTheme(toggleTheme)}>
+            {theme === "dark" ? "Light mode" : "Dark mode"}
           </button>
         </nav>
       </section>
@@ -215,4 +229,23 @@ function Metric(props: { label: string; value: number }) {
  */
 function formatType(type: LearningItemType) {
   return type === "Dsa" ? "DSA" : type === "SystemDesign" ? "System Design" : type === "Flashcard" ? "Flashcard" : "Basics";
+}
+
+/**
+ * Reads the saved application theme from local storage.
+ *
+ * @returns The initial application theme.
+ */
+function readInitialTheme(): AppTheme {
+  return localStorage.getItem("repetitio-theme") === "dark" ? "dark" : "light";
+}
+
+/**
+ * Toggles the application theme.
+ *
+ * @param currentTheme - Current application theme.
+ * @returns The next application theme.
+ */
+function toggleTheme(currentTheme: AppTheme): AppTheme {
+  return currentTheme === "dark" ? "light" : "dark";
 }

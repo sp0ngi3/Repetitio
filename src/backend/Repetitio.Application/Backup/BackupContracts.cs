@@ -74,6 +74,27 @@ public sealed record BackupValidationResponse
 }
 
 /// <summary>
+/// Represents an automatic shutdown backup response.
+/// </summary>
+public sealed record AutomaticBackupResponse
+{
+    /// <summary>
+    /// Gets the automatic backup file name.
+    /// </summary>
+    public required string FileName { get; init; }
+
+    /// <summary>
+    /// Gets the full automatic backup file path.
+    /// </summary>
+    public required string FilePath { get; init; }
+
+    /// <summary>
+    /// Gets the number of retained automatic backups after cleanup.
+    /// </summary>
+    public required int RetainedAutomaticBackupCount { get; init; }
+}
+
+/// <summary>
 /// Represents an import backup response.
 /// </summary>
 public sealed record ImportBackupResponse

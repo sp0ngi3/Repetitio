@@ -437,6 +437,7 @@ const backupStatus = {
  * Configures default API mocks before each component test.
  */
 beforeEach(() => {
+  localStorage.clear();
   vi.mocked(getDashboard).mockResolvedValue(dashboard);
   vi.mocked(getBasicExercises).mockResolvedValue(basics);
   vi.mocked(getLearningItems).mockResolvedValue(learningItems);
@@ -580,6 +581,19 @@ describe("App", () => {
 
     expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeInTheDocument();
     expect(await screen.findByText("Learning areas")).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that the application shell can switch to dark mode.
+   */
+  it("toggles dark mode", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Dark mode" }));
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(localStorage.getItem("repetitio-theme")).toBe("dark");
+    expect(screen.getByRole("button", { name: "Light mode" })).toBeInTheDocument();
   });
 
   /**

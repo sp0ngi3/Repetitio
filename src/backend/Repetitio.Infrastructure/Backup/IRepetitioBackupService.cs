@@ -20,6 +20,13 @@ public interface IRepetitioBackupService
     Task<BackupExport> ExportAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Creates a retained automatic shutdown backup on disk.
+    /// </summary>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The automatic backup result.</returns>
+    Task<AutomaticBackupResult> CreateAutomaticShutdownBackupAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Validates a backup archive without importing it.
     /// </summary>
     /// <param name="backupStream">The backup archive stream.</param>
@@ -81,6 +88,27 @@ public sealed record BackupExport
     /// Gets the backup manifest.
     /// </summary>
     public required BackupManifest Manifest { get; init; }
+}
+
+/// <summary>
+/// Represents an automatic backup written to the local backup directory.
+/// </summary>
+public sealed record AutomaticBackupResult
+{
+    /// <summary>
+    /// Gets the automatic backup file name.
+    /// </summary>
+    public required string FileName { get; init; }
+
+    /// <summary>
+    /// Gets the full automatic backup file path.
+    /// </summary>
+    public required string FilePath { get; init; }
+
+    /// <summary>
+    /// Gets the number of retained automatic backups after cleanup.
+    /// </summary>
+    public required int RetainedAutomaticBackupCount { get; init; }
 }
 
 /// <summary>

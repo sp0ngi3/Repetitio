@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http.Json;
 
 namespace Repetitio.Launcher;
 
@@ -8,6 +9,7 @@ namespace Repetitio.Launcher;
 internal static class Program
 {
     private const string FrontendUrl = "http://localhost:3000";
+    private const string AutomaticShutdownBackupUrl = "http://localhost:8080/api/backup/automatic-shutdown";
 
     /// <summary>
     /// Runs the launcher command.
@@ -91,9 +93,11 @@ internal static class Program
     /// </summary>
     /// <param name="workspace">The Repetitio workspace root.</param>
     /// <returns>The process exit code.</returns>
-    private static Task<int> StopAsync(string workspace)
+    private static async Task<int> StopAsync(string workspace)
     {
-        return RunDockerComposeAsync(workspace, "down");
+        await CreateAutomaticShutdownBackupAsync();
+
+        return await RunDockerComposeAsync(workspace, "down");
     }
 
     /// <summary>
@@ -116,6 +120,42 @@ internal static class Program
     private static Task<int> StatusAsync(string workspace)
     {
         return RunDockerComposeAsync(workspace, "ps");
+    }
+
+    /// <summary>
+    /// Requests a retained automatic backup before stopping the local stack.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    private static async Task CreateAutomaticShutdownBackupAsync()
+    {
+        try
+        {
+            using var httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(12)
+            };
+
+            using var response = await httpClient.PostAsync(AutomaticShutdownBackupUrl, content: null);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Automatic backup skipped: API returned {(int)response.StatusCode}.");
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<AutomaticBackupResponse>();
+            Console.WriteLine(result is null
+                ? "Automatic backup created."
+                : $"Automatic backup created: {result.FileName}. Retained automatic backups: {result.RetainedAutomaticBackupCount}/3.");
+        }
+        catch (HttpRequestException)
+        {
+            Console.WriteLine("Automatic backup skipped: API is not reachable.");
+        }
+        catch (TaskCanceledException)
+        {
+            Console.WriteLine("Automatic backup skipped: API did not respond in time.");
+        }
     }
 
     /// <summary>
@@ -260,5 +300,21 @@ internal static class Program
         {
             writer.WriteLine(line);
         }
+    }
+
+    /// <summary>
+    /// Represents the automatic backup API response.
+    /// </summary>
+    private sealed record AutomaticBackupResponse
+    {
+        /// <summary>
+        /// Gets the automatic backup file name.
+        /// </summary>
+        public string FileName { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Gets the number of retained automatic backups.
+        /// </summary>
+        public int RetainedAutomaticBackupCount { get; init; }
     }
 }

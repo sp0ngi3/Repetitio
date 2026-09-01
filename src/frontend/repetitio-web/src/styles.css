@@ -76,6 +76,12 @@ button:disabled {
   font-weight: 800;
 }
 
+.theme-toggle {
+  border-color: #1f2428;
+  color: #ffffff;
+  background: #1f2428;
+}
+
 .app-nav button.active,
 .secondary-button {
   border-color: #3478c7;
@@ -1345,6 +1351,188 @@ textarea {
 
 .system-design-document-textarea:focus {
   min-height: 680px;
+}
+
+[data-theme="dark"] {
+  color: #e8edf2;
+  background: #101418;
+}
+
+[data-theme="dark"] body {
+  background:
+    linear-gradient(180deg, rgba(15, 19, 23, 0.94), rgba(17, 22, 27, 0.98)),
+    #101418;
+}
+
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] .metric-card strong,
+[data-theme="dark"] .item-meta dd,
+[data-theme="dark"] .problem-document h4,
+[data-theme="dark"] .attempt-stats dd,
+[data-theme="dark"] .execution-summary strong,
+[data-theme="dark"] .test-result-row strong,
+[data-theme="dark"] .test-result-row > span {
+  color: #f2f6fa;
+}
+
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .item-card,
+[data-theme="dark"] .notes-companion {
+  border-color: #2b3640;
+  background: #171d23;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="dark"] .app-nav button,
+[data-theme="dark"] .secondary-button,
+[data-theme="dark"] .danger-button,
+[data-theme="dark"] .tag-filter-chip,
+[data-theme="dark"] .pagination-button,
+[data-theme="dark"] .note-area-tabs button {
+  border-color: #35424d;
+  color: #dce5ec;
+  background: #1d252c;
+}
+
+[data-theme="dark"] .app-nav button.active,
+[data-theme="dark"] .secondary-button,
+[data-theme="dark"] .tag-filter-chip.active,
+[data-theme="dark"] .note-area-tabs button.active {
+  border-color: #5aa2ee;
+  color: #081018;
+  background: #7bbcff;
+}
+
+[data-theme="dark"] .theme-toggle {
+  border-color: #dce5ec;
+  color: #101418;
+  background: #f2f6fa;
+}
+
+[data-theme="dark"] .danger-button {
+  border-color: #7f3d38;
+  color: #ffd6d1;
+  background: #371b1d;
+}
+
+[data-theme="dark"] .eyebrow,
+[data-theme="dark"] .metric-card span,
+[data-theme="dark"] .list-row span,
+[data-theme="dark"] .item-card p,
+[data-theme="dark"] .record-header,
+[data-theme="dark"] .record-row small,
+[data-theme="dark"] .problem-row small,
+[data-theme="dark"] .picker-row small,
+[data-theme="dark"] .muted-copy,
+[data-theme="dark"] .pagination-bar,
+[data-theme="dark"] .validation-box span,
+[data-theme="dark"] .validation-box small,
+[data-theme="dark"] .autosave-state,
+[data-theme="dark"] label {
+  color: #a9b6c2;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea,
+[data-theme="dark"] .signature,
+[data-theme="dark"] .empty-state,
+[data-theme="dark"] .example-block,
+[data-theme="dark"] .solution-box,
+[data-theme="dark"] .card-picker-toolbar > span,
+[data-theme="dark"] .selected-card-strip,
+[data-theme="dark"] .flashcard-picker-list,
+[data-theme="dark"] .date-chip,
+[data-theme="dark"] .session-metrics span,
+[data-theme="dark"] .backup-status-list div,
+[data-theme="dark"] .validation-box,
+[data-theme="dark"] .execution-panel,
+[data-theme="dark"] .test-result-row,
+[data-theme="dark"] .attempt-stats div,
+[data-theme="dark"] .flashcard-card {
+  border-color: #2f3b45;
+  color: #e8edf2;
+  background: #111820;
+}
+
+[data-theme="dark"] .list-row,
+[data-theme="dark"] .record-row,
+[data-theme="dark"] .picker-row,
+[data-theme="dark"] .problem-row,
+[data-theme="dark"] .basics-filter-panel,
+[data-theme="dark"] .pagination-bar,
+[data-theme="dark"] .problem-tabs,
+[data-theme="dark"] .solution-peek {
+  border-color: #2b3640;
+}
+
+[data-theme="dark"] .problem-row,
+[data-theme="dark"] .record-row {
+  color: #e8edf2;
+  background: transparent;
+}
+
+[data-theme="dark"] .record-row:hover {
+  background: #1b242c;
+}
+
+[data-theme="dark"] .problem-row.active,
+[data-theme="dark"] .problem-row:hover {
+  border-color: #5aa2ee;
+  background: #182535;
+  box-shadow: 0 0 0 3px rgba(90, 162, 238, 0.16);
+}
+
+[data-theme="dark"] .count-strip span,
+[data-theme="dark"] .tag-row span {
+  border-color: #35424d;
+  color: #dce5ec;
+  background: #1d252c;
+}
+
+[data-theme="dark"] .difficulty-pill,
+[data-theme="dark"] .status-pill.ready,
+[data-theme="dark"] .autosave-state.saved {
+  color: #a7f3cf;
+  background: #123327;
+}
+
+[data-theme="dark"] .problem-score,
+[data-theme="dark"] .status-pill.warning {
+  color: #ffd99a;
+  background: #3a2a14;
+}
+
+[data-theme="dark"] .error-banner,
+[data-theme="dark"] .validation-box.invalid,
+[data-theme="dark"] .execution-panel.failed,
+[data-theme="dark"] .autosave-state.error {
+  border-color: #7f3d38;
+  color: #ffd6d1;
+  background: #371b1d;
+}
+
+[data-theme="dark"] .validation-box.valid,
+[data-theme="dark"] .execution-panel.passed {
+  border-color: #286144;
+  background: #102c22;
+}
+
+[data-theme="dark"] .problem-tabs {
+  background: #111820;
+}
+
+[data-theme="dark"] .problem-tabs button {
+  color: #a9b6c2;
+}
+
+[data-theme="dark"] .problem-tabs button.active {
+  color: #f2f6fa;
+  background: #171d23;
+  box-shadow: inset 0 -2px 0 #7bbcff;
 }
 
 @media (max-width: 900px) {
