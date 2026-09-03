@@ -53,6 +53,21 @@ public sealed record ImportFlashcardBatchRequest
     /// Gets the flashcards to import.
     /// </summary>
     public IReadOnlyCollection<CreateFlashcardRequest> Flashcards { get; init; } = [];
+
+    /// <summary>
+    /// Gets a value indicating whether saved learning sessions should be created from the imported flashcards.
+    /// </summary>
+    public bool CreateLearningSessions { get; init; }
+
+    /// <summary>
+    /// Gets the optional base name for automatically created saved learning sessions.
+    /// </summary>
+    public string? LearningSessionName { get; init; }
+
+    /// <summary>
+    /// Gets the maximum number of imported flashcards in one automatically created saved learning session.
+    /// </summary>
+    public int LearningSessionSize { get; init; } = 25;
 }
 
 /// <summary>
@@ -74,6 +89,11 @@ public sealed record ImportFlashcardBatchResponse
     /// Gets the imported flashcard learning item identifiers.
     /// </summary>
     public required IReadOnlyCollection<Guid> FlashcardIds { get; init; }
+
+    /// <summary>
+    /// Gets the saved learning sessions created from the imported flashcards.
+    /// </summary>
+    public required IReadOnlyCollection<FlashcardDeckSummaryResponse> CreatedLearningSessions { get; init; }
 }
 
 /// <summary>

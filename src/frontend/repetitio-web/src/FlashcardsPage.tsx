@@ -105,6 +105,18 @@ interface FlashcardImportDraft extends FlashcardForm {
 }
 
 /**
+ * Batch import saved learning session options.
+ */
+interface FlashcardImportSessionForm {
+  /** Whether to create saved learning sessions from imported cards. */
+  createLearningSessions: boolean;
+  /** Base name used for automatically created saved learning sessions. */
+  learningSessionName: string;
+  /** Maximum number of imported cards per saved learning session. */
+  learningSessionSize: string;
+}
+
+/**
  * Active study session state.
  */
 interface StudySession {
@@ -141,6 +153,15 @@ const emptyDeckForm: FlashcardDeckForm = {
   description: "",
   defaultSessionSize: "25",
   selectedCardIds: []
+};
+
+/**
+ * Initial batch import saved learning session options.
+ */
+const emptyImportSessionForm: FlashcardImportSessionForm = {
+  createLearningSessions: false,
+  learningSessionName: "",
+  learningSessionSize: "25"
 };
 
 /**
@@ -217,6 +238,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   const [importFileName, setImportFileName] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importDrafts, setImportDrafts] = useState<FlashcardImportDraft[]>([]);
+  const [importSessionForm, setImportSessionForm] = useState<FlashcardImportSessionForm>(emptyImportSessionForm);
   const [showImportExample, setShowImportExample] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debouncedCardSearch = useDebouncedValue(filters.search, searchDebounceMs);
@@ -292,6 +314,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
     try {
       const response = await getFlashcards({
         search: debouncedPickerSearch,
+        sort: "priority",
         page: pickerPage,
         pageSize: deckPickerPageSize
       });
@@ -550,6 +573,11 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
     try {
       const payload = parseFlashcardImport(await file.text());
       setImportDrafts(payload.flashcards.map((flashcard, index) => createImportDraft(flashcard, index)));
+      setImportSessionForm({
+        createLearningSessions: false,
+        learningSessionName: createImportSessionName(file.name),
+        learningSessionSize: "25"
+      });
       setImportMessage(`Loaded ${formatCardCount(payload.flashcards.length)} from ${file.name}. Review before importing.`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to import flashcards.");
@@ -589,7 +617,21 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
     setImportDrafts([]);
     setImportFileName(null);
     setImportMessage(null);
+    setImportSessionForm(emptyImportSessionForm);
     setError(null);
+  }
+
+  /**
+   * Updates one batch import saved learning session option.
+   *
+   * @param key - Field to update.
+   * @param value - New field value.
+   */
+  function updateImportSessionForm<K extends keyof FlashcardImportSessionForm>(
+    key: K,
+    value: FlashcardImportSessionForm[K]
+  ) {
+    setImportSessionForm((current) => ({ ...current, [key]: value }));
   }
 
   /**
@@ -607,12 +649,16 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
 
     try {
       const result = await importFlashcardsBatch({
-        flashcards: importDrafts.map(toCreateFlashcardRequest)
+        flashcards: importDrafts.map(toCreateFlashcardRequest),
+        ...toImportLearningSessionRequest(importSessionForm)
       });
-      setImportMessage(formatImportMessage(result.importedCount));
+      setImportMessage(formatImportMessage(result.importedCount, result.createdLearningSessions.length));
       setImportDrafts([]);
+      setImportSessionForm(emptyImportSessionForm);
       setCurrentPage(1);
+      setDeckPage(1);
       await loadFlashcards();
+      await loadDecks();
       await props.onChanged();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to import flashcards.");
@@ -885,10 +931,12 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
         <FlashcardImportReviewPanel
           drafts={importDrafts}
           fileName={importFileName}
+          sessionForm={importSessionForm}
           isImporting={isImporting}
           onClear={clearImportDrafts}
           onImport={() => void saveImportDrafts()}
           onRemove={removeImportDraft}
+          onSessionFormChange={updateImportSessionForm}
           onUpdate={updateImportDraft}
         />
       ) : null}
@@ -1156,12 +1204,19 @@ interface FlashcardImportReviewPanelProps {
   fileName: string | null;
   /** Whether the import is being saved. */
   isImporting: boolean;
+  /** Saved learning session options for this import. */
+  sessionForm: FlashcardImportSessionForm;
   /** Clears the review queue. */
   onClear: () => void;
   /** Saves all reviewed flashcards. */
   onImport: () => void;
   /** Removes one draft. */
   onRemove: (draftId: string) => void;
+  /** Updates one import saved learning session option. */
+  onSessionFormChange: <K extends keyof FlashcardImportSessionForm>(
+    key: K,
+    value: FlashcardImportSessionForm[K]
+  ) => void;
   /** Updates one draft field. */
   onUpdate: <K extends keyof FlashcardForm>(draftId: string, key: K, value: FlashcardForm[K]) => void;
 }
@@ -1190,6 +1245,44 @@ function FlashcardImportReviewPanel(props: FlashcardImportReviewPanelProps) {
         <button className="secondary-button" type="button" disabled={props.isImporting} onClick={props.onClear}>
           Clear import
         </button>
+      </div>
+
+      <div className="flashcard-import-session-options">
+        <label className="checkbox-row">
+          <input
+            checked={props.sessionForm.createLearningSessions}
+            type="checkbox"
+            disabled={props.isImporting}
+            onChange={(event) => props.onSessionFormChange("createLearningSessions", event.target.checked)}
+          />
+          <span>Create learning session from this import</span>
+        </label>
+
+        {props.sessionForm.createLearningSessions ? (
+          <div className="form-grid two-columns">
+            <label>
+              Session name
+              <input
+                value={props.sessionForm.learningSessionName}
+                disabled={props.isImporting}
+                onChange={(event) => props.onSessionFormChange("learningSessionName", event.target.value)}
+                placeholder="Imported flashcards"
+              />
+            </label>
+
+            <label>
+              Cards per session
+              <input
+                min="1"
+                max="200"
+                type="number"
+                value={props.sessionForm.learningSessionSize}
+                disabled={props.isImporting}
+                onChange={(event) => props.onSessionFormChange("learningSessionSize", event.target.value)}
+              />
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <div className="flashcard-import-draft-list">
@@ -1523,6 +1616,7 @@ function FlashcardDeckFormPanel(props: FlashcardDeckFormPanelProps) {
                   <small>
                     {flashcard.source || "Personal"} · {flashcard.tags.map((tag) => `#${tag}`).join(" ")}
                   </small>
+                  <small>{formatFlashcardPickerMeta(flashcard)}</small>
                 </span>
               </label>
             ))}
@@ -1753,6 +1847,22 @@ function toSaveFlashcardDeckRequest(form: FlashcardDeckForm) {
 }
 
 /**
+ * Converts import saved learning session options into an API request patch.
+ *
+ * @param form - Import saved learning session options.
+ * @returns Import request session fields.
+ */
+function toImportLearningSessionRequest(form: FlashcardImportSessionForm) {
+  const sessionSize = Number(form.learningSessionSize);
+
+  return {
+    createLearningSessions: form.createLearningSessions,
+    learningSessionName: form.learningSessionName.trim(),
+    learningSessionSize: Number.isFinite(sessionSize) ? sessionSize : 25
+  };
+}
+
+/**
  * Parses a flashcard batch import file.
  *
  * @param contents - Raw JSON file contents.
@@ -1891,8 +2001,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * @param importedCount - Number of imported cards.
  * @returns A friendly import message.
  */
-function formatImportMessage(importedCount: number) {
-  return `Imported ${formatCardCount(importedCount)}.`;
+function formatImportMessage(importedCount: number, createdLearningSessionCount: number) {
+  const sessionMessage =
+    createdLearningSessionCount === 0
+      ? ""
+      : ` Created ${createdLearningSessionCount === 1 ? "1 learning session" : `${createdLearningSessionCount} learning sessions`}.`;
+
+  return `Imported ${formatCardCount(importedCount)}.${sessionMessage}`;
 }
 
 /**
@@ -1914,6 +2029,36 @@ function formatCardCount(count: number) {
  */
 function selectStudyCards(cards: Flashcard[], size: number) {
   return shuffleFlashcards(cards).slice(0, size);
+}
+
+/**
+ * Creates a default saved learning session name from an import file name.
+ *
+ * @param fileName - Selected import file name.
+ * @returns A readable session name.
+ */
+function createImportSessionName(fileName: string) {
+  const withoutExtension = fileName.replace(/\.[^.]+$/, "").trim();
+
+  return withoutExtension ? `Imported ${withoutExtension}` : "Imported flashcards";
+}
+
+/**
+ * Formats priority metadata for cards in the learning session picker.
+ *
+ * @param flashcard - Flashcard to summarize.
+ * @returns Compact priority detail.
+ */
+function formatFlashcardPickerMeta(flashcard: Flashcard) {
+  if (isDueForReview(flashcard) && flashcard.nextReviewAt) {
+    return `Due ${formatDate(flashcard.nextReviewAt)}`;
+  }
+
+  if (!flashcard.lastPracticedAt) {
+    return "New card";
+  }
+
+  return flashcard.confidence ? `Confidence ${flashcard.confidence}/5` : "Needs signal";
 }
 
 /**

@@ -271,6 +271,7 @@ export function getFlashcards(filters: {
   status?: LearningItemStatus | "";
   difficulty?: LearningDifficulty | "";
   search?: string;
+  sort?: "priority";
   page?: number;
   pageSize?: number;
 } = {}): Promise<PagedFlashcardResponse> {
@@ -286,6 +287,10 @@ export function getFlashcards(filters: {
 
   if (filters.search?.trim()) {
     query.set("search", filters.search.trim());
+  }
+
+  if (filters.sort) {
+    query.set("sort", filters.sort);
   }
 
   if (filters.page) {

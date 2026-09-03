@@ -977,6 +977,15 @@ textarea {
   width: auto;
 }
 
+.flashcard-import-session-options {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
 .flashcard-import-draft-list {
   display: grid;
   max-height: 72vh;

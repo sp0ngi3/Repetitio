@@ -15,6 +15,7 @@ namespace Repetitio.Api.Endpoints;
 public static class FlashcardEndpoints
 {
     private const int MaxBatchImportSize = 1000;
+    private const string PriorityFlashcardSort = "priority";
 
     /// <summary>
     /// Adds flashcard endpoints to the application.
@@ -58,6 +59,7 @@ public static class FlashcardEndpoints
         LearningItemStatus? status,
         LearningDifficulty? difficulty,
         string? search,
+        string? sort,
         int page = 1,
         int pageSize = 10)
     {
@@ -87,10 +89,7 @@ public static class FlashcardEndpoints
         var normalizedPage = NormalizePage(page);
         var normalizedPageSize = NormalizePageSize(pageSize);
         var totalCount = await query.CountAsync();
-        var flashcards = await query
-            .OrderBy(flashcard => flashcard.LearningItem.NextReviewAt == null)
-            .ThenBy(flashcard => flashcard.LearningItem.NextReviewAt)
-            .ThenBy(flashcard => flashcard.LearningItem.Title)
+        var flashcards = await ApplyFlashcardSort(query, sort)
             .Skip((normalizedPage - 1) * normalizedPageSize)
             .Take(normalizedPageSize)
             .ToListAsync();
@@ -167,6 +166,11 @@ public static class FlashcardEndpoints
             return Results.BadRequest($"A single import can contain at most {MaxBatchImportSize} flashcards.");
         }
 
+        if (request.CreateLearningSessions && !IsValidDefaultSessionSize(request.LearningSessionSize))
+        {
+            return Results.BadRequest("Learning session size must be between 1 and 200.");
+        }
+
         var validation = ValidateFlashcardBatchRequest(requestedFlashcards);
 
         if (validation is not null)
@@ -176,6 +180,7 @@ public static class FlashcardEndpoints
 
         var now = DateTime.UtcNow;
         var importedIds = new List<Guid>(requestedCount);
+        var createdLearningSessions = new List<FlashcardDeck>();
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
@@ -189,6 +194,16 @@ public static class FlashcardEndpoints
             importedIds.Add(flashcard.LearningItemId);
         }
 
+        if (request.CreateLearningSessions)
+        {
+            createdLearningSessions.AddRange(CreateImportedLearningSessions(
+                importedIds,
+                request.LearningSessionName,
+                request.LearningSessionSize,
+                now));
+            dbContext.FlashcardDecks.AddRange(createdLearningSessions);
+        }
+
         await dbContext.SaveChangesAsync();
         await transaction.CommitAsync();
 
@@ -196,7 +211,8 @@ public static class FlashcardEndpoints
         {
             RequestedCount = requestedCount,
             ImportedCount = importedIds.Count,
-            FlashcardIds = importedIds
+            FlashcardIds = importedIds,
+            CreatedLearningSessions = createdLearningSessions.Select(ToDeckSummaryResponse).ToArray()
         });
     }
 
@@ -609,6 +625,40 @@ public static class FlashcardEndpoints
     }
 
     /// <summary>
+    /// Applies the requested flashcard ordering.
+    /// </summary>
+    /// <param name="query">The flashcard query to sort.</param>
+    /// <param name="sort">The requested sort mode.</param>
+    /// <returns>The sorted flashcard query.</returns>
+    private static IOrderedQueryable<Flashcard> ApplyFlashcardSort(IQueryable<Flashcard> query, string? sort)
+    {
+        if (string.Equals(sort, PriorityFlashcardSort, StringComparison.OrdinalIgnoreCase))
+        {
+            var now = DateTime.UtcNow;
+
+            return query
+                .OrderByDescending(flashcard =>
+                    flashcard.LearningItem.NextReviewAt != null && flashcard.LearningItem.NextReviewAt <= now)
+                .ThenBy(flashcard => flashcard.LearningItem.Confidence ?? 0)
+                .ThenByDescending(flashcard =>
+                    flashcard.LearningItem.Difficulty == LearningDifficulty.Hard
+                        ? 3
+                        : flashcard.LearningItem.Difficulty == LearningDifficulty.Medium
+                            ? 2
+                            : flashcard.LearningItem.Difficulty == LearningDifficulty.Easy
+                                ? 1
+                                : 0)
+                .ThenByDescending(flashcard => flashcard.LearningItem.CreatedAt)
+                .ThenBy(flashcard => flashcard.LearningItem.Title);
+        }
+
+        return query
+            .OrderBy(flashcard => flashcard.LearningItem.NextReviewAt == null)
+            .ThenBy(flashcard => flashcard.LearningItem.NextReviewAt)
+            .ThenBy(flashcard => flashcard.LearningItem.Title);
+    }
+
+    /// <summary>
     /// Creates the common deck query with selected flashcards.
     /// </summary>
     /// <param name="dbContext">The database context.</param>
@@ -649,6 +699,44 @@ public static class FlashcardEndpoints
                 SortOrder = sortOrder++
             });
         }
+    }
+
+    /// <summary>
+    /// Creates one or more saved learning sessions from imported flashcard identifiers.
+    /// </summary>
+    /// <param name="cardIds">The imported flashcard identifiers in import order.</param>
+    /// <param name="requestedName">The requested base saved session name.</param>
+    /// <param name="sessionSize">The maximum number of cards per saved session.</param>
+    /// <param name="createdAt">The creation timestamp.</param>
+    /// <returns>The created saved learning session definitions.</returns>
+    private static IReadOnlyCollection<FlashcardDeck> CreateImportedLearningSessions(
+        IReadOnlyList<Guid> cardIds,
+        string? requestedName,
+        int sessionSize,
+        DateTime createdAt)
+    {
+        var sessionCount = (int)Math.Ceiling(cardIds.Count / (double)sessionSize);
+        var baseName = TrimOptional(requestedName) ?? "Imported flashcards";
+        var decks = new List<FlashcardDeck>(sessionCount);
+
+        for (var index = 0; index < sessionCount; index++)
+        {
+            var chunk = cardIds.Skip(index * sessionSize).Take(sessionSize).ToArray();
+            var deck = new FlashcardDeck
+            {
+                Id = Guid.NewGuid(),
+                Name = sessionCount == 1 ? baseName : $"{baseName} {index + 1}",
+                Description = $"Created from batch import on {createdAt:yyyy-MM-dd}.",
+                DefaultSessionSize = sessionSize,
+                CreatedAt = createdAt,
+                UpdatedAt = createdAt
+            };
+
+            AddDeckCards(deck, chunk);
+            decks.Add(deck);
+        }
+
+        return decks;
     }
 
     /// <summary>
@@ -771,6 +859,30 @@ public static class FlashcardEndpoints
                 .OrderBy(deckCard => deckCard.SortOrder)
                 .Select(deckCard => ToResponse(deckCard.Flashcard))
                 .ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Converts a deck into a list summary response.
+    /// </summary>
+    /// <param name="deck">The deck.</param>
+    /// <returns>The saved session summary.</returns>
+    private static FlashcardDeckSummaryResponse ToDeckSummaryResponse(FlashcardDeck deck)
+    {
+        return new FlashcardDeckSummaryResponse
+        {
+            Id = deck.Id,
+            Name = deck.Name,
+            Description = deck.Description,
+            CardCount = deck.Cards.Count,
+            DefaultSessionSize = deck.DefaultSessionSize,
+            TotalRuns = deck.TotalRuns,
+            TotalReviews = deck.Reviews.Count,
+            KnownReviews = deck.Reviews.Count(review => review.KnewAnswer),
+            LastPracticedAt = deck.LastPracticedAt,
+            NextReviewAt = deck.NextReviewAt,
+            CreatedAt = deck.CreatedAt,
+            UpdatedAt = deck.UpdatedAt
         };
     }
 

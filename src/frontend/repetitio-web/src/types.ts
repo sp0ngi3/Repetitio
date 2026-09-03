@@ -607,6 +607,12 @@ export interface CreateFlashcardRequest {
 export interface ImportFlashcardBatchRequest {
   /** Flashcards to import. */
   flashcards: CreateFlashcardRequest[];
+  /** Whether saved learning sessions should be created from imported flashcards. */
+  createLearningSessions?: boolean;
+  /** Optional base name for automatically created saved learning sessions. */
+  learningSessionName?: string;
+  /** Maximum number of imported flashcards in one automatically created saved learning session. */
+  learningSessionSize?: number;
 }
 
 /**
@@ -619,6 +625,8 @@ export interface ImportFlashcardBatchResponse {
   importedCount: number;
   /** Imported flashcard identifiers. */
   flashcardIds: string[];
+  /** Saved learning sessions created from the imported flashcards. */
+  createdLearningSessions: FlashcardDeckSummary[];
 }
 
 /**

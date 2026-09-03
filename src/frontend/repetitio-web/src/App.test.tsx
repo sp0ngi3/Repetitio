@@ -542,7 +542,8 @@ beforeEach(() => {
   vi.mocked(importFlashcardsBatch).mockResolvedValue({
     requestedCount: 1,
     importedCount: 1,
-    flashcardIds: ["flashcard-imported-1"]
+    flashcardIds: ["flashcard-imported-1"],
+    createdLearningSessions: []
   });
   vi.mocked(updateFlashcard).mockResolvedValue(flashcards[0]);
   vi.mocked(deleteFlashcard).mockResolvedValue();
@@ -833,8 +834,92 @@ describe("App", () => {
           difficulty: "Medium",
           tags: ["networking", "tcp"]
         }
+      ],
+      createLearningSessions: false,
+      learningSessionName: "Imported flashcards",
+      learningSessionSize: 25
+    });
+  });
+
+  /**
+   * Verifies that Flashcard batch imports can create split learning sessions.
+   */
+  it("creates split learning sessions from imported flashcards", async () => {
+    vi.mocked(importFlashcardsBatch).mockResolvedValueOnce({
+      requestedCount: 2,
+      importedCount: 2,
+      flashcardIds: ["flashcard-imported-1", "flashcard-imported-2"],
+      createdLearningSessions: [
+        {
+          id: "deck-import-1",
+          name: "Imported interview-cards 1",
+          description: "Created from batch import on 2026-09-03.",
+          cardCount: 1,
+          defaultSessionSize: 1,
+          totalRuns: 0,
+          totalReviews: 0,
+          knownReviews: 0,
+          lastPracticedAt: null,
+          nextReviewAt: null,
+          createdAt: "2026-09-03T12:00:00Z",
+          updatedAt: "2026-09-03T12:00:00Z"
+        },
+        {
+          id: "deck-import-2",
+          name: "Imported interview-cards 2",
+          description: "Created from batch import on 2026-09-03.",
+          cardCount: 1,
+          defaultSessionSize: 1,
+          totalRuns: 0,
+          totalReviews: 0,
+          knownReviews: 0,
+          lastPracticedAt: null,
+          nextReviewAt: null,
+          createdAt: "2026-09-03T12:00:00Z",
+          updatedAt: "2026-09-03T12:00:00Z"
+        }
       ]
     });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+
+    const file = new File(
+      [
+        JSON.stringify([
+          {
+            title: "DNS",
+            question: "What does DNS resolve?",
+            explanation: "Names to addresses.",
+            difficulty: "Easy"
+          },
+          {
+            title: "TLS",
+            question: "What does TLS protect?",
+            explanation: "Transport confidentiality and integrity.",
+            difficulty: "Medium"
+          }
+        ])
+      ],
+      "interview-cards.json",
+      { type: "application/json" }
+    );
+
+    fireEvent.change(screen.getByLabelText("Batch import"), { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Create learning session from this import" }));
+    fireEvent.change(screen.getByLabelText("Cards per session"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Import reviewed flashcards" }));
+
+    expect(await screen.findByText(/Created 2 learning sessions/i)).toBeInTheDocument();
+    expect(importFlashcardsBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createLearningSessions: true,
+        learningSessionName: "Imported interview-cards",
+        learningSessionSize: 1
+      })
+    );
   });
 
   /**
