@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
@@ -6,6 +6,7 @@ import {
   createFlashcard,
   createFlashcardDeck,
   createNotePage,
+  createPracticeSession,
   deleteFlashcard,
   deleteFlashcardDeck,
   deleteNotePage,
@@ -292,8 +293,8 @@ const dsaProblems: DsaProblem[] = [
     status: "InProgress",
     difficulty: "Easy",
     confidence: 3,
-    lastPracticedAt: null,
-    nextReviewAt: null,
+    lastPracticedAt: "2026-08-24T12:00:00Z",
+    nextReviewAt: "2026-08-31T12:00:00Z",
     totalAttempts: 2,
     successfulAttempts: 1,
     source: "LeetCode",
@@ -302,18 +303,35 @@ const dsaProblems: DsaProblem[] = [
     problemStatement: null,
     testCases: null,
     assumptions: null,
-    approach: null,
-    notes: null,
-    whatHelped: null,
-    whatWasDifficult: null,
-    improveNext: null,
+    approach: "Use a stack and match every closing bracket with the top opener.",
+    notes: "Remember to reject closing brackets when the stack is empty.",
+    whatHelped: "Mapping closers to openers.",
+    whatWasDifficult: "Empty stack edge cases.",
+    improveNext: "Name the guard clauses first.",
     knowledgeChecklist: null,
     questionsToAsk: null,
     missedMentalSteps: null,
     expectedTimeComplexity: "O(n)",
     expectedSpaceComplexity: "O(n)",
     solutions: [],
-    practiceSessions: []
+    practiceSessions: [
+      {
+        id: "dsa-attempt-1",
+        learningItemId: "dsa-1",
+        learningItemTitle: "Valid Parentheses",
+        startedAt: "2026-08-24T12:00:00Z",
+        completedAt: "2026-08-24T12:25:00Z",
+        durationMs: 1500000,
+        outcome: "Completed",
+        confidence: 3,
+        notes: "Missed the odd length shortcut.",
+        sourceCode: "public bool IsValid(string s) => true;",
+        whatHelped: "Stack invariant.",
+        whatWasDifficult: "Bracket map setup.",
+        improveNext: "Write edge cases before code.",
+        createdAt: "2026-08-24T12:25:00Z"
+      }
+    ]
   }
 ];
 
@@ -662,7 +680,39 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Problems" })).toBeInTheDocument();
     expect(await screen.findByText("Valid Parentheses")).toBeInTheDocument();
+    expect(screen.getByText("Due now")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add problem" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that DSA repeat attempts start fresh while history keeps prior reflection.
+   */
+  it("opens DSA detail with a fresh attempt and full prior attempt history", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "DSA" }));
+    fireEvent.click(await screen.findByText("Valid Parentheses"));
+
+    expect(await screen.findByRole("heading", { name: "Attempt problem" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Approach")).toHaveValue("");
+    expect(screen.getByLabelText("Notes")).toHaveValue("");
+    expect(screen.getByText("Reveal saved approach and notes")).toBeInTheDocument();
+    expect(screen.getByText("Missed the odd length shortcut.")).toBeInTheDocument();
+    expect(screen.getByText("public bool IsValid(string s) => true;")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Fresh repeat notes." } });
+    fireEvent.change(screen.getByLabelText("Source code"), { target: { value: "public bool IsValid(string s) => false;" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save attempt" }));
+
+    await waitFor(() => {
+      expect(createPracticeSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          learningItemId: "dsa-1",
+          notes: "Fresh repeat notes.",
+          sourceCode: "public bool IsValid(string s) => false;"
+        })
+      );
+    });
   });
 
   /**

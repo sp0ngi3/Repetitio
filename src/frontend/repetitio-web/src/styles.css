@@ -528,6 +528,17 @@ textarea {
   width: 100%;
 }
 
+.dsa-table .record-header,
+.dsa-table .record-row {
+  grid-template-columns:
+    minmax(220px, 1.35fr)
+    minmax(150px, 0.9fr)
+    minmax(130px, 0.55fr)
+    minmax(130px, 0.55fr)
+    minmax(105px, 0.45fr)
+    minmax(78px, 0.35fr);
+}
+
 .system-design-table .record-header,
 .system-design-table .record-row {
   grid-template-columns: minmax(260px, 1.5fr) minmax(190px, 1fr) minmax(110px, 0.6fr) minmax(110px, 0.55fr) minmax(90px, 0.4fr);
@@ -787,7 +798,7 @@ textarea {
 
 .attempt-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
   margin: 0;
 }
@@ -809,6 +820,85 @@ textarea {
   margin: 4px 0 0;
   color: #24313a;
   font-weight: 900;
+}
+
+.attempt-stats .date-chip {
+  display: inline-flex;
+}
+
+.memory-peek {
+  border: 1px solid #e1e6eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.attempt-history-entry {
+  border: 1px solid #e1e6eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.attempt-history-entry summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attempt-history-entry summary span:last-child {
+  color: #65717b;
+  font-size: 0.84rem;
+}
+
+.attempt-history-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.history-field {
+  border: 1px solid #e1e6eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfe;
+}
+
+.history-field strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #25313a;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.history-field p {
+  margin-bottom: 0;
+  color: #3e4a53;
+  white-space: pre-wrap;
+}
+
+.compact-empty {
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.solution-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.solution-meta span {
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 4px 8px;
+  color: #52616c;
+  background: #fbfcfe;
+  font-size: 0.82rem;
+  font-weight: 850;
 }
 
 .solution-box {
@@ -2209,6 +2299,10 @@ textarea {
 [data-theme="dark"] .empty-state,
 [data-theme="dark"] .example-block,
 [data-theme="dark"] .solution-box,
+[data-theme="dark"] .memory-peek,
+[data-theme="dark"] .attempt-history-entry,
+[data-theme="dark"] .history-field,
+[data-theme="dark"] .solution-meta span,
 [data-theme="dark"] .card-picker-toolbar > span,
 [data-theme="dark"] .selected-card-strip,
 [data-theme="dark"] .flashcard-picker-list,
@@ -2232,8 +2326,20 @@ textarea {
 [data-theme="dark"] .basics-filter-panel,
 [data-theme="dark"] .pagination-bar,
 [data-theme="dark"] .problem-tabs,
+[data-theme="dark"] .memory-peek,
+[data-theme="dark"] .attempt-history-entry,
+[data-theme="dark"] .history-field,
 [data-theme="dark"] .solution-peek {
   border-color: #2b3640;
+}
+
+[data-theme="dark"] .history-field strong {
+  color: #dce5ec;
+}
+
+[data-theme="dark"] .history-field p,
+[data-theme="dark"] .attempt-history-entry summary span:last-child {
+  color: #a9b6c2;
 }
 
 [data-theme="dark"] .problem-row,
@@ -2408,9 +2514,20 @@ textarea {
 
   .record-row,
   .record-header,
+  .dsa-table .record-row,
+  .dsa-table .record-header,
   .system-design-table .record-row,
   .system-design-table .record-header {
     grid-template-columns: 1fr;
+  }
+
+  .dsa-table .date-chip {
+    width: fit-content;
+  }
+
+  .attempt-history-entry summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .app-nav {

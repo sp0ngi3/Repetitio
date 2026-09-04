@@ -8,6 +8,7 @@ import {
   getDsaProblems,
   updateDsaProblem
 } from "./api";
+import { getPracticeAgeClass, getReviewDueClass } from "./practiceAge";
 import type {
   CreateDsaProblemRequest,
   CreateDsaSolutionRequest,
@@ -17,6 +18,7 @@ import type {
   LearningDifficulty,
   LearningItemStatus,
   PracticeOutcome,
+  PracticeSession,
   UpdateDsaProblemRequest
 } from "./types";
 
@@ -236,7 +238,7 @@ export function DsaPage({ onChanged }: DsaPageProps) {
   function openProblem(problem: DsaProblem) {
     setSelectedProblemId(problem.id);
     setProblemForm(createProblemFormFromProblem(problem));
-    setAttemptForm(createAttemptFormFromProblem(problem));
+    setAttemptForm(emptyAttemptForm);
     setSolutionForm(emptySolutionForm);
     setView("detail");
     setError(null);
@@ -360,7 +362,7 @@ export function DsaPage({ onChanged }: DsaPageProps) {
         whatWasDifficult: attemptForm.whatWasDifficult.trim() || selectedProblem.whatWasDifficult || "",
         improveNext: attemptForm.improveNext.trim() || selectedProblem.improveNext || ""
       });
-      await createPracticeSession(toPracticeRequest(selectedProblem.id, attemptForm));
+      await createPracticeSession(toPracticeRequest(selectedProblem.id, attemptForm, solutionForm.sourceCode));
 
       if (solutionForm.sourceCode.trim()) {
         await createDsaSolution(selectedProblem.id, {
@@ -535,28 +537,37 @@ function DsaDashboard(props: DsaDashboardProps) {
         {props.isLoading ? (
           <p className="empty-state">Loading DSA problems...</p>
         ) : props.problems.length ? (
-          <div className="record-table">
+          <div className="record-table dsa-table">
             <div className="record-header">
               <span>Problem</span>
               <span>Tags</span>
+              <span>Last practiced</span>
+              <span>Next review</span>
               <span>Status</span>
-              <span>Difficulty</span>
-              <span>Times solved</span>
+              <span>Solved</span>
             </div>
-            {props.problems.map((problem) => (
-              <button className="record-row" type="button" key={problem.id} onClick={() => props.onOpen(problem)}>
-                <span>
-                  <strong>{problem.title}</strong>
-                  <small>{problem.source || "Personal"} {problem.nextReviewAt ? `· ${formatDate(problem.nextReviewAt)}` : ""}</small>
-                </span>
-                <span className="tag-row compact">
-                  {problem.tags.length ? problem.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
-                </span>
-                <span>{formatStatus(problem.status)}</span>
-                <span>{problem.difficulty}</span>
-                <span>{problem.successfulAttempts}</span>
-              </button>
-            ))}
+            {props.problems.map((problem) => {
+              const lastPracticedClass = getPracticeAgeClass(problem.lastPracticedAt);
+              const nextReviewClass = getReviewDueClass(problem.nextReviewAt, problem.lastPracticedAt);
+
+              return (
+                <button className="record-row" type="button" key={problem.id} onClick={() => props.onOpen(problem)}>
+                  <span>
+                    <strong>{problem.title}</strong>
+                    <small>
+                      {problem.source || "Personal"} · {problem.difficulty}
+                    </small>
+                  </span>
+                  <span className="tag-row compact">
+                    {problem.tags.length ? problem.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
+                  </span>
+                  <span className={`date-chip ${lastPracticedClass}`}>{formatLastPracticed(problem.lastPracticedAt)}</span>
+                  <span className={`date-chip ${nextReviewClass}`}>{formatNextReview(problem)}</span>
+                  <span>{formatStatus(problem.status)}</span>
+                  <span>{problem.successfulAttempts}/{Math.max(problem.totalAttempts, problem.successfulAttempts)}</span>
+                </button>
+              );
+            })}
           </div>
         ) : (
           <p className="empty-state">No DSA problems yet.</p>
@@ -693,7 +704,25 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
               <dt>Difficulty</dt>
               <dd>{props.problem.difficulty}</dd>
             </div>
+            <div>
+              <dt>Last practiced</dt>
+              <dd>
+                <span className={`date-chip ${getPracticeAgeClass(props.problem.lastPracticedAt)}`}>
+                  {formatLastPracticed(props.problem.lastPracticedAt)}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>Next review</dt>
+              <dd>
+                <span className={`date-chip ${getReviewDueClass(props.problem.nextReviewAt, props.problem.lastPracticedAt)}`}>
+                  {formatNextReview(props.problem)}
+                </span>
+              </dd>
+            </div>
           </dl>
+
+          <SavedProblemMemory problem={props.problem} />
 
           <form className="attempt-form" onSubmit={props.onAttemptSubmit}>
             <div className="form-grid two-columns">
@@ -1054,6 +1083,31 @@ interface AttemptHistoryProps {
 }
 
 /**
+ * Renders previously saved problem-level memory behind an explicit reveal.
+ *
+ * @param props - Component props.
+ * @returns The saved memory section.
+ */
+function SavedProblemMemory(props: AttemptHistoryProps) {
+  if (!hasAnyText(props.problem.approach, props.problem.notes, props.problem.whatHelped, props.problem.whatWasDifficult, props.problem.improveNext)) {
+    return null;
+  }
+
+  return (
+    <details className="solution-peek memory-peek">
+      <summary>Reveal saved approach and notes</summary>
+      <div className="attempt-history-grid">
+        <HistoryField label="Approach" value={props.problem.approach} />
+        <HistoryField label="Notes" value={props.problem.notes} />
+        <HistoryField label="What helped" value={props.problem.whatHelped} />
+        <HistoryField label="What was difficult" value={props.problem.whatWasDifficult} />
+        <HistoryField label="Improve next" value={props.problem.improveNext} />
+      </div>
+    </details>
+  );
+}
+
+/**
  * Renders prior attempts and saved solutions.
  *
  * @param props - Component props.
@@ -1064,17 +1118,33 @@ function AttemptHistory(props: AttemptHistoryProps) {
     <div className="history-panel">
       <h3>History</h3>
       {props.problem.practiceSessions.length ? (
-        <ul className="stack-list">
+        <div className="detail-stack">
           {props.problem.practiceSessions.map((session) => (
-            <li className="list-row" key={session.id}>
-              <div>
-                <strong>{formatStatus(session.outcome)}</strong>
-                <span>{formatDate(session.startedAt)}</span>
-              </div>
-              <span className="confidence">{session.confidence ? `${session.confidence}/5` : "No confidence"}</span>
-            </li>
+            <details className="solution-peek attempt-history-entry" key={session.id}>
+              <summary>
+                <span>
+                  {formatStatus(session.outcome)} · {formatDateTime(session.startedAt)}
+                </span>
+                <span>{formatAttemptMeta(session)}</span>
+              </summary>
+              {hasAnyText(session.notes, session.whatHelped, session.whatWasDifficult, session.improveNext) ? (
+                <div className="attempt-history-grid">
+                  <HistoryField label="Notes" value={session.notes} />
+                  <HistoryField label="What helped" value={session.whatHelped} />
+                  <HistoryField label="What was difficult" value={session.whatWasDifficult} />
+                  <HistoryField label="Improve next" value={session.improveNext} />
+                </div>
+              ) : (
+                <p className="empty-state compact-empty">No reflection captured for this attempt.</p>
+              )}
+              {session.sourceCode ? (
+                <pre>
+                  <code>{session.sourceCode}</code>
+                </pre>
+              ) : null}
+            </details>
           ))}
-        </ul>
+        </div>
       ) : (
         <p className="empty-state">No attempts yet.</p>
       )}
@@ -1087,6 +1157,12 @@ function AttemptHistory(props: AttemptHistoryProps) {
                 {solution.language} · {formatDate(solution.createdAt)}
               </summary>
               {solution.explanation ? <p>{solution.explanation}</p> : null}
+              {solution.timeComplexity || solution.spaceComplexity ? (
+                <div className="solution-meta">
+                  {solution.timeComplexity ? <span>Time {solution.timeComplexity}</span> : null}
+                  {solution.spaceComplexity ? <span>Space {solution.spaceComplexity}</span> : null}
+                </div>
+              ) : null}
               <pre>
                 <code>{solution.sourceCode}</code>
               </pre>
@@ -1094,6 +1170,35 @@ function AttemptHistory(props: AttemptHistoryProps) {
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Props accepted by a history field.
+ */
+interface HistoryFieldProps {
+  /** Field label. */
+  label: string;
+  /** Optional field value. */
+  value?: string | null;
+}
+
+/**
+ * Renders one non-empty reflection field.
+ *
+ * @param props - Component props.
+ * @returns A labeled history field when it has content.
+ */
+function HistoryField(props: HistoryFieldProps) {
+  if (!hasText(props.value)) {
+    return null;
+  }
+
+  return (
+    <div className="history-field">
+      <strong>{props.label}</strong>
+      <p>{props.value}</p>
     </div>
   );
 }
@@ -1132,23 +1237,6 @@ function createProblemFormFromProblem(problem: DsaProblem): DsaProblemForm {
     assumptions: problem.assumptions ?? "",
     expectedTimeComplexity: problem.expectedTimeComplexity ?? "",
     expectedSpaceComplexity: problem.expectedSpaceComplexity ?? ""
-  };
-}
-
-/**
- * Creates an attempt form from an existing DSA problem.
- *
- * @param problem - Existing DSA problem.
- * @returns Editable DSA attempt form.
- */
-function createAttemptFormFromProblem(problem: DsaProblem): DsaAttemptForm {
-  return {
-    ...emptyAttemptForm,
-    approach: problem.approach ?? "",
-    notes: problem.notes ?? "",
-    whatHelped: problem.whatHelped ?? "",
-    whatWasDifficult: problem.whatWasDifficult ?? "",
-    improveNext: problem.improveNext ?? ""
   };
 }
 
@@ -1202,9 +1290,10 @@ function toUpdateProblemRequest(form: DsaProblemForm, problem: DsaProblem): Upda
  *
  * @param problemId - DSA problem identifier.
  * @param form - Editable attempt form.
+ * @param sourceCode - Optional source code captured during the attempt.
  * @returns Practice session creation payload.
  */
-function toPracticeRequest(problemId: string, form: DsaAttemptForm): CreatePracticeSessionRequest {
+function toPracticeRequest(problemId: string, form: DsaAttemptForm, sourceCode?: string): CreatePracticeSessionRequest {
   const durationMinutes = Number(form.durationMinutes);
   const durationMs = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes * 60 * 1000 : undefined;
 
@@ -1214,10 +1303,117 @@ function toPracticeRequest(problemId: string, form: DsaAttemptForm): CreatePract
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
     notes: form.notes.trim(),
+    sourceCode: sourceCode?.trim() || undefined,
     whatHelped: form.whatHelped.trim(),
     whatWasDifficult: form.whatWasDifficult.trim(),
     improveNext: form.improveNext.trim()
   };
+}
+
+/**
+ * Formats the last practice timestamp for dashboard display.
+ *
+ * @param value - Last practice timestamp.
+ * @returns Human-readable last practice text.
+ */
+function formatLastPracticed(value?: string | null) {
+  return value ? formatDate(value) : "Never";
+}
+
+/**
+ * Formats the next review state for dashboard display.
+ *
+ * @param problem - DSA problem with review metadata.
+ * @returns Human-readable review text.
+ */
+function formatNextReview(problem: DsaProblem) {
+  if (!problem.nextReviewAt) {
+    return problem.lastPracticedAt ? "Not scheduled" : "Start now";
+  }
+
+  const reviewAt = new Date(problem.nextReviewAt).getTime();
+
+  if (!Number.isFinite(reviewAt)) {
+    return "Not scheduled";
+  }
+
+  return reviewAt <= Date.now() ? "Due now" : formatDate(problem.nextReviewAt);
+}
+
+/**
+ * Formats an attempt timestamp with date and time.
+ *
+ * @param value - ISO date value.
+ * @returns Human-readable date and time text.
+ */
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "Unknown date";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+/**
+ * Formats compact attempt metadata for history summaries.
+ *
+ * @param session - Practice session.
+ * @returns Compact confidence and duration text.
+ */
+function formatAttemptMeta(session: PracticeSession) {
+  const confidence = session.confidence ? `${session.confidence}/5` : "No confidence";
+  const duration = formatDuration(session.durationMs);
+
+  return duration ? `${confidence} · ${duration}` : confidence;
+}
+
+/**
+ * Formats a duration in milliseconds.
+ *
+ * @param durationMs - Duration in milliseconds.
+ * @returns Human-readable duration when present.
+ */
+function formatDuration(durationMs?: number | null) {
+  if (!durationMs || durationMs <= 0) {
+    return "";
+  }
+
+  const minutes = Math.round(durationMs / 60000);
+
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
+/**
+ * Checks whether optional text contains visible characters.
+ *
+ * @param value - Optional text value.
+ * @returns True when the value contains text.
+ */
+function hasText(value?: string | null) {
+  return Boolean(value?.trim());
+}
+
+/**
+ * Checks whether any optional text value contains visible characters.
+ *
+ * @param values - Optional text values.
+ * @returns True when at least one value contains text.
+ */
+function hasAnyText(...values: Array<string | null | undefined>) {
+  return values.some(hasText);
 }
 
 /**
