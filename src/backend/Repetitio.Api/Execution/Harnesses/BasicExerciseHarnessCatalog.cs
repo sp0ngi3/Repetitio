@@ -13,23 +13,19 @@ public static class BasicExerciseHarnessCatalog
     {
         return
         [
-            new BasicExerciseHarness("two-pointers-two-sum-sorted", """
-        results.Add(RunArray("middle plus end", [1, 4], () => Solution.TwoSumSorted([1, 2, 4, 6, 8], 10)));
-        results.Add(RunArray("no pair", [-1, -1], () => Solution.TwoSumSorted([1, 3, 5], 20)));
-        results.Add(RunArray("negative plus positive", [0, 3], () => Solution.TwoSumSorted([-5, -2, 0, 7], 2)));
-        results.Add(RunArray("duplicates", [0, 1], () => Solution.TwoSumSorted([2, 2, 3], 4)));
-        results.Add(RunArray("empty", [-1, -1], () => Solution.TwoSumSorted([], 1)));
-        results.Add(RunArray("single", [-1, -1], () => Solution.TwoSumSorted([5], 5)));
-        results.Add(RunArray("duplicate at right side", [1, 2], () => Solution.TwoSumSorted([1, 4, 4], 8)));
-        results.Add(RunArray("outer values", [0, 3], () => Solution.TwoSumSorted([-3, -1, 2, 4], 1)));
-        results.Add(RunArray("zero target missing", [-1, -1], () => Solution.TwoSumSorted([0, 1, 2, 3], 0)));
-        results.Add(RunArray("negative target", [0, 1], () => Solution.TwoSumSorted([-10, -4, -1], -14)));
-"""),
-            new BasicExerciseHarness("linked-list-insert", """
+            new BasicExerciseHarness("linked-list-insert-at-head", """
         results.Add(RunList("insert head into empty", [1], () => Solution.InsertAtHead(BuildList([]), 1)));
         results.Add(RunList("insert head into existing", [1, 2, 3], () => Solution.InsertAtHead(BuildList([2, 3]), 1)));
+        results.Add(RunList("insert before single node", [5, 10], () => Solution.InsertAtHead(BuildList([10]), 5)));
+        results.Add(RunList("insert negative value", [-2, -1, 0], () => Solution.InsertAtHead(BuildList([-1, 0]), -2)));
+""", includeLinkedListHelpers: true),
+            new BasicExerciseHarness("linked-list-insert-at-end", """
         results.Add(RunList("insert end into empty", [1], () => Solution.InsertAtEnd(BuildList([]), 1)));
         results.Add(RunList("insert end into existing", [1, 2, 3], () => Solution.InsertAtEnd(BuildList([1, 2]), 3)));
+        results.Add(RunList("insert after single node", [7, 8], () => Solution.InsertAtEnd(BuildList([7]), 8)));
+        results.Add(RunList("insert after negative values", [-2, 0, 5], () => Solution.InsertAtEnd(BuildList([-2, 0]), 5)));
+""", includeLinkedListHelpers: true),
+            new BasicExerciseHarness("linked-list-insert-at-index", """
         results.Add(RunList("insert in middle", [1, 2, 3], () => Solution.InsertAtIndex(BuildList([1, 3]), 1, 2)));
         results.Add(RunList("insert at zero", [1, 2, 3], () => Solution.InsertAtIndex(BuildList([2, 3]), 0, 1)));
         results.Add(RunList("insert at length", [1, 2, 3], () => Solution.InsertAtIndex(BuildList([1, 2]), 2, 3)));

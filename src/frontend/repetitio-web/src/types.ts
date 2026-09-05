@@ -99,6 +99,12 @@ export interface CreatePracticeSessionRequest {
   outcome: PracticeOutcome;
   /** Confidence value from 1 to 5. */
   confidence?: number | null;
+  /** Optional next review date selected for the practiced item. */
+  nextReviewAt?: string;
+  /** Approach used during the attempt. */
+  approach?: string;
+  /** Prompt used during the attempt. */
+  prompt?: string;
   /** Free-form notes. */
   notes?: string;
   /** Source code submitted or drafted during the attempt. */
@@ -243,6 +249,10 @@ export interface PracticeSession {
   outcome: PracticeOutcome;
   /** Confidence value from 1 to 5. */
   confidence?: number | null;
+  /** Approach used during the attempt. */
+  approach?: string | null;
+  /** Prompt used during the attempt. */
+  prompt?: string | null;
   /** Free-form notes. */
   notes?: string | null;
   /** Source code submitted or drafted during the attempt. */

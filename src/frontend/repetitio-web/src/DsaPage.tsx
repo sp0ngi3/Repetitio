@@ -9,6 +9,8 @@ import {
   updateDsaProblem
 } from "./api";
 import { getPracticeAgeClass, getReviewDueClass } from "./practiceAge";
+import { sortByLastPracticed, type LastPracticedSort } from "./practiceSort";
+import { createDefaultNextReviewDate, toNextReviewTimestamp, type ReviewSchedulePreset } from "./reviewSchedule";
 import type {
   CreateDsaProblemRequest,
   CreateDsaSolutionRequest,
@@ -52,6 +54,8 @@ interface DsaFilters {
   status: LearningItemStatus | "";
   /** Optional difficulty filter. */
   difficulty: LearningDifficulty | "";
+  /** Last practice sort preference. */
+  lastPracticedSort: LastPracticedSort;
 }
 
 /**
@@ -92,6 +96,8 @@ interface DsaAttemptForm {
   confidence: string;
   /** Attempt duration in minutes as form text. */
   durationMinutes: string;
+  /** Next review date as a date input value. */
+  nextReviewAt: string;
   /** Attempt notes. */
   notes: string;
   /** What helped during the attempt. */
@@ -124,17 +130,6 @@ const emptyProblemForm: DsaProblemForm = {
 /**
  * Initial DSA attempt form state.
  */
-const emptyAttemptForm: DsaAttemptForm = {
-  outcome: "Completed",
-  confidence: "",
-  durationMinutes: "",
-  notes: "",
-  whatHelped: "",
-  whatWasDifficult: "",
-  improveNext: "",
-  approach: ""
-};
-
 /**
  * Initial solution form state.
  */
@@ -150,6 +145,8 @@ const emptySolutionForm: CreateDsaSolutionRequest = {
  * Props accepted by the DSA page.
  */
 interface DsaPageProps {
+  /** Default review schedule for new practice attempts. */
+  reviewSchedulePreset: ReviewSchedulePreset;
   /** Called after DSA changes that should update parent dashboard data. */
   onChanged?: () => Promise<void> | void;
 }
@@ -160,14 +157,19 @@ interface DsaPageProps {
  * @param props - Component props.
  * @returns The DSA page.
  */
-export function DsaPage({ onChanged }: DsaPageProps) {
+export function DsaPage({ reviewSchedulePreset, onChanged }: DsaPageProps) {
   const [view, setView] = useState<DsaView>("dashboard");
   const [problems, setProblems] = useState<DsaProblem[]>([]);
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<DsaFilters>({ search: "", status: "", difficulty: "" });
+  const [filters, setFilters] = useState<DsaFilters>({
+    search: "",
+    status: "",
+    difficulty: "",
+    lastPracticedSort: "never-first"
+  });
   const [template, setTemplate] = useState<DsaProblemTemplate | null>(null);
   const [problemForm, setProblemForm] = useState<DsaProblemForm>(emptyProblemForm);
-  const [attemptForm, setAttemptForm] = useState<DsaAttemptForm>(emptyAttemptForm);
+  const [attemptForm, setAttemptForm] = useState<DsaAttemptForm>(() => createEmptyAttemptForm(reviewSchedulePreset));
   const [solutionForm, setSolutionForm] = useState<CreateDsaSolutionRequest>(emptySolutionForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -224,7 +226,7 @@ export function DsaPage({ onChanged }: DsaPageProps) {
   function openNewProblem() {
     setSelectedProblemId(null);
     setProblemForm(createProblemFormFromTemplate(template));
-    setAttemptForm(emptyAttemptForm);
+    setAttemptForm(createEmptyAttemptForm(reviewSchedulePreset));
     setSolutionForm(emptySolutionForm);
     setView("new");
     setError(null);
@@ -238,7 +240,7 @@ export function DsaPage({ onChanged }: DsaPageProps) {
   function openProblem(problem: DsaProblem) {
     setSelectedProblemId(problem.id);
     setProblemForm(createProblemFormFromProblem(problem));
-    setAttemptForm(emptyAttemptForm);
+    setAttemptForm(createEmptyAttemptForm(reviewSchedulePreset));
     setSolutionForm(emptySolutionForm);
     setView("detail");
     setError(null);
@@ -354,14 +356,7 @@ export function DsaPage({ onChanged }: DsaPageProps) {
 
     try {
       const metadata = toUpdateProblemRequest(problemForm, selectedProblem);
-      await updateDsaProblem(selectedProblem.id, {
-        ...metadata,
-        approach: attemptForm.approach.trim() || metadata.approach,
-        notes: attemptForm.notes.trim() || selectedProblem.notes || "",
-        whatHelped: attemptForm.whatHelped.trim() || selectedProblem.whatHelped || "",
-        whatWasDifficult: attemptForm.whatWasDifficult.trim() || selectedProblem.whatWasDifficult || "",
-        improveNext: attemptForm.improveNext.trim() || selectedProblem.improveNext || ""
-      });
+      await updateDsaProblem(selectedProblem.id, metadata);
       await createPracticeSession(toPracticeRequest(selectedProblem.id, attemptForm, solutionForm.sourceCode));
 
       if (solutionForm.sourceCode.trim()) {
@@ -372,7 +367,7 @@ export function DsaPage({ onChanged }: DsaPageProps) {
         });
       }
 
-      setAttemptForm(emptyAttemptForm);
+      setAttemptForm(createEmptyAttemptForm(reviewSchedulePreset));
       setSolutionForm(emptySolutionForm);
       await loadProblems();
       await onChanged?.();
@@ -476,6 +471,11 @@ interface DsaDashboardProps {
  * @returns The DSA dashboard.
  */
 function DsaDashboard(props: DsaDashboardProps) {
+  const sortedProblems = useMemo(
+    () => sortByLastPracticed(props.problems, props.filters.lastPracticedSort),
+    [props.filters.lastPracticedSort, props.problems]
+  );
+
   return (
     <>
       <div className="section-heading">
@@ -531,6 +531,20 @@ function DsaDashboard(props: DsaDashboardProps) {
             ))}
           </select>
         </label>
+
+        <label>
+          Last practiced
+          <select
+            value={props.filters.lastPracticedSort}
+            onChange={(event) =>
+              props.onFiltersChange({ ...props.filters, lastPracticedSort: event.target.value as LastPracticedSort })
+            }
+          >
+            <option value="never-first">Never practiced first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="newest">Newest first</option>
+          </select>
+        </label>
       </div>
 
       <section className="panel data-panel" aria-label="DSA problem records">
@@ -546,7 +560,7 @@ function DsaDashboard(props: DsaDashboardProps) {
               <span>Status</span>
               <span>Solved</span>
             </div>
-            {props.problems.map((problem) => {
+            {sortedProblems.map((problem) => {
               const lastPracticedClass = getPracticeAgeClass(problem.lastPracticedAt);
               const nextReviewClass = getReviewDueClass(problem.nextReviewAt, problem.lastPracticedAt);
 
@@ -722,8 +736,6 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
             </div>
           </dl>
 
-          <SavedProblemMemory problem={props.problem} />
-
           <form className="attempt-form" onSubmit={props.onAttemptSubmit}>
             <div className="form-grid two-columns">
               <label>
@@ -763,6 +775,15 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
                 value={props.attemptForm.durationMinutes}
                 onChange={(event) => props.onAttemptChange("durationMinutes", event.target.value)}
                 placeholder="35"
+              />
+            </label>
+
+            <label>
+              Next review
+              <input
+                type="date"
+                value={props.attemptForm.nextReviewAt}
+                onChange={(event) => props.onAttemptChange("nextReviewAt", event.target.value)}
               />
             </label>
 
@@ -1083,32 +1104,7 @@ interface AttemptHistoryProps {
 }
 
 /**
- * Renders previously saved problem-level memory behind an explicit reveal.
- *
- * @param props - Component props.
- * @returns The saved memory section.
- */
-function SavedProblemMemory(props: AttemptHistoryProps) {
-  if (!hasAnyText(props.problem.approach, props.problem.notes, props.problem.whatHelped, props.problem.whatWasDifficult, props.problem.improveNext)) {
-    return null;
-  }
-
-  return (
-    <details className="solution-peek memory-peek">
-      <summary>Reveal saved approach and notes</summary>
-      <div className="attempt-history-grid">
-        <HistoryField label="Approach" value={props.problem.approach} />
-        <HistoryField label="Notes" value={props.problem.notes} />
-        <HistoryField label="What helped" value={props.problem.whatHelped} />
-        <HistoryField label="What was difficult" value={props.problem.whatWasDifficult} />
-        <HistoryField label="Improve next" value={props.problem.improveNext} />
-      </div>
-    </details>
-  );
-}
-
-/**
- * Renders prior attempts and saved solutions.
+ * Renders prior attempts, saved problem memory, and saved solutions.
  *
  * @param props - Component props.
  * @returns Attempt history.
@@ -1117,6 +1113,22 @@ function AttemptHistory(props: AttemptHistoryProps) {
   return (
     <div className="history-panel">
       <h3>History</h3>
+      {hasAnyText(props.problem.approach, props.problem.notes, props.problem.whatHelped, props.problem.whatWasDifficult, props.problem.improveNext) ? (
+        <details className="solution-peek attempt-history-entry">
+          <summary>
+            <span>Saved problem notes</span>
+            <span>Legacy memory</span>
+          </summary>
+          <div className="attempt-history-grid">
+            <HistoryField label="Approach" value={props.problem.approach} />
+            <HistoryField label="Notes" value={props.problem.notes} />
+            <HistoryField label="What helped" value={props.problem.whatHelped} />
+            <HistoryField label="What was difficult" value={props.problem.whatWasDifficult} />
+            <HistoryField label="Improve next" value={props.problem.improveNext} />
+          </div>
+        </details>
+      ) : null}
+
       {props.problem.practiceSessions.length ? (
         <div className="detail-stack">
           {props.problem.practiceSessions.map((session) => (
@@ -1127,8 +1139,9 @@ function AttemptHistory(props: AttemptHistoryProps) {
                 </span>
                 <span>{formatAttemptMeta(session)}</span>
               </summary>
-              {hasAnyText(session.notes, session.whatHelped, session.whatWasDifficult, session.improveNext) ? (
+              {hasAnyText(session.approach, session.notes, session.whatHelped, session.whatWasDifficult, session.improveNext) ? (
                 <div className="attempt-history-grid">
+                  <HistoryField label="Approach" value={session.approach} />
                   <HistoryField label="Notes" value={session.notes} />
                   <HistoryField label="What helped" value={session.whatHelped} />
                   <HistoryField label="What was difficult" value={session.whatWasDifficult} />
@@ -1302,11 +1315,33 @@ function toPracticeRequest(problemId: string, form: DsaAttemptForm, sourceCode?:
     outcome: form.outcome,
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
+    nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
+    approach: form.approach.trim(),
     notes: form.notes.trim(),
     sourceCode: sourceCode?.trim() || undefined,
     whatHelped: form.whatHelped.trim(),
     whatWasDifficult: form.whatWasDifficult.trim(),
     improveNext: form.improveNext.trim()
+  };
+}
+
+/**
+ * Creates an empty DSA attempt form with the default next review date.
+ *
+ * @param reviewSchedulePreset - Selected default review interval.
+ * @returns Editable DSA attempt form.
+ */
+function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): DsaAttemptForm {
+  return {
+    outcome: "Completed",
+    confidence: "",
+    durationMinutes: "",
+    nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
+    notes: "",
+    whatHelped: "",
+    whatWasDifficult: "",
+    improveNext: "",
+    approach: ""
   };
 }
 

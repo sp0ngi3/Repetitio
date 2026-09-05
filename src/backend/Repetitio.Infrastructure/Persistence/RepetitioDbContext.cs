@@ -131,6 +131,8 @@ public sealed class RepetitioDbContext : DbContext
         {
             entity.HasKey(session => session.Id);
             entity.Property(session => session.Outcome).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(session => session.Approach).HasMaxLength(8000);
+            entity.Property(session => session.Prompt).HasMaxLength(12000);
             entity.Property(session => session.Notes).HasMaxLength(4000);
             entity.Property(session => session.SourceCode).HasMaxLength(20000);
             entity.Property(session => session.WhatHelped).HasMaxLength(2000);

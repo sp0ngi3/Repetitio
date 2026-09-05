@@ -32,6 +32,7 @@ import {
   updateNotePage,
   validateBackup
 } from "./api";
+import { createDefaultNextReviewDate } from "./reviewSchedule";
 import type {
   BasicExercise,
   Dashboard,
@@ -324,6 +325,7 @@ const dsaProblems: DsaProblem[] = [
         durationMs: 1500000,
         outcome: "Completed",
         confidence: 3,
+        approach: "Use stack pop checks for every closer.",
         notes: "Missed the odd length shortcut.",
         sourceCode: "public bool IsValid(string s) => true;",
         whatHelped: "Stack invariant.",
@@ -359,8 +361,8 @@ const systemDesignProblems: SystemDesignProblem[] = [
     status: "InProgress",
     difficulty: "Medium",
     confidence: 3,
-    lastPracticedAt: null,
-    nextReviewAt: null,
+    lastPracticedAt: "2026-08-30T12:45:00Z",
+    nextReviewAt: "2026-09-06T12:45:00Z",
     totalAttempts: 1,
     successfulAttempts: 1,
     source: "Personal",
@@ -390,6 +392,7 @@ const systemDesignProblems: SystemDesignProblem[] = [
         durationMs: 2700000,
         outcome: "Completed",
         confidence: 3,
+        prompt: "Design a distributed rate limiter for user API requests.",
         notes: "Covered core flow.",
         sourceCode: null,
         whatHelped: "Drawing the data flow.",
@@ -601,6 +604,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(await screen.findByRole("heading", { name: "Backup" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Default next review")).toHaveValue("one-month");
     expect(screen.getByRole("button", { name: "Export Data" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Validate Backup" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Import Data" })).toBeInTheDocument();
@@ -639,6 +643,7 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Problems" })).toBeInTheDocument();
     expect(await screen.findByText("Design a Rate Limiter")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Last practiced" })).toHaveValue("never-first");
     expect(screen.getByRole("button", { name: "Add problem" })).toBeInTheDocument();
   });
 
@@ -652,7 +657,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Add problem" }));
 
     expect(await screen.findByRole("heading", { name: "Add problem" })).toBeInTheDocument();
-    expect(screen.getByText("Design document")).toBeInTheDocument();
+    expect(screen.getByText("Statement")).toBeInTheDocument();
     expect(screen.queryByLabelText("Markdown preview")).not.toBeInTheDocument();
   });
 
@@ -666,8 +671,18 @@ describe("App", () => {
     fireEvent.click(await screen.findByText("Design a Rate Limiter"));
 
     expect(await screen.findByRole("heading", { name: "Attempt design" })).toBeInTheDocument();
-    expect(screen.getByText("Previous attempts")).toBeInTheDocument();
+    expect(screen.getByLabelText("Prompt")).toHaveValue("");
+    expect(screen.getByLabelText("Reflection")).toHaveValue("");
+    expect(screen.getByText("History")).toBeInTheDocument();
+    expect(screen.getByText("Last practiced")).toBeInTheDocument();
+    expect(screen.getAllByText("Next review").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("3/5 · 45 min"));
+    expect(screen.getByText("Design a distributed rate limiter for user API requests.")).toBeInTheDocument();
     expect(screen.getByText("Covered core flow.")).toBeInTheDocument();
+    expect(screen.getAllByText("Practice global limits.").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Use prompt" }));
+
+    expect(screen.getByLabelText("Prompt")).toHaveValue("Design a distributed rate limiter for user API requests.");
   });
 
   /**
@@ -680,8 +695,26 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Problems" })).toBeInTheDocument();
     expect(await screen.findByText("Valid Parentheses")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Last practiced" })).toHaveValue("never-first");
     expect(screen.getByText("Due now")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add problem" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that the default review schedule setting prefills new practice attempts.
+   */
+  it("uses the selected default review schedule for new attempts", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(await screen.findByLabelText("Default next review"), { target: { value: "two-weeks" } });
+
+    await waitFor(() => expect(localStorage.getItem("repetitio-review-schedule")).toBe("two-weeks"));
+
+    fireEvent.click(screen.getByRole("button", { name: "DSA" }));
+    fireEvent.click(await screen.findByText("Valid Parentheses"));
+
+    expect(screen.getByLabelText("Next review")).toHaveValue(createDefaultNextReviewDate("two-weeks"));
   });
 
   /**
@@ -696,10 +729,13 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Attempt problem" })).toBeInTheDocument();
     expect(screen.getByLabelText("Approach")).toHaveValue("");
     expect(screen.getByLabelText("Notes")).toHaveValue("");
-    expect(screen.getByText("Reveal saved approach and notes")).toBeInTheDocument();
+    expect(screen.queryByText("Reveal saved approach and notes")).not.toBeInTheDocument();
+    expect(screen.getByText("Saved problem notes")).toBeInTheDocument();
+    expect(screen.getByText("Use stack pop checks for every closer.")).toBeInTheDocument();
     expect(screen.getByText("Missed the odd length shortcut.")).toBeInTheDocument();
     expect(screen.getByText("public bool IsValid(string s) => true;")).toBeInTheDocument();
 
+    fireEvent.change(screen.getByLabelText("Approach"), { target: { value: "Scan and push open brackets." } });
     fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Fresh repeat notes." } });
     fireEvent.change(screen.getByLabelText("Source code"), { target: { value: "public bool IsValid(string s) => false;" } });
     fireEvent.click(screen.getByRole("button", { name: "Save attempt" }));
@@ -708,6 +744,7 @@ describe("App", () => {
       expect(createPracticeSession).toHaveBeenCalledWith(
         expect.objectContaining({
           learningItemId: "dsa-1",
+          approach: "Scan and push open brackets.",
           notes: "Fresh repeat notes.",
           sourceCode: "public bool IsValid(string s) => false;"
         })
@@ -1129,6 +1166,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Basics" }));
 
     expect(await screen.findByRole("heading", { name: "Exercises" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Last practiced" })).toHaveValue("never-first");
     expect(screen.getByText("Showing 1-10 of 13")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Generated Basic 10" })).not.toBeInTheDocument();
 
@@ -1146,6 +1184,47 @@ describe("App", () => {
 
     expect(screen.getByRole("button", { name: "Reverse Linked List" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Generated Basic 1" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that Basics dashboard can surface never-practiced exercises first or newest practice first.
+   */
+  it("sorts the Basics dashboard by last practiced", async () => {
+    vi.mocked(getBasicExercises).mockResolvedValueOnce([
+      createBasicExercise({
+        slug: "old-basic",
+        learningItemId: "old-basic",
+        title: "Old Basic",
+        lastPracticedAt: "2026-08-01T12:00:00Z"
+      }),
+      createBasicExercise({
+        slug: "recent-basic",
+        learningItemId: "recent-basic",
+        title: "Recent Basic",
+        lastPracticedAt: "2026-09-01T12:00:00Z"
+      }),
+      createBasicExercise({
+        slug: "never-basic",
+        learningItemId: "never-basic",
+        title: "Never Basic",
+        lastPracticedAt: null
+      })
+    ]);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
+
+    expect(await screen.findByRole("button", { name: "Never Basic" })).toBeInTheDocument();
+    let rows = Array.from(document.querySelectorAll(".basics-title-table .record-row")).map(
+      (row) => row.textContent ?? ""
+    );
+    expect(rows[0]).toContain("Never Basic");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Last practiced" }), { target: { value: "newest" } });
+
+    rows = Array.from(document.querySelectorAll(".basics-title-table .record-row")).map((row) => row.textContent ?? "");
+    expect(rows[0]).toContain("Recent Basic");
   });
 
   /**

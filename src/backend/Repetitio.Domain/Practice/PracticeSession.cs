@@ -48,6 +48,16 @@ public sealed class PracticeSession
     public int? Confidence { get; set; }
 
     /// <summary>
+    /// Gets or sets the approach used during the attempt.
+    /// </summary>
+    public string? Approach { get; set; }
+
+    /// <summary>
+    /// Gets or sets the prompt used during the attempt.
+    /// </summary>
+    public string? Prompt { get; set; }
+
+    /// <summary>
     /// Gets or sets free-form notes about the attempt.
     /// </summary>
     public string? Notes { get; set; }

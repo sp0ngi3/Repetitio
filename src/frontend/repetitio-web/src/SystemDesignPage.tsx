@@ -7,12 +7,16 @@ import {
   getSystemDesignProblems,
   updateSystemDesignProblem
 } from "./api";
+import { getPracticeAgeClass, getReviewDueClass } from "./practiceAge";
+import { sortByLastPracticed, type LastPracticedSort } from "./practiceSort";
+import { createDefaultNextReviewDate, toNextReviewTimestamp, type ReviewSchedulePreset } from "./reviewSchedule";
 import type {
   CreatePracticeSessionRequest,
   CreateSystemDesignProblemRequest,
   LearningDifficulty,
   LearningItemStatus,
   PracticeOutcome,
+  PracticeSession,
   SystemDesignProblem,
   SystemDesignProblemTemplate,
   UpdateSystemDesignProblemRequest
@@ -48,6 +52,8 @@ interface SystemDesignFilters {
   status: LearningItemStatus | "";
   /** Optional difficulty filter. */
   difficulty: LearningDifficulty | "";
+  /** Last practice sort preference. */
+  lastPracticedSort: LastPracticedSort;
 }
 
 /**
@@ -88,6 +94,10 @@ interface SystemDesignAttemptForm {
   confidence: string;
   /** Attempt duration in minutes as form text. */
   durationMinutes: string;
+  /** Next review date as a date input value. */
+  nextReviewAt: string;
+  /** Prompt used for this attempt. */
+  prompt: string;
   /** Attempt notes. */
   notes: string;
   /** Reflection notes in markdown. */
@@ -120,21 +130,12 @@ const emptyProblemForm: SystemDesignProblemForm = {
 /**
  * Initial System Design attempt form state.
  */
-const emptyAttemptForm: SystemDesignAttemptForm = {
-  outcome: "Completed",
-  confidence: "",
-  durationMinutes: "",
-  notes: "",
-  reflectionMarkdown: "",
-  whatHelped: "",
-  whatWasDifficult: "",
-  improveNext: ""
-};
-
 /**
  * Props accepted by the System Design page.
  */
 interface SystemDesignPageProps {
+  /** Default review schedule for new practice attempts. */
+  reviewSchedulePreset: ReviewSchedulePreset;
   /** Called after System Design changes that should update parent dashboard data. */
   onChanged?: () => Promise<void> | void;
 }
@@ -145,14 +146,21 @@ interface SystemDesignPageProps {
  * @param props - Component props.
  * @returns The System Design page.
  */
-export function SystemDesignPage({ onChanged }: SystemDesignPageProps) {
+export function SystemDesignPage({ reviewSchedulePreset, onChanged }: SystemDesignPageProps) {
   const [view, setView] = useState<SystemDesignView>("dashboard");
   const [problems, setProblems] = useState<SystemDesignProblem[]>([]);
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<SystemDesignFilters>({ search: "", status: "", difficulty: "" });
+  const [filters, setFilters] = useState<SystemDesignFilters>({
+    search: "",
+    status: "",
+    difficulty: "",
+    lastPracticedSort: "never-first"
+  });
   const [template, setTemplate] = useState<SystemDesignProblemTemplate | null>(null);
   const [problemForm, setProblemForm] = useState<SystemDesignProblemForm>(emptyProblemForm);
-  const [attemptForm, setAttemptForm] = useState<SystemDesignAttemptForm>(emptyAttemptForm);
+  const [attemptForm, setAttemptForm] = useState<SystemDesignAttemptForm>(() =>
+    createEmptyAttemptForm(reviewSchedulePreset)
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -208,7 +216,7 @@ export function SystemDesignPage({ onChanged }: SystemDesignPageProps) {
   function openNewProblem() {
     setSelectedProblemId(null);
     setProblemForm(createProblemFormFromTemplate(template));
-    setAttemptForm(emptyAttemptForm);
+    setAttemptForm(createEmptyAttemptForm(reviewSchedulePreset));
     setView("new");
     setError(null);
   }
@@ -221,7 +229,7 @@ export function SystemDesignPage({ onChanged }: SystemDesignPageProps) {
   function openProblem(problem: SystemDesignProblem) {
     setSelectedProblemId(problem.id);
     setProblemForm(createProblemFormFromProblem(problem));
-    setAttemptForm(createAttemptFormFromProblem(problem));
+    setAttemptForm(createEmptyAttemptForm(reviewSchedulePreset));
     setView("detail");
     setError(null);
   }
@@ -253,6 +261,15 @@ export function SystemDesignPage({ onChanged }: SystemDesignPageProps) {
    */
   function updateAttemptForm<K extends keyof SystemDesignAttemptForm>(key: K, value: SystemDesignAttemptForm[K]) {
     setAttemptForm((current) => ({ ...current, [key]: value }));
+  }
+
+  /**
+   * Reuses a previous attempt prompt as the starting point for the current attempt.
+   *
+   * @param prompt - Prompt text to reuse.
+   */
+  function usePromptFromHistory(prompt: string) {
+    setAttemptForm((current) => ({ ...current, prompt }));
   }
 
   /**
@@ -326,16 +343,10 @@ export function SystemDesignPage({ onChanged }: SystemDesignPageProps) {
 
     try {
       const metadata = toUpdateProblemRequest(problemForm, selectedProblem);
-      await updateSystemDesignProblem(selectedProblem.id, {
-        ...metadata,
-        reflectionMarkdown: attemptForm.reflectionMarkdown.trim() || metadata.reflectionMarkdown,
-        whatHelped: attemptForm.whatHelped.trim() || metadata.whatHelped,
-        whatWasDifficult: attemptForm.whatWasDifficult.trim() || metadata.whatWasDifficult,
-        improveNext: attemptForm.improveNext.trim() || metadata.improveNext
-      });
+      await updateSystemDesignProblem(selectedProblem.id, metadata);
       await createPracticeSession(toPracticeRequest(selectedProblem.id, attemptForm));
 
-      setAttemptForm(emptyAttemptForm);
+      setAttemptForm(createEmptyAttemptForm(reviewSchedulePreset));
       await loadProblems();
       await onChanged?.();
     } catch (requestError) {
@@ -405,6 +416,7 @@ export function SystemDesignPage({ onChanged }: SystemDesignPageProps) {
           onChange={updateProblemForm}
           onDelete={handleDeleteProblem}
           onSave={saveProblemMetadata}
+          onUsePrompt={usePromptFromHistory}
         />
       ) : null}
     </section>
@@ -436,6 +448,11 @@ interface SystemDesignDashboardProps {
  * @returns The System Design dashboard.
  */
 function SystemDesignDashboard(props: SystemDesignDashboardProps) {
+  const sortedProblems = useMemo(
+    () => sortByLastPracticed(props.problems, props.filters.lastPracticedSort),
+    [props.filters.lastPracticedSort, props.problems]
+  );
+
   return (
     <>
       <div className="section-heading">
@@ -491,6 +508,20 @@ function SystemDesignDashboard(props: SystemDesignDashboardProps) {
             ))}
           </select>
         </label>
+
+        <label>
+          Last practiced
+          <select
+            value={props.filters.lastPracticedSort}
+            onChange={(event) =>
+              props.onFiltersChange({ ...props.filters, lastPracticedSort: event.target.value as LastPracticedSort })
+            }
+          >
+            <option value="never-first">Never practiced first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="newest">Newest first</option>
+          </select>
+        </label>
       </div>
 
       <section className="panel data-panel" aria-label="System Design problem records">
@@ -501,24 +532,33 @@ function SystemDesignDashboard(props: SystemDesignDashboardProps) {
             <div className="record-header">
               <span>Problem</span>
               <span>Tags</span>
+              <span>Last practiced</span>
+              <span>Next review</span>
               <span>Status</span>
               <span>Difficulty</span>
               <span>Attempts</span>
             </div>
-            {props.problems.map((problem) => (
-              <button className="record-row" type="button" key={problem.id} onClick={() => props.onOpen(problem)}>
-                <span>
-                  <strong>{problem.title}</strong>
-                  <small>{problem.source || "Personal"} {problem.nextReviewAt ? `· ${formatDate(problem.nextReviewAt)}` : ""}</small>
-                </span>
-                <span className="tag-row compact">
-                  {problem.tags.length ? problem.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
-                </span>
-                <span>{formatStatus(problem.status)}</span>
-                <span>{problem.difficulty}</span>
-                <span>{problem.totalAttempts}</span>
-              </button>
-            ))}
+            {sortedProblems.map((problem) => {
+              const lastPracticedClass = getPracticeAgeClass(problem.lastPracticedAt);
+              const nextReviewClass = getReviewDueClass(problem.nextReviewAt, problem.lastPracticedAt);
+
+              return (
+                <button className="record-row" type="button" key={problem.id} onClick={() => props.onOpen(problem)}>
+                  <span>
+                    <strong>{problem.title}</strong>
+                    <small>{problem.source || "Personal"}</small>
+                  </span>
+                  <span className="tag-row compact">
+                    {problem.tags.length ? problem.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
+                  </span>
+                  <span className={`date-chip ${lastPracticedClass}`}>{formatLastPracticed(problem.lastPracticedAt)}</span>
+                  <span className={`date-chip ${nextReviewClass}`}>{formatNextReview(problem)}</span>
+                  <span>{formatStatus(problem.status)}</span>
+                  <span>{problem.difficulty}</span>
+                  <span>{problem.totalAttempts}</span>
+                </button>
+              );
+            })}
           </div>
         ) : (
           <p className="empty-state">No System Design problems yet.</p>
@@ -602,6 +642,8 @@ interface SystemDesignDetailPageProps {
   onDelete: () => void;
   /** Saves problem metadata. */
   onSave: () => void;
+  /** Reuses a prompt from a previous attempt. */
+  onUsePrompt: (prompt: string) => void;
 }
 
 /**
@@ -648,6 +690,22 @@ function SystemDesignDetailPage(props: SystemDesignDetailPageProps) {
               <dt>Difficulty</dt>
               <dd>{props.problem.difficulty}</dd>
             </div>
+            <div>
+              <dt>Last practiced</dt>
+              <dd>
+                <span className={`date-chip ${getPracticeAgeClass(props.problem.lastPracticedAt)}`}>
+                  {formatLastPracticed(props.problem.lastPracticedAt)}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>Next review</dt>
+              <dd>
+                <span className={`date-chip ${getReviewDueClass(props.problem.nextReviewAt, props.problem.lastPracticedAt)}`}>
+                  {formatNextReview(props.problem)}
+                </span>
+              </dd>
+            </div>
           </dl>
 
           <form className="attempt-form" onSubmit={props.onAttemptSubmit}>
@@ -691,6 +749,23 @@ function SystemDesignDetailPage(props: SystemDesignDetailPageProps) {
                 placeholder="45"
               />
             </label>
+
+            <label>
+              Next review
+              <input
+                type="date"
+                value={props.attemptForm.nextReviewAt}
+                onChange={(event) => props.onAttemptChange("nextReviewAt", event.target.value)}
+              />
+            </label>
+
+            <MarkdownEditor
+              label="Prompt"
+              value={props.attemptForm.prompt}
+              onChange={(value) => props.onAttemptChange("prompt", value)}
+              placeholder="Prompt for this attempt."
+              variant="reflection"
+            />
 
             <MarkdownEditor
               label="Reflection"
@@ -745,7 +820,7 @@ function SystemDesignDetailPage(props: SystemDesignDetailPageProps) {
             </button>
           </form>
 
-          <SystemDesignAttemptHistory problem={props.problem} />
+          <SystemDesignAttemptHistory problem={props.problem} onUsePrompt={props.onUsePrompt} />
         </aside>
       </div>
     </>
@@ -791,10 +866,10 @@ function SystemDesignEditorPanel(props: SystemDesignEditorPanelProps) {
       </label>
 
       <MarkdownEditor
-        label="Design document"
+        label="Statement"
         value={props.form.designMarkdown}
         onChange={(value) => props.onChange("designMarkdown", value)}
-        placeholder="Write the full prompt, requirements, constraints, estimates, APIs, data model, architecture, scaling strategy, tradeoffs, and notes here."
+        placeholder="Problem, scope, requirements, constraints, and target design areas."
         variant="document"
       />
     </section>
@@ -954,6 +1029,8 @@ function PageBackHeader(props: PageBackHeaderProps) {
 interface SystemDesignAttemptHistoryProps {
   /** Selected System Design problem. */
   problem: SystemDesignProblem;
+  /** Reuses a previous prompt in the current attempt form. */
+  onUsePrompt: (prompt: string) => void;
 }
 
 /**
@@ -965,26 +1042,85 @@ interface SystemDesignAttemptHistoryProps {
 function SystemDesignAttemptHistory(props: SystemDesignAttemptHistoryProps) {
   return (
     <div className="history-panel">
-      <h3>Previous attempts</h3>
+      <h3>History</h3>
+      {hasAnyText(props.problem.reflectionMarkdown, props.problem.whatHelped, props.problem.whatWasDifficult, props.problem.improveNext) ? (
+        <details className="solution-peek attempt-history-entry">
+          <summary>
+            <span>Saved design notes</span>
+            <span>Legacy memory</span>
+          </summary>
+          <div className="attempt-history-grid">
+            <SystemDesignHistoryField label="Reflection" value={props.problem.reflectionMarkdown} />
+            <SystemDesignHistoryField label="What helped" value={props.problem.whatHelped} />
+            <SystemDesignHistoryField label="What was difficult" value={props.problem.whatWasDifficult} />
+            <SystemDesignHistoryField label="Improve next" value={props.problem.improveNext} />
+          </div>
+        </details>
+      ) : null}
+
       {props.problem.practiceSessions.length ? (
-        <ul className="stack-list">
+        <div className="detail-stack">
           {props.problem.practiceSessions.map((session) => (
-            <li className="list-row" key={session.id}>
-              <div>
-                <strong>{formatStatus(session.outcome)}</strong>
-                <span>{formatDate(session.startedAt)}</span>
-                {session.notes ? <small>{session.notes}</small> : null}
-                {session.whatHelped ? <small>Helped: {session.whatHelped}</small> : null}
-                {session.whatWasDifficult ? <small>Difficult: {session.whatWasDifficult}</small> : null}
-                {session.improveNext ? <small>Next: {session.improveNext}</small> : null}
-              </div>
-              <span className="confidence">{session.confidence ? `${session.confidence}/5` : "No confidence"}</span>
-            </li>
+            <details className="solution-peek attempt-history-entry" key={session.id}>
+              <summary>
+                <span>
+                  {formatStatus(session.outcome)} · {formatDateTime(session.startedAt)}
+                </span>
+                <span>{formatAttemptMeta(session)}</span>
+              </summary>
+              {hasText(session.prompt) ? (
+                <div className="history-entry-actions">
+                  <button className="secondary-button" type="button" onClick={() => props.onUsePrompt(session.prompt ?? "")}>
+                    Use prompt
+                  </button>
+                </div>
+              ) : null}
+              {hasAnyText(session.prompt, session.notes, session.whatHelped, session.whatWasDifficult, session.improveNext) ? (
+                <div className="attempt-history-grid">
+                  <SystemDesignHistoryField label="Prompt" value={session.prompt} />
+                  <SystemDesignHistoryField label="Reflection" value={session.notes} />
+                  <SystemDesignHistoryField label="What helped" value={session.whatHelped} />
+                  <SystemDesignHistoryField label="What was difficult" value={session.whatWasDifficult} />
+                  <SystemDesignHistoryField label="Improve next" value={session.improveNext} />
+                </div>
+              ) : (
+                <p className="empty-state compact-empty">No reflection captured for this attempt.</p>
+              )}
+            </details>
           ))}
-        </ul>
+        </div>
       ) : (
         <p className="empty-state">No attempts yet.</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Props accepted by a System Design history field.
+ */
+interface SystemDesignHistoryFieldProps {
+  /** Field label. */
+  label: string;
+  /** Optional field value. */
+  value?: string | null;
+}
+
+/**
+ * Renders one non-empty history field.
+ *
+ * @param props - Component props.
+ * @returns A labeled history field when it has content.
+ */
+function SystemDesignHistoryField(props: SystemDesignHistoryFieldProps) {
+  if (!hasText(props.value)) {
+    return null;
+  }
+
+  return (
+    <div className="history-field">
+      <strong>{props.label}</strong>
+      <p>{props.value}</p>
     </div>
   );
 }
@@ -1089,22 +1225,6 @@ function createProblemFormFromProblem(problem: SystemDesignProblem): SystemDesig
 }
 
 /**
- * Creates an attempt form from an existing System Design problem.
- *
- * @param problem - Existing System Design problem.
- * @returns Editable System Design attempt form.
- */
-function createAttemptFormFromProblem(problem: SystemDesignProblem): SystemDesignAttemptForm {
-  return {
-    ...emptyAttemptForm,
-    reflectionMarkdown: problem.reflectionMarkdown ?? "",
-    whatHelped: problem.whatHelped ?? "",
-    whatWasDifficult: problem.whatWasDifficult ?? "",
-    improveNext: problem.improveNext ?? ""
-  };
-}
-
-/**
  * Converts the problem form into a create request.
  *
  * @param form - Editable System Design problem form.
@@ -1169,10 +1289,33 @@ function toPracticeRequest(problemId: string, form: SystemDesignAttemptForm): Cr
     outcome: form.outcome,
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
+    nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
+    prompt: form.prompt.trim(),
     notes: form.notes.trim() || form.reflectionMarkdown.trim(),
     whatHelped: form.whatHelped.trim(),
     whatWasDifficult: form.whatWasDifficult.trim(),
     improveNext: form.improveNext.trim()
+  };
+}
+
+/**
+ * Creates an empty System Design attempt form with the default next review date.
+ *
+ * @param reviewSchedulePreset - Selected default review interval.
+ * @returns Editable System Design attempt form.
+ */
+function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): SystemDesignAttemptForm {
+  return {
+    outcome: "Completed",
+    confidence: "",
+    durationMinutes: "",
+    nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
+    prompt: "",
+    notes: "",
+    reflectionMarkdown: "",
+    whatHelped: "",
+    whatWasDifficult: "",
+    improveNext: ""
   };
 }
 
@@ -1197,6 +1340,112 @@ function parseTags(value: string) {
  */
 function formatStatus(status: string) {
   return status.replace(/([A-Z])/g, " $1").trim();
+}
+
+/**
+ * Formats the last practice timestamp for dashboard display.
+ *
+ * @param value - Last practice timestamp.
+ * @returns Human-readable last practice text.
+ */
+function formatLastPracticed(value?: string | null) {
+  return value ? formatDate(value) : "Never";
+}
+
+/**
+ * Formats the next review state for dashboard display.
+ *
+ * @param problem - System Design problem with review metadata.
+ * @returns Human-readable review text.
+ */
+function formatNextReview(problem: SystemDesignProblem) {
+  if (!problem.nextReviewAt) {
+    return problem.lastPracticedAt ? "Not scheduled" : "Start now";
+  }
+
+  const reviewAt = new Date(problem.nextReviewAt).getTime();
+
+  if (!Number.isFinite(reviewAt)) {
+    return "Not scheduled";
+  }
+
+  return reviewAt <= Date.now() ? "Due now" : formatDate(problem.nextReviewAt);
+}
+
+/**
+ * Formats an attempt timestamp with date and time.
+ *
+ * @param value - ISO date value.
+ * @returns Human-readable date and time text.
+ */
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "Unknown date";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+/**
+ * Formats compact attempt metadata for history summaries.
+ *
+ * @param session - Practice session.
+ * @returns Compact confidence and duration text.
+ */
+function formatAttemptMeta(session: PracticeSession) {
+  const confidence = session.confidence ? `${session.confidence}/5` : "No confidence";
+  const duration = formatDuration(session.durationMs);
+
+  return duration ? `${confidence} · ${duration}` : confidence;
+}
+
+/**
+ * Formats a duration in milliseconds.
+ *
+ * @param durationMs - Duration in milliseconds.
+ * @returns Human-readable duration when present.
+ */
+function formatDuration(durationMs?: number | null) {
+  if (!durationMs || durationMs <= 0) {
+    return "";
+  }
+
+  const minutes = Math.round(durationMs / 60000);
+
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
+/**
+ * Checks whether optional text contains visible characters.
+ *
+ * @param value - Optional text value.
+ * @returns True when the value contains text.
+ */
+function hasText(value?: string | null) {
+  return Boolean(value?.trim());
+}
+
+/**
+ * Checks whether any optional text value contains visible characters.
+ *
+ * @param values - Optional text values.
+ * @returns True when at least one value contains text.
+ */
+function hasAnyText(...values: Array<string | null | undefined>) {
+  return values.some(hasText);
 }
 
 /**

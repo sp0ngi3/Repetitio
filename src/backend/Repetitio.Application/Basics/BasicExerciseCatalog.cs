@@ -32,8 +32,9 @@ public static class BasicExerciseCatalog
     private static readonly BasicExerciseResponse[] Exercises =
     [
         ReverseLinkedListExercise.Definition,
-        ArrayTechniqueExercises.TwoSumSorted,
-        LinkedListTechniqueExercises.LinkedListInsert,
+        LinkedListTechniqueExercises.LinkedListInsertAtHead,
+        LinkedListTechniqueExercises.LinkedListInsertAtEnd,
+        LinkedListTechniqueExercises.LinkedListInsertAtIndex,
         LinkedListTechniqueExercises.LinkedListGet,
         LinkedListTechniqueExercises.DetectLinkedListCycle,
         RecursionExercises.Factorial,

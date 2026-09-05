@@ -6,6 +6,11 @@ import { DsaPage } from "./DsaPage";
 import { FlashcardsPage } from "./FlashcardsPage";
 import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
+import {
+  readInitialReviewSchedulePreset,
+  saveReviewSchedulePreset,
+  type ReviewSchedulePreset
+} from "./reviewSchedule";
 import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from "./types";
 
 /**
@@ -36,6 +41,9 @@ const databaseHealthPollMs = 10_000;
 export function App() {
   const [activePage, setActivePage] = useState<AppPage>("overview");
   const [theme, setTheme] = useState<AppTheme>(readInitialTheme);
+  const [reviewSchedulePreset, setReviewSchedulePreset] = useState<ReviewSchedulePreset>(
+    readInitialReviewSchedulePreset
+  );
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [basicExercises, setBasicExercises] = useState<BasicExercise[]>([]);
   const [items, setItems] = useState<LearningItem[]>([]);
@@ -112,6 +120,10 @@ export function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("repetitio-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    saveReviewSchedulePreset(reviewSchedulePreset);
+  }, [reviewSchedulePreset]);
 
   const groupedCounts = useMemo(() => {
     return items.reduce<Record<LearningItemType, number>>(
@@ -193,17 +205,30 @@ export function App() {
         <OverviewPage dashboard={dashboard} groupedCounts={groupedCounts} />
       ) : null}
 
-      {activePage === "dsa" ? <DsaPage onChanged={refreshData} /> : null}
+      {activePage === "dsa" ? <DsaPage reviewSchedulePreset={reviewSchedulePreset} onChanged={refreshData} /> : null}
 
-      {activePage === "system-design" ? <SystemDesignPage onChanged={refreshData} /> : null}
+      {activePage === "system-design" ? (
+        <SystemDesignPage reviewSchedulePreset={reviewSchedulePreset} onChanged={refreshData} />
+      ) : null}
 
-      {activePage === "basics" ? <BasicsPage basicExercises={basicExercises} onChanged={refreshData} /> : null}
+      {activePage === "basics" ? (
+        <BasicsPage
+          basicExercises={basicExercises}
+          reviewSchedulePreset={reviewSchedulePreset}
+          onChanged={refreshData}
+        />
+      ) : null}
 
       {activePage === "flashcards" ? <FlashcardsPage onChanged={refreshData} /> : null}
 
       {activePage === "notes" ? <NotesPage /> : null}
 
-      {activePage === "settings" ? <BackupPage /> : null}
+      {activePage === "settings" ? (
+        <SettingsPage
+          reviewSchedulePreset={reviewSchedulePreset}
+          onReviewSchedulePresetChange={setReviewSchedulePreset}
+        />
+      ) : null}
 
       <NotesCompanion />
     </main>
@@ -321,6 +346,51 @@ function Metric(props: { label: string; value: number }) {
       <span>{props.label}</span>
       <strong>{props.value}</strong>
     </article>
+  );
+}
+
+/**
+ * Props accepted by the settings page.
+ */
+interface SettingsPageProps {
+  /** Selected default review schedule preset. */
+  reviewSchedulePreset: ReviewSchedulePreset;
+  /** Updates the default review schedule preset. */
+  onReviewSchedulePresetChange: (preset: ReviewSchedulePreset) => void;
+}
+
+/**
+ * Renders app settings and backup controls.
+ *
+ * @param props - Component props.
+ * @returns The settings page.
+ */
+function SettingsPage(props: SettingsPageProps) {
+  return (
+    <div className="settings-stack">
+      <section className="panel settings-panel" aria-labelledby="practice-settings-title">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Practice settings</p>
+            <h2 id="practice-settings-title">Review schedule</h2>
+          </div>
+        </div>
+
+        <label>
+          Default next review
+          <select
+            value={props.reviewSchedulePreset}
+            onChange={(event) => props.onReviewSchedulePresetChange(event.target.value as ReviewSchedulePreset)}
+          >
+            <option value="one-week">1 week</option>
+            <option value="two-weeks">2 weeks</option>
+            <option value="one-month">1 month</option>
+          </select>
+        </label>
+      </section>
+
+      <BackupPage />
+    </div>
   );
 }
 

@@ -8,6 +8,19 @@ namespace Repetitio.UnitTests.Review;
 public sealed class ConfidenceReviewScheduleTests
 {
     /// <summary>
+    /// Verifies that regular practice defaults to a one-month review interval.
+    /// </summary>
+    [Fact]
+    public void CalculateDefaultNextReviewAt_WhenCalled_ReturnsOneMonthLater()
+    {
+        var completedAt = new DateTime(2026, 8, 30, 12, 0, 0, DateTimeKind.Utc);
+
+        var nextReviewAt = ConfidenceReviewSchedule.CalculateDefaultNextReviewAt(completedAt);
+
+        Assert.Equal(completedAt.AddMonths(1), nextReviewAt);
+    }
+
+    /// <summary>
     /// Verifies that each confidence level maps to the expected review interval.
     /// </summary>
     /// <param name="confidence">The confidence value.</param>

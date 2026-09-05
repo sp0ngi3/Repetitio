@@ -503,15 +503,25 @@ textarea {
   gap: 16px;
 }
 
+.settings-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-panel label {
+  max-width: 320px;
+}
+
 .tracker-toolbar {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(160px, 220px) minmax(160px, 220px);
+  grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(150px, 200px));
   gap: 12px;
   align-items: end;
 }
 
 .data-panel {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .record-table {
@@ -541,7 +551,14 @@ textarea {
 
 .system-design-table .record-header,
 .system-design-table .record-row {
-  grid-template-columns: minmax(260px, 1.5fr) minmax(190px, 1fr) minmax(110px, 0.6fr) minmax(110px, 0.55fr) minmax(90px, 0.4fr);
+  grid-template-columns:
+    minmax(210px, 1.25fr)
+    minmax(130px, 0.75fr)
+    minmax(120px, 0.55fr)
+    minmax(120px, 0.55fr)
+    minmax(95px, 0.45fr)
+    minmax(95px, 0.45fr)
+    minmax(78px, 0.35fr);
 }
 
 .flashcard-table .record-header,
@@ -551,7 +568,9 @@ textarea {
 
 .basics-filter-panel {
   display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
   gap: 12px;
+  align-items: end;
   border-bottom: 1px solid #e1e6eb;
   padding: 0 0 16px;
   margin-bottom: 14px;
@@ -560,6 +579,7 @@ textarea {
 .tag-filter-list {
   display: flex;
   flex-wrap: wrap;
+  grid-column: 1 / -1;
   gap: 8px;
 }
 
@@ -855,6 +875,12 @@ textarea {
 .attempt-history-grid {
   display: grid;
   gap: 10px;
+  margin-top: 12px;
+}
+
+.history-entry-actions {
+  display: flex;
+  justify-content: flex-end;
   margin-top: 12px;
 }
 
@@ -2536,6 +2562,14 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .basics-filter-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .tag-filter-list {
+    grid-column: auto;
+  }
+
   .record-header {
     display: none;
   }
@@ -2549,7 +2583,8 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .dsa-table .date-chip {
+  .dsa-table .date-chip,
+  .system-design-table .date-chip {
     width: fit-content;
   }
 

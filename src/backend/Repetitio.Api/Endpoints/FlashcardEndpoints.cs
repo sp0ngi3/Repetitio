@@ -921,6 +921,8 @@ public static class FlashcardEndpoints
             DurationMs = session.DurationMs,
             Outcome = session.Outcome,
             Confidence = session.Confidence,
+            Approach = session.Approach,
+            Prompt = session.Prompt,
             Notes = session.Notes,
             SourceCode = session.SourceCode,
             WhatHelped = session.WhatHelped,

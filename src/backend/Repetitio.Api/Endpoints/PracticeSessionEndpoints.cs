@@ -92,6 +92,8 @@ public static class PracticeSessionEndpoints
             DurationMs = durationMs,
             Outcome = request.Outcome,
             Confidence = request.Confidence,
+            Approach = request.Approach?.Trim(),
+            Prompt = request.Prompt?.Trim(),
             Notes = request.Notes?.Trim(),
             SourceCode = request.SourceCode?.Trim(),
             WhatHelped = request.WhatHelped?.Trim(),
@@ -100,7 +102,7 @@ public static class PracticeSessionEndpoints
             CreatedAt = now
         };
 
-        UpdateLearningItemAfterPractice(learningItem, session, now);
+        UpdateLearningItemAfterPractice(learningItem, session, request.NextReviewAt, now);
 
         dbContext.PracticeSessions.Add(session);
         await dbContext.SaveChangesAsync();
@@ -113,18 +115,23 @@ public static class PracticeSessionEndpoints
     /// </summary>
     /// <param name="learningItem">The practiced learning item.</param>
     /// <param name="session">The created practice session.</param>
+    /// <param name="nextReviewAt">The optional explicit next review date.</param>
     /// <param name="updatedAt">The update timestamp.</param>
-    private static void UpdateLearningItemAfterPractice(LearningItem learningItem, PracticeSession session, DateTime updatedAt)
+    private static void UpdateLearningItemAfterPractice(
+        LearningItem learningItem,
+        PracticeSession session,
+        DateTime? nextReviewAt,
+        DateTime updatedAt)
     {
-        learningItem.LastPracticedAt = session.CompletedAt ?? session.StartedAt;
+        var practicedAt = session.CompletedAt ?? session.StartedAt;
+
+        learningItem.LastPracticedAt = practicedAt;
         learningItem.UpdatedAt = updatedAt;
+        learningItem.NextReviewAt = nextReviewAt ?? ConfidenceReviewSchedule.CalculateDefaultNextReviewAt(practicedAt);
 
         if (session.Confidence is not null)
         {
             learningItem.Confidence = session.Confidence;
-            learningItem.NextReviewAt = ConfidenceReviewSchedule.CalculateNextReviewAt(
-                session.CompletedAt ?? session.StartedAt,
-                session.Confidence.Value);
         }
 
         var successfulAttemptCount = learningItem.PracticeSessions.Count(PracticeProgressPolicy.IsSuccessfulAttempt)

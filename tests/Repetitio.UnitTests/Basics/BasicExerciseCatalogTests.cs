@@ -42,14 +42,17 @@ public sealed class BasicExerciseCatalogTests
         var slugs = BasicExerciseCatalog.GetAll().Select(exercise => exercise.Slug).ToHashSet(StringComparer.Ordinal);
 
         Assert.Contains("reverse-linked-list", slugs);
-        Assert.Contains("two-pointers-two-sum-sorted", slugs);
+        Assert.DoesNotContain("two-pointers-two-sum-sorted", slugs);
         Assert.DoesNotContain("kadane-maximum-subarray", slugs);
         Assert.DoesNotContain("kadane-max-subarray-range", slugs);
         Assert.DoesNotContain("prefix-sum-range-query", slugs);
         Assert.DoesNotContain("prefix-sum-pivot-index", slugs);
         Assert.DoesNotContain("sliding-window-max-average", slugs);
         Assert.DoesNotContain("sliding-window-min-size-subarray-sum", slugs);
-        Assert.Contains("linked-list-insert", slugs);
+        Assert.DoesNotContain("linked-list-insert", slugs);
+        Assert.Contains("linked-list-insert-at-head", slugs);
+        Assert.Contains("linked-list-insert-at-end", slugs);
+        Assert.Contains("linked-list-insert-at-index", slugs);
         Assert.Contains("linked-list-get", slugs);
         Assert.Contains("fast-slow-detect-linked-list-cycle", slugs);
         Assert.DoesNotContain("fast-slow-find-duplicate-number", slugs);

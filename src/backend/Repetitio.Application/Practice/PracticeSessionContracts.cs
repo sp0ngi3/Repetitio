@@ -38,6 +38,21 @@ public sealed record CreatePracticeSessionRequest
     public int? Confidence { get; init; }
 
     /// <summary>
+    /// Gets the optional next review date selected for the practiced item.
+    /// </summary>
+    public DateTime? NextReviewAt { get; init; }
+
+    /// <summary>
+    /// Gets the approach used during the session.
+    /// </summary>
+    public string? Approach { get; init; }
+
+    /// <summary>
+    /// Gets the prompt used during the session.
+    /// </summary>
+    public string? Prompt { get; init; }
+
+    /// <summary>
     /// Gets free-form notes about the session.
     /// </summary>
     public string? Notes { get; init; }
@@ -107,6 +122,16 @@ public sealed record PracticeSessionResponse
     /// Gets the confidence value from 1 to 5.
     /// </summary>
     public int? Confidence { get; init; }
+
+    /// <summary>
+    /// Gets the approach used during the session.
+    /// </summary>
+    public string? Approach { get; init; }
+
+    /// <summary>
+    /// Gets the prompt used during the session.
+    /// </summary>
+    public string? Prompt { get; init; }
 
     /// <summary>
     /// Gets free-form notes about the session.

@@ -6,6 +6,16 @@ namespace Repetitio.Application.Review;
 public static class ConfidenceReviewSchedule
 {
     /// <summary>
+    /// Calculates the default next review date for regular practice.
+    /// </summary>
+    /// <param name="completedAt">The UTC completion date used as the schedule anchor.</param>
+    /// <returns>The default next review date.</returns>
+    public static DateTime CalculateDefaultNextReviewAt(DateTime completedAt)
+    {
+        return completedAt.AddMonths(1);
+    }
+
+    /// <summary>
     /// Calculates the next review date for a completed session.
     /// </summary>
     /// <param name="completedAt">The UTC completion date used as the schedule anchor.</param>

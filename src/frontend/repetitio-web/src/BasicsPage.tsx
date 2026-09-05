@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { createPracticeSession, executeBasicExercise } from "./api";
 import { getPracticeAgeClass } from "./practiceAge";
+import { sortByLastPracticed, type LastPracticedSort } from "./practiceSort";
+import { createDefaultNextReviewDate, toNextReviewTimestamp, type ReviewSchedulePreset } from "./reviewSchedule";
 import type {
   BasicExercise,
   CreatePracticeSessionRequest,
@@ -54,6 +56,8 @@ interface BasicsAttemptForm {
   confidence: string;
   /** Attempt duration in minutes as form text. */
   durationMinutes: string;
+  /** Next review date as a date input value. */
+  nextReviewAt: string;
   /** Attempt notes. */
   notes: string;
   /** What helped during the attempt. */
@@ -69,23 +73,14 @@ interface BasicsAttemptForm {
 /**
  * Initial Basics attempt form state.
  */
-const emptyAttemptForm: BasicsAttemptForm = {
-  outcome: "Completed",
-  confidence: "",
-  durationMinutes: "",
-  notes: "",
-  whatHelped: "",
-  whatWasDifficult: "",
-  improveNext: "",
-  codeDraft: ""
-};
-
 /**
  * Props accepted by the Basics page.
  */
 interface BasicsPageProps {
   /** Built-in Basics exercises with progress. */
   basicExercises: BasicExercise[];
+  /** Default review schedule for new practice attempts. */
+  reviewSchedulePreset: ReviewSchedulePreset;
   /** Called after a Basics attempt is recorded. */
   onChanged: () => Promise<void> | void;
 }
@@ -101,9 +96,12 @@ export function BasicsPage(props: BasicsPageProps) {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
+  const [lastPracticedSort, setLastPracticedSort] = useState<LastPracticedSort>("never-first");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeProblemTab, setActiveProblemTab] = useState<BasicsProblemTab>("description");
-  const [attemptForm, setAttemptForm] = useState<BasicsAttemptForm>(emptyAttemptForm);
+  const [attemptForm, setAttemptForm] = useState<BasicsAttemptForm>(() =>
+    createEmptyAttemptForm(props.reviewSchedulePreset)
+  );
   const [executionResult, setExecutionResult] = useState<ExecuteBasicExerciseResponse | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -119,16 +117,20 @@ export function BasicsPage(props: BasicsPageProps) {
     () => filterBasicExercises(props.basicExercises, searchQuery, selectedTag),
     [props.basicExercises, searchQuery, selectedTag]
   );
-  const pageCount = Math.max(1, Math.ceil(filteredExercises.length / basicsPageSize));
+  const sortedExercises = useMemo(
+    () => sortByLastPracticed(filteredExercises, lastPracticedSort),
+    [filteredExercises, lastPracticedSort]
+  );
+  const pageCount = Math.max(1, Math.ceil(sortedExercises.length / basicsPageSize));
   const effectivePage = Math.min(currentPage, pageCount);
   const pagedExercises = useMemo(
-    () => paginateBasicExercises(filteredExercises, effectivePage, basicsPageSize),
-    [filteredExercises, effectivePage]
+    () => paginateBasicExercises(sortedExercises, effectivePage, basicsPageSize),
+    [sortedExercises, effectivePage]
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedTag]);
+  }, [lastPracticedSort, searchQuery, selectedTag]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, pageCount));
@@ -142,7 +144,7 @@ export function BasicsPage(props: BasicsPageProps) {
   function openExercise(exercise: BasicExercise) {
     setSelectedSlug(exercise.slug);
     setActiveProblemTab("description");
-    setAttemptForm(createAttemptForm(exercise));
+    setAttemptForm(createAttemptForm(exercise, props.reviewSchedulePreset));
     setExecutionResult(null);
     setView("detail");
     setError(null);
@@ -210,7 +212,7 @@ export function BasicsPage(props: BasicsPageProps) {
 
     try {
       await createPracticeSession(toPracticeRequest(selectedExercise.learningItemId, attemptForm));
-      setAttemptForm(createAttemptForm(selectedExercise));
+      setAttemptForm(createAttemptForm(selectedExercise, props.reviewSchedulePreset));
       await props.onChanged();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to save Basics attempt.");
@@ -391,6 +393,15 @@ export function BasicsPage(props: BasicsPageProps) {
               </label>
 
               <label>
+                Next review
+                <input
+                  type="date"
+                  value={attemptForm.nextReviewAt}
+                  onChange={(event) => updateAttemptForm("nextReviewAt", event.target.value)}
+                />
+              </label>
+
+              <label>
                 Notes
                 <textarea
                   value={attemptForm.notes}
@@ -481,6 +492,18 @@ export function BasicsPage(props: BasicsPageProps) {
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="exercise or hashtag..."
                 />
+              </label>
+
+              <label>
+                Last practiced
+                <select
+                  value={lastPracticedSort}
+                  onChange={(event) => setLastPracticedSort(event.target.value as LastPracticedSort)}
+                >
+                  <option value="never-first">Never practiced first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="newest">Newest first</option>
+                </select>
               </label>
 
               <div className="tag-filter-list" aria-label="Basics hashtags">
@@ -739,6 +762,7 @@ function toPracticeRequest(learningItemId: string, form: BasicsAttemptForm): Cre
     outcome: form.outcome,
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
+    nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
     notes: form.notes.trim(),
     sourceCode: form.codeDraft.trim(),
     whatHelped: form.whatHelped.trim(),
@@ -748,14 +772,35 @@ function toPracticeRequest(learningItemId: string, form: BasicsAttemptForm): Cre
 }
 
 /**
+ * Creates an empty attempt form with the default next review date.
+ *
+ * @param reviewSchedulePreset - Selected default review interval.
+ * @returns Editable attempt form.
+ */
+function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): BasicsAttemptForm {
+  return {
+    outcome: "Completed",
+    confidence: "",
+    durationMinutes: "",
+    nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
+    notes: "",
+    whatHelped: "",
+    whatWasDifficult: "",
+    improveNext: "",
+    codeDraft: ""
+  };
+}
+
+/**
  * Creates the local attempt form for a Basics exercise.
  *
  * @param exercise - Selected Basics exercise.
+ * @param reviewSchedulePreset - Selected default review interval.
  * @returns Editable attempt form.
  */
-function createAttemptForm(exercise: BasicExercise): BasicsAttemptForm {
+function createAttemptForm(exercise: BasicExercise, reviewSchedulePreset: ReviewSchedulePreset): BasicsAttemptForm {
   return {
-    ...emptyAttemptForm,
+    ...createEmptyAttemptForm(reviewSchedulePreset),
     codeDraft: exercise.starterCode
   };
 }
