@@ -19,6 +19,18 @@ import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from ".
 type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "notes" | "settings";
 
 /**
+ * Internal navigation target for opening a concrete learning item.
+ */
+interface FocusedLearningTarget {
+  /** Learning item identifier. */
+  id: string;
+  /** Learning item type. */
+  type: LearningItemType;
+  /** Unique value that allows reopening the same item twice. */
+  nonce: number;
+}
+
+/**
  * Visual themes supported by the application shell.
  */
 type AppTheme = "light" | "dark";
@@ -45,6 +57,7 @@ export function App() {
     readInitialReviewSchedulePreset
   );
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [focusedLearningTarget, setFocusedLearningTarget] = useState<FocusedLearningTarget | null>(null);
   const [basicExercises, setBasicExercises] = useState<BasicExercise[]>([]);
   const [items, setItems] = useState<LearningItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -138,6 +151,65 @@ export function App() {
     );
   }, [basicExercises.length, items]);
 
+  /**
+   * Opens a concrete learning item in its owning module.
+   *
+   * @param target - Item type and identifier.
+   */
+  function openLearningTarget(target: { id: string; type: LearningItemType }) {
+    setFocusedLearningTarget({ ...target, nonce: Date.now() });
+    setActivePage(toAppPage(target.type));
+  }
+
+  /**
+   * Opens the highest-priority item represented by a weakness tag.
+   *
+   * @param tag - Weakness tag to drill.
+   */
+  function openWeaknessTag(tag: string) {
+    const normalizedTag = tag.toLowerCase();
+    const candidates = [
+      ...items
+        .filter((item) => item.tags.some((itemTag) => itemTag.toLowerCase() === normalizedTag))
+        .map((item) => ({
+          id: item.id,
+          type: item.type,
+          confidence: item.confidence,
+          lastPracticedAt: item.lastPracticedAt,
+          nextReviewAt: item.nextReviewAt,
+          totalAttempts: item.totalAttempts
+        })),
+      ...basicExercises
+        .filter((exercise) => exercise.tags.some((itemTag) => itemTag.toLowerCase() === normalizedTag))
+        .map((exercise) => ({
+          id: exercise.learningItemId,
+          type: "Basics" as const,
+          confidence: exercise.confidence,
+          lastPracticedAt: exercise.lastPracticedAt,
+          nextReviewAt: exercise.nextReviewAt,
+          totalAttempts: exercise.totalAttempts
+        }))
+    ];
+
+    const bestCandidate = candidates
+      .map((candidate) => ({
+        ...candidate,
+        score: calculateOverviewTargetScore(candidate)
+      }))
+      .sort((left, right) => right.score - left.score)[0];
+
+    if (bestCandidate) {
+      openLearningTarget(bestCandidate);
+    }
+  }
+
+  /**
+   * Clears a handled deep-link target.
+   */
+  function clearFocusedLearningTarget() {
+    setFocusedLearningTarget(null);
+  }
+
   return (
     <main className="app-shell">
       <section className="top-bar" aria-labelledby="page-title">
@@ -202,24 +274,53 @@ export function App() {
       {error ? <p className="error-banner">{error}</p> : null}
 
       {activePage === "overview" ? (
-        <OverviewPage dashboard={dashboard} groupedCounts={groupedCounts} />
+        <OverviewPage
+          dashboard={dashboard}
+          groupedCounts={groupedCounts}
+          onOpenItem={openLearningTarget}
+          onOpenWeaknessTag={openWeaknessTag}
+        />
       ) : null}
 
-      {activePage === "dsa" ? <DsaPage reviewSchedulePreset={reviewSchedulePreset} onChanged={refreshData} /> : null}
+      {activePage === "dsa" ? (
+        <DsaPage
+          focusItemId={focusedLearningTarget?.type === "Dsa" ? focusedLearningTarget.id : null}
+          focusNonce={focusedLearningTarget?.type === "Dsa" ? focusedLearningTarget.nonce : null}
+          reviewSchedulePreset={reviewSchedulePreset}
+          onChanged={refreshData}
+          onFocusHandled={clearFocusedLearningTarget}
+        />
+      ) : null}
 
       {activePage === "system-design" ? (
-        <SystemDesignPage reviewSchedulePreset={reviewSchedulePreset} onChanged={refreshData} />
+        <SystemDesignPage
+          focusItemId={focusedLearningTarget?.type === "SystemDesign" ? focusedLearningTarget.id : null}
+          focusNonce={focusedLearningTarget?.type === "SystemDesign" ? focusedLearningTarget.nonce : null}
+          reviewSchedulePreset={reviewSchedulePreset}
+          onChanged={refreshData}
+          onFocusHandled={clearFocusedLearningTarget}
+        />
       ) : null}
 
       {activePage === "basics" ? (
         <BasicsPage
           basicExercises={basicExercises}
+          focusItemId={focusedLearningTarget?.type === "Basics" ? focusedLearningTarget.id : null}
+          focusNonce={focusedLearningTarget?.type === "Basics" ? focusedLearningTarget.nonce : null}
           reviewSchedulePreset={reviewSchedulePreset}
           onChanged={refreshData}
+          onFocusHandled={clearFocusedLearningTarget}
         />
       ) : null}
 
-      {activePage === "flashcards" ? <FlashcardsPage onChanged={refreshData} /> : null}
+      {activePage === "flashcards" ? (
+        <FlashcardsPage
+          focusCardId={focusedLearningTarget?.type === "Flashcard" ? focusedLearningTarget.id : null}
+          focusNonce={focusedLearningTarget?.type === "Flashcard" ? focusedLearningTarget.nonce : null}
+          onChanged={refreshData}
+          onFocusHandled={clearFocusedLearningTarget}
+        />
+      ) : null}
 
       {activePage === "notes" ? <NotesPage /> : null}
 
@@ -282,6 +383,10 @@ interface OverviewPageProps {
   dashboard: Dashboard | null;
   /** Learning item counts grouped by type. */
   groupedCounts: Record<LearningItemType, number>;
+  /** Opens a concrete learning item in its owning module. */
+  onOpenItem: (target: { id: string; type: LearningItemType }) => void;
+  /** Opens a high-priority item for a weakness tag. */
+  onOpenWeaknessTag: (tag: string) => void;
 }
 
 /**
@@ -298,6 +403,85 @@ function OverviewPage(props: OverviewPageProps) {
         <Metric label="This week" value={props.dashboard?.practicesThisWeek ?? 0} />
         <Metric label="Due reviews" value={props.dashboard?.dueReviewCount ?? 0} />
         <Metric label="Never practiced" value={props.dashboard?.neverPracticedCount ?? 0} />
+      </section>
+
+      <section className="dashboard-focus-grid" aria-label="Daily interview focus">
+        <section className="panel data-panel" aria-labelledby="today-plan-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Daily interview plan</p>
+              <h2 id="today-plan-title">Today</h2>
+            </div>
+            <span className="confidence">{props.dashboard?.interviewPlan?.length ?? 0}/5</span>
+          </div>
+
+          {props.dashboard?.interviewPlan?.length ? (
+            <ul className="stack-list">
+              {props.dashboard.interviewPlan.map((item) => (
+                <li className="list-row today-plan-row" key={item.id}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>
+                      {formatType(item.type)} · {item.reason}
+                    </span>
+                    <span className="tag-row compact">
+                      {item.tags.length ? item.tags.slice(0, 4).map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
+                    </span>
+                  </div>
+                  <div className="overview-row-actions">
+                    <span className="confidence">{item.confidence ? `${item.confidence}/5` : "No confidence"}</span>
+                    <button className="secondary-button compact-button" type="button" onClick={() => props.onOpenItem(item)}>
+                      Open
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">No suggested practice items yet.</p>
+          )}
+        </section>
+
+        <section className="panel data-panel" aria-labelledby="weakness-map-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Weakness map</p>
+              <h2 id="weakness-map-title">Tags to drill</h2>
+            </div>
+          </div>
+
+          {props.dashboard?.weaknessMap?.length ? (
+            <ul className="weakness-list">
+              {props.dashboard.weaknessMap.map((weakness) => (
+                <li className="weakness-row" key={weakness.tag}>
+                  <div>
+                    <strong>#{weakness.tag}</strong>
+                    <span>
+                      {weakness.itemCount} items · {weakness.failedOrPartialAttempts} failed/partial
+                    </span>
+                    {weakness.improveNextSamples.length ? (
+                      <small>{weakness.improveNextSamples[0]}</small>
+                    ) : null}
+                  </div>
+                  <div className="overview-row-actions">
+                    <span className="confidence">
+                      {weakness.averageConfidence ? `${weakness.averageConfidence}/5` : "No confidence"}
+                    </span>
+                    <button
+                      className="secondary-button compact-button"
+                      type="button"
+                      onClick={() => props.onOpenWeaknessTag(weakness.tag)}
+                    >
+                      Drill
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">Weakness tags will appear after a few attempts.</p>
+          )}
+        </section>
       </section>
 
       <section className="panel data-panel" aria-labelledby="overview-title">
@@ -322,7 +506,12 @@ function OverviewPage(props: OverviewPageProps) {
                   <strong>{item.title}</strong>
                   <span>{formatType(item.type)}</span>
                 </div>
-                <span className="confidence">{item.confidence ? `${item.confidence}/5` : "No confidence"}</span>
+                <div className="overview-row-actions">
+                  <span className="confidence">{item.confidence ? `${item.confidence}/5` : "No confidence"}</span>
+                  <button className="secondary-button compact-button" type="button" onClick={() => props.onOpenItem(item)}>
+                    Open
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -402,6 +591,68 @@ function SettingsPage(props: SettingsPageProps) {
  */
 function formatType(type: LearningItemType) {
   return type === "Dsa" ? "DSA" : type === "SystemDesign" ? "System Design" : type === "Flashcard" ? "Flashcard" : "Basics";
+}
+
+/**
+ * Converts a learning item type into the owning app page.
+ *
+ * @param type - Learning item type.
+ * @returns App page containing the item.
+ */
+function toAppPage(type: LearningItemType): AppPage {
+  if (type === "Dsa") {
+    return "dsa";
+  }
+
+  if (type === "SystemDesign") {
+    return "system-design";
+  }
+
+  if (type === "Flashcard") {
+    return "flashcards";
+  }
+
+  return "basics";
+}
+
+/**
+ * Scores candidate items when opening a weakness tag.
+ *
+ * @param candidate - Potential item to drill.
+ * @returns Higher score for more useful practice targets.
+ */
+function calculateOverviewTargetScore(candidate: {
+  confidence?: number | null;
+  lastPracticedAt?: string | null;
+  nextReviewAt?: string | null;
+  totalAttempts: number;
+}) {
+  const now = Date.now();
+  let score = 0;
+
+  if (candidate.nextReviewAt && new Date(candidate.nextReviewAt).getTime() <= now) {
+    score += 100;
+  }
+
+  if (!candidate.lastPracticedAt) {
+    score += 80;
+  } else if (new Date(candidate.lastPracticedAt).getTime() <= now - 21 * 24 * 60 * 60 * 1000) {
+    score += 35;
+  }
+
+  if (!candidate.confidence) {
+    score += 20;
+  } else if (candidate.confidence <= 2) {
+    score += 45;
+  } else if (candidate.confidence === 3) {
+    score += 20;
+  }
+
+  if (candidate.totalAttempts === 0) {
+    score += 15;
+  }
+
+  return score;
 }
 
 /**

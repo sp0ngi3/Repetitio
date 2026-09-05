@@ -16,6 +16,11 @@ public static class FlashcardEndpoints
 {
     private const int MaxBatchImportSize = 1000;
     private const string PriorityFlashcardSort = "priority";
+    private const string LastPracticedOldestSort = "last-practiced-oldest";
+    private const string LastPracticedNewestSort = "last-practiced-newest";
+    private const string CreatedNewestSort = "created-newest";
+    private const string NameSort = "name";
+    private const string TitleSort = "title";
 
     /// <summary>
     /// Adds flashcard endpoints to the application.
@@ -59,6 +64,7 @@ public static class FlashcardEndpoints
         LearningItemStatus? status,
         LearningDifficulty? difficulty,
         string? search,
+        string? tag,
         string? sort,
         int page = 1,
         int pageSize = 10)
@@ -86,6 +92,18 @@ public static class FlashcardEndpoints
                 || flashcard.LearningItem.Tags.Any(itemTag => itemTag.Tag.Name.Contains(normalizedSearch)));
         }
 
+        var tags = await query
+            .SelectMany(flashcard => flashcard.LearningItem.Tags.Select(itemTag => itemTag.Tag.Name))
+            .Distinct()
+            .OrderBy(tagName => tagName)
+            .ToArrayAsync();
+
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            var normalizedTag = tag.Trim();
+            query = query.Where(flashcard => flashcard.LearningItem.Tags.Any(itemTag => itemTag.Tag.Name == normalizedTag));
+        }
+
         var normalizedPage = NormalizePage(page);
         var normalizedPageSize = NormalizePageSize(pageSize);
         var totalCount = await query.CountAsync();
@@ -97,6 +115,7 @@ public static class FlashcardEndpoints
         return Results.Ok(new PagedFlashcardResponse
         {
             Items = flashcards.Select(ToResponse).ToArray(),
+            Tags = tags,
             TotalCount = totalCount,
             Page = normalizedPage,
             PageSize = normalizedPageSize
@@ -301,10 +320,12 @@ public static class FlashcardEndpoints
     private static async Task<IResult> GetDecksAsync(
         RepetitioDbContext dbContext,
         string? search,
+        string? tag,
+        string? sort,
         int page = 1,
         int pageSize = 10)
     {
-        var query = dbContext.FlashcardDecks.AsNoTracking();
+        var query = DeckQuery(dbContext).AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -320,35 +341,32 @@ public static class FlashcardEndpoints
                     || deckCard.Flashcard.LearningItem.Tags.Any(itemTag => itemTag.Tag.Name.Contains(normalizedSearch))));
         }
 
+        var tags = await query
+            .SelectMany(deck => deck.Cards.SelectMany(deckCard =>
+                deckCard.Flashcard.LearningItem.Tags.Select(itemTag => itemTag.Tag.Name)))
+            .Distinct()
+            .OrderBy(tagName => tagName)
+            .ToArrayAsync();
+
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            var normalizedTag = tag.Trim();
+            query = query.Where(deck => deck.Cards.Any(deckCard =>
+                deckCard.Flashcard.LearningItem.Tags.Any(itemTag => itemTag.Tag.Name == normalizedTag)));
+        }
+
         var normalizedPage = NormalizePage(page);
         var normalizedPageSize = NormalizePageSize(pageSize);
         var totalCount = await query.CountAsync();
-        var decks = await query
-            .OrderBy(deck => deck.NextReviewAt == null)
-            .ThenBy(deck => deck.NextReviewAt)
-            .ThenBy(deck => deck.Name)
+        var decks = await ApplyDeckSort(query, sort)
             .Skip((normalizedPage - 1) * normalizedPageSize)
             .Take(normalizedPageSize)
-            .Select(deck => new FlashcardDeckSummaryResponse
-            {
-                Id = deck.Id,
-                Name = deck.Name,
-                Description = deck.Description,
-                CardCount = deck.Cards.Count,
-                DefaultSessionSize = deck.DefaultSessionSize,
-                TotalRuns = deck.TotalRuns,
-                TotalReviews = deck.Reviews.Count,
-                KnownReviews = deck.Reviews.Count(review => review.KnewAnswer),
-                LastPracticedAt = deck.LastPracticedAt,
-                NextReviewAt = deck.NextReviewAt,
-                CreatedAt = deck.CreatedAt,
-                UpdatedAt = deck.UpdatedAt
-            })
             .ToListAsync();
 
         return Results.Ok(new PagedFlashcardDeckResponse
         {
-            Items = decks,
+            Items = decks.Select(ToDeckSummaryResponse).ToArray(),
+            Tags = tags,
             TotalCount = totalCount,
             Page = normalizedPage,
             PageSize = normalizedPageSize
@@ -638,7 +656,9 @@ public static class FlashcardEndpoints
             .ThenInclude(itemTag => itemTag.Tag)
             .Include(flashcard => flashcard.LearningItem)
             .ThenInclude(item => item.PracticeSessions)
-            .Include(flashcard => flashcard.Reviews);
+            .Include(flashcard => flashcard.Reviews)
+            .Include(flashcard => flashcard.DeckCards)
+            .ThenInclude(deckCard => deckCard.Deck);
     }
 
     /// <summary>
@@ -669,10 +689,80 @@ public static class FlashcardEndpoints
                 .ThenBy(flashcard => flashcard.LearningItem.Title);
         }
 
+        if (string.Equals(sort, LastPracticedOldestSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query
+                .OrderBy(flashcard => flashcard.LearningItem.LastPracticedAt != null)
+                .ThenBy(flashcard => flashcard.LearningItem.LastPracticedAt)
+                .ThenBy(flashcard => flashcard.LearningItem.Title);
+        }
+
+        if (string.Equals(sort, LastPracticedNewestSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query
+                .OrderBy(flashcard => flashcard.LearningItem.LastPracticedAt == null)
+                .ThenByDescending(flashcard => flashcard.LearningItem.LastPracticedAt)
+                .ThenBy(flashcard => flashcard.LearningItem.Title);
+        }
+
+        if (string.Equals(sort, CreatedNewestSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query
+                .OrderByDescending(flashcard => flashcard.LearningItem.CreatedAt)
+                .ThenBy(flashcard => flashcard.LearningItem.Title);
+        }
+
+        if (string.Equals(sort, TitleSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query.OrderBy(flashcard => flashcard.LearningItem.Title);
+        }
+
         return query
             .OrderBy(flashcard => flashcard.LearningItem.NextReviewAt == null)
             .ThenBy(flashcard => flashcard.LearningItem.NextReviewAt)
             .ThenBy(flashcard => flashcard.LearningItem.Title);
+    }
+
+    /// <summary>
+    /// Applies the requested saved learning session ordering.
+    /// </summary>
+    /// <param name="query">The deck query to sort.</param>
+    /// <param name="sort">The requested sort mode.</param>
+    /// <returns>The sorted deck query.</returns>
+    private static IOrderedQueryable<FlashcardDeck> ApplyDeckSort(IQueryable<FlashcardDeck> query, string? sort)
+    {
+        if (string.Equals(sort, LastPracticedOldestSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query
+                .OrderBy(deck => deck.LastPracticedAt != null)
+                .ThenBy(deck => deck.LastPracticedAt)
+                .ThenBy(deck => deck.Name);
+        }
+
+        if (string.Equals(sort, LastPracticedNewestSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query
+                .OrderBy(deck => deck.LastPracticedAt == null)
+                .ThenByDescending(deck => deck.LastPracticedAt)
+                .ThenBy(deck => deck.Name);
+        }
+
+        if (string.Equals(sort, CreatedNewestSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query
+                .OrderByDescending(deck => deck.CreatedAt)
+                .ThenBy(deck => deck.Name);
+        }
+
+        if (string.Equals(sort, NameSort, StringComparison.OrdinalIgnoreCase))
+        {
+            return query.OrderBy(deck => deck.Name);
+        }
+
+        return query
+            .OrderBy(deck => deck.NextReviewAt == null)
+            .ThenBy(deck => deck.NextReviewAt)
+            .ThenBy(deck => deck.Name);
     }
 
     /// <summary>
@@ -843,6 +933,14 @@ public static class FlashcardEndpoints
             LastPracticedAt = flashcard.LearningItem.LastPracticedAt,
             NextReviewAt = flashcard.LearningItem.NextReviewAt,
             Tags = flashcard.LearningItem.Tags.Select(itemTag => itemTag.Tag.Name).Order(StringComparer.Ordinal).ToArray(),
+            LearningSessions = flashcard.DeckCards
+                .OrderBy(deckCard => deckCard.Deck.Name)
+                .Select(deckCard => new FlashcardDeckMembershipResponse
+                {
+                    Id = deckCard.DeckId,
+                    Name = deckCard.Deck.Name
+                })
+                .ToArray(),
             TotalReviews = flashcard.Reviews.Count,
             KnownReviews = flashcard.Reviews.Count(review => review.KnewAnswer),
             PracticeSessions = flashcard.LearningItem.PracticeSessions
@@ -872,6 +970,11 @@ public static class FlashcardEndpoints
             NextReviewAt = deck.NextReviewAt,
             CreatedAt = deck.CreatedAt,
             UpdatedAt = deck.UpdatedAt,
+            Tags = deck.Cards
+                .SelectMany(deckCard => deckCard.Flashcard.LearningItem.Tags.Select(itemTag => itemTag.Tag.Name))
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray(),
             Cards = deck.Cards
                 .OrderBy(deckCard => deckCard.SortOrder)
                 .Select(deckCard => ToResponse(deckCard.Flashcard))
@@ -899,7 +1002,12 @@ public static class FlashcardEndpoints
             LastPracticedAt = deck.LastPracticedAt,
             NextReviewAt = deck.NextReviewAt,
             CreatedAt = deck.CreatedAt,
-            UpdatedAt = deck.UpdatedAt
+            UpdatedAt = deck.UpdatedAt,
+            Tags = deck.Cards
+                .SelectMany(deckCard => deckCard.Flashcard.LearningItem.Tags.Select(itemTag => itemTag.Tag.Name))
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray()
         };
     }
 
@@ -921,6 +1029,11 @@ public static class FlashcardEndpoints
             DurationMs = session.DurationMs,
             Outcome = session.Outcome,
             Confidence = session.Confidence,
+            ClarifiedRequirements = session.ClarifiedRequirements,
+            FoundEdgeCases = session.FoundEdgeCases,
+            ExplainedComplexity = session.ExplainedComplexity,
+            TestedSolution = session.TestedSolution,
+            CommunicatedTradeoffs = session.CommunicatedTradeoffs,
             Approach = session.Approach,
             Prompt = session.Prompt,
             Notes = session.Notes,

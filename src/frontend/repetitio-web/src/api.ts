@@ -271,7 +271,8 @@ export function getFlashcards(filters: {
   status?: LearningItemStatus | "";
   difficulty?: LearningDifficulty | "";
   search?: string;
-  sort?: "priority";
+  tag?: string;
+  sort?: "priority" | "last-practiced-oldest" | "last-practiced-newest" | "created-newest" | "title";
   page?: number;
   pageSize?: number;
 } = {}): Promise<PagedFlashcardResponse> {
@@ -287,6 +288,10 @@ export function getFlashcards(filters: {
 
   if (filters.search?.trim()) {
     query.set("search", filters.search.trim());
+  }
+
+  if (filters.tag?.trim()) {
+    query.set("tag", filters.tag.trim());
   }
 
   if (filters.sort) {
@@ -316,6 +321,16 @@ export function createFlashcard(request: CreateFlashcardRequest): Promise<Flashc
     method: "POST",
     body: JSON.stringify(request)
   });
+}
+
+/**
+ * Loads one flashcard.
+ *
+ * @param id - Flashcard identifier.
+ * @returns The matching flashcard.
+ */
+export function getFlashcard(id: string): Promise<Flashcard> {
+  return requestJson<Flashcard>(`/api/flashcards/${id}`);
 }
 
 /**
@@ -370,6 +385,8 @@ export async function deleteFlashcard(id: string): Promise<void> {
  */
 export function getFlashcardDecks(filters: {
   search?: string;
+  tag?: string;
+  sort?: "priority" | "last-practiced-oldest" | "last-practiced-newest" | "created-newest" | "name";
   page?: number;
   pageSize?: number;
 } = {}): Promise<PagedFlashcardDeckResponse> {
@@ -377,6 +394,14 @@ export function getFlashcardDecks(filters: {
 
   if (filters.search?.trim()) {
     query.set("search", filters.search.trim());
+  }
+
+  if (filters.tag?.trim()) {
+    query.set("tag", filters.tag.trim());
+  }
+
+  if (filters.sort) {
+    query.set("sort", filters.sort);
   }
 
   if (filters.page) {

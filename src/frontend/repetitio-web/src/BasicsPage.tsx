@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { createPracticeSession, executeBasicExercise } from "./api";
+import {
+  AttemptScorecard,
+  AttemptScorecardSummary,
+  emptyAttemptScorecard,
+  type AttemptScorecardValue
+} from "./AttemptScorecard";
 import { getPracticeAgeClass } from "./practiceAge";
 import { sortByLastPracticed, type LastPracticedSort } from "./practiceSort";
 import { createDefaultNextReviewDate, toNextReviewTimestamp, type ReviewSchedulePreset } from "./reviewSchedule";
@@ -49,7 +55,7 @@ const problemTabs: { key: BasicsProblemTab; label: string }[] = [
 /**
  * Represents the local Basics attempt form state.
  */
-interface BasicsAttemptForm {
+interface BasicsAttemptForm extends AttemptScorecardValue {
   /** Attempt outcome. */
   outcome: PracticeOutcome;
   /** Confidence value as form text. */
@@ -79,10 +85,16 @@ interface BasicsAttemptForm {
 interface BasicsPageProps {
   /** Built-in Basics exercises with progress. */
   basicExercises: BasicExercise[];
+  /** Learning item id to open from the Overview page. */
+  focusItemId?: string | null;
+  /** Changes when the same focused item should be reopened. */
+  focusNonce?: number | null;
   /** Default review schedule for new practice attempts. */
   reviewSchedulePreset: ReviewSchedulePreset;
   /** Called after a Basics attempt is recorded. */
   onChanged: () => Promise<void> | void;
+  /** Called after the focused item has been opened. */
+  onFocusHandled?: () => void;
 }
 
 /**
@@ -135,6 +147,19 @@ export function BasicsPage(props: BasicsPageProps) {
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, pageCount));
   }, [pageCount]);
+
+  useEffect(() => {
+    if (!props.focusItemId) {
+      return;
+    }
+
+    const focusedExercise = props.basicExercises.find((exercise) => exercise.learningItemId === props.focusItemId);
+
+    if (focusedExercise) {
+      openExercise(focusedExercise);
+      props.onFocusHandled?.();
+    }
+  }, [props.focusItemId, props.focusNonce, props.basicExercises]);
 
   /**
    * Opens the selected Basics exercise detail page.
@@ -401,6 +426,11 @@ export function BasicsPage(props: BasicsPageProps) {
                 />
               </label>
 
+              <AttemptScorecard
+                value={attemptForm}
+                onChange={(key, value) => updateAttemptForm(key, value)}
+              />
+
               <label>
                 Notes
                 <textarea
@@ -449,6 +479,7 @@ export function BasicsPage(props: BasicsPageProps) {
                     <div>
                       <strong>{formatStatus(session.outcome)}</strong>
                       <span>{formatDate(session.startedAt)}</span>
+                      <AttemptScorecardSummary value={session} />
                       {session.notes ? <small>{session.notes}</small> : null}
                       {session.sourceCode ? (
                         <details className="history-code">
@@ -763,6 +794,11 @@ function toPracticeRequest(learningItemId: string, form: BasicsAttemptForm): Cre
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
     nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
+    clarifiedRequirements: form.clarifiedRequirements,
+    foundEdgeCases: form.foundEdgeCases,
+    explainedComplexity: form.explainedComplexity,
+    testedSolution: form.testedSolution,
+    communicatedTradeoffs: form.communicatedTradeoffs,
     notes: form.notes.trim(),
     sourceCode: form.codeDraft.trim(),
     whatHelped: form.whatHelped.trim(),
@@ -783,6 +819,7 @@ function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): Bas
     confidence: "",
     durationMinutes: "",
     nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
+    ...emptyAttemptScorecard,
     notes: "",
     whatHelped: "",
     whatWasDifficult: "",

@@ -67,7 +67,23 @@ public sealed record ImportFlashcardBatchRequest
     /// <summary>
     /// Gets the maximum number of imported flashcards in one automatically created saved learning session.
     /// </summary>
-    public int LearningSessionSize { get; init; } = 25;
+    public int LearningSessionSize { get; init; } = 50;
+}
+
+/// <summary>
+/// Represents a saved learning session that contains a flashcard.
+/// </summary>
+public sealed record FlashcardDeckMembershipResponse
+{
+    /// <summary>
+    /// Gets the saved learning session identifier.
+    /// </summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>
+    /// Gets the saved learning session name.
+    /// </summary>
+    public required string Name { get; init; }
 }
 
 /// <summary>
@@ -178,6 +194,11 @@ public sealed record FlashcardResponse
     public required IReadOnlyCollection<string> Tags { get; init; }
 
     /// <summary>
+    /// Gets the saved learning sessions that contain this flashcard.
+    /// </summary>
+    public required IReadOnlyCollection<FlashcardDeckMembershipResponse> LearningSessions { get; init; }
+
+    /// <summary>
     /// Gets the number of recorded reviews.
     /// </summary>
     public required int TotalReviews { get; init; }
@@ -202,6 +223,11 @@ public sealed record PagedFlashcardResponse
     /// Gets the flashcards on the current page.
     /// </summary>
     public required IReadOnlyCollection<FlashcardResponse> Items { get; init; }
+
+    /// <summary>
+    /// Gets tag facets for the current search and fixed filters.
+    /// </summary>
+    public required IReadOnlyCollection<string> Tags { get; init; }
 
     /// <summary>
     /// Gets the total number of matching flashcards.
@@ -309,6 +335,11 @@ public sealed record FlashcardDeckResponse
     /// Gets the date and time when the deck was last updated.
     /// </summary>
     public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>
+    /// Gets tag names represented by this saved learning session.
+    /// </summary>
+    public required IReadOnlyCollection<string> Tags { get; init; }
 }
 
 /// <summary>
@@ -375,6 +406,11 @@ public sealed record FlashcardDeckSummaryResponse
     /// Gets the date and time when the deck was last updated.
     /// </summary>
     public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>
+    /// Gets tag names represented by this saved learning session.
+    /// </summary>
+    public required IReadOnlyCollection<string> Tags { get; init; }
 }
 
 /// <summary>
@@ -386,6 +422,11 @@ public sealed record PagedFlashcardDeckResponse
     /// Gets the saved learning sessions on the current page.
     /// </summary>
     public required IReadOnlyCollection<FlashcardDeckSummaryResponse> Items { get; init; }
+
+    /// <summary>
+    /// Gets tag facets for the current search.
+    /// </summary>
+    public required IReadOnlyCollection<string> Tags { get; init; }
 
     /// <summary>
     /// Gets the total number of matching saved learning sessions.

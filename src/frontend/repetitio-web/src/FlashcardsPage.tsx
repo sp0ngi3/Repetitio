@@ -5,6 +5,7 @@ import {
   createFlashcardDeck,
   deleteFlashcard,
   deleteFlashcardDeck,
+  getFlashcard,
   getFlashcardDeck,
   getFlashcardDecks,
   getFlashcards,
@@ -29,6 +30,21 @@ import type {
  * Flashcard page view modes.
  */
 type FlashcardView = "dashboard" | "new-card" | "edit-card" | "new-deck" | "edit-deck" | "study";
+
+/**
+ * Dashboard sub-views.
+ */
+type FlashcardsDashboardMode = "sessions" | "cards";
+
+/**
+ * Flashcard sort modes supported by the API.
+ */
+type FlashcardSort = "priority" | "last-practiced-oldest" | "last-practiced-newest" | "created-newest" | "title";
+
+/**
+ * Saved learning session sort modes supported by the API.
+ */
+type LearningSessionSort = "priority" | "last-practiced-oldest" | "last-practiced-newest" | "created-newest" | "name";
 
 /**
  * Number of flashcards shown on one dashboard page.
@@ -96,6 +112,22 @@ interface FlashcardFilters {
   status: LearningItemStatus | "";
   /** Difficulty filter. */
   difficulty: LearningDifficulty | "";
+  /** Tag filter. */
+  tag: string;
+  /** Sort mode. */
+  sort: FlashcardSort;
+}
+
+/**
+ * Saved learning session list filters.
+ */
+interface LearningSessionFilters {
+  /** Text search. */
+  search: string;
+  /** Tag filter. */
+  tag: string;
+  /** Sort mode. */
+  sort: LearningSessionSort;
 }
 
 /**
@@ -166,7 +198,7 @@ const emptyDeckForm: FlashcardDeckForm = {
 const emptyImportSessionForm: FlashcardImportSessionForm = {
   createLearningSessions: false,
   learningSessionName: "",
-  learningSessionSize: "25"
+  learningSessionSize: "50"
 };
 
 /**
@@ -204,8 +236,14 @@ const flashcardImportExample = JSON.stringify(
  * Props accepted by the Flashcards page.
  */
 interface FlashcardsPageProps {
+  /** Flashcard id to open from the Overview page. */
+  focusCardId?: string | null;
+  /** Changes when the same focused card should be reopened. */
+  focusNonce?: number | null;
   /** Called after flashcard practice changes global progress data. */
   onChanged: () => Promise<void> | void;
+  /** Called after the focused card has been opened. */
+  onFocusHandled?: () => void;
 }
 
 /**
@@ -216,12 +254,25 @@ interface FlashcardsPageProps {
  */
 export function FlashcardsPage(props: FlashcardsPageProps) {
   const [view, setView] = useState<FlashcardView>("dashboard");
+  const [dashboardMode, setDashboardMode] = useState<FlashcardsDashboardMode>("sessions");
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [flashcardTotalCount, setFlashcardTotalCount] = useState(0);
+  const [flashcardAvailableTags, setFlashcardAvailableTags] = useState<string[]>([]);
   const [decks, setDecks] = useState<FlashcardDeckSummary[]>([]);
   const [deckTotalCount, setDeckTotalCount] = useState(0);
-  const [filters, setFilters] = useState<FlashcardFilters>({ search: "", status: "", difficulty: "" });
-  const [deckSearch, setDeckSearch] = useState("");
+  const [deckAvailableTags, setDeckAvailableTags] = useState<string[]>([]);
+  const [filters, setFilters] = useState<FlashcardFilters>({
+    search: "",
+    status: "",
+    difficulty: "",
+    tag: "",
+    sort: "priority"
+  });
+  const [deckFilters, setDeckFilters] = useState<LearningSessionFilters>({
+    search: "",
+    tag: "",
+    sort: "last-practiced-oldest"
+  });
   const [cardForm, setCardForm] = useState<FlashcardForm>(emptyFlashcardForm);
   const [deckForm, setDeckForm] = useState<FlashcardDeckForm>(emptyDeckForm);
   const [selectedCard, setSelectedCard] = useState<Flashcard | null>(null);
@@ -247,7 +298,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   const [showImportExample, setShowImportExample] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debouncedCardSearch = useDebouncedValue(filters.search, searchDebounceMs);
-  const debouncedDeckSearch = useDebouncedValue(deckSearch, searchDebounceMs);
+  const debouncedDeckSearch = useDebouncedValue(deckFilters.search, searchDebounceMs);
   const debouncedPickerSearch = useDebouncedValue(pickerSearch, searchDebounceMs);
 
   const flashcardPageCount = Math.max(1, Math.ceil(flashcardTotalCount / flashcardsPageSize));
@@ -279,6 +330,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
         pageSize: flashcardsPageSize
       });
       setFlashcards(response.items);
+      setFlashcardAvailableTags(response.tags);
       setFlashcardTotalCount(response.totalCount);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to load flashcards.");
@@ -297,10 +349,13 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
     try {
       const response = await getFlashcardDecks({
         search: debouncedDeckSearch,
+        tag: deckFilters.tag,
+        sort: deckFilters.sort,
         page: deckPage,
         pageSize: decksPageSize
       });
       setDecks(response.items);
+      setDeckAvailableTags(response.tags);
       setDeckTotalCount(response.totalCount);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to load flashcard sessions.");
@@ -335,17 +390,41 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
 
   useEffect(() => {
     void loadFlashcards();
-  }, [debouncedCardSearch, filters.status, filters.difficulty, currentPage]);
+  }, [debouncedCardSearch, filters.status, filters.difficulty, filters.tag, filters.sort, currentPage]);
 
   useEffect(() => {
     void loadDecks();
-  }, [debouncedDeckSearch, deckPage]);
+  }, [debouncedDeckSearch, deckFilters.tag, deckFilters.sort, deckPage]);
 
   useEffect(() => {
     if (view === "new-deck" || view === "edit-deck") {
       void loadPickerCards();
     }
   }, [view, debouncedPickerSearch, pickerPage]);
+
+  useEffect(() => {
+    if (!props.focusCardId) {
+      return;
+    }
+
+    async function openFocusedCard() {
+      setIsSaving(true);
+      setError(null);
+
+      try {
+        const flashcard = await getFlashcard(props.focusCardId!);
+        setDashboardMode("cards");
+        openEditCard(flashcard);
+        props.onFocusHandled?.();
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Unable to open flashcard.");
+      } finally {
+        setIsSaving(false);
+      }
+    }
+
+    void openFocusedCard();
+  }, [props.focusCardId, props.focusNonce]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, flashcardPageCount));
@@ -460,12 +539,12 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   }
 
   /**
-   * Updates saved learning session search and resets pagination.
+   * Updates saved learning session filters and resets pagination.
    *
-   * @param value - Search value.
+   * @param patch - Filter values to change.
    */
-  function updateDeckSearch(value: string) {
-    setDeckSearch(value);
+  function updateDeckFilters(patch: Partial<LearningSessionFilters>) {
+    setDeckFilters((current) => ({ ...current, ...patch }));
     setDeckPage(1);
   }
 
@@ -581,7 +660,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
       setImportSessionForm({
         createLearningSessions: false,
         learningSessionName: createImportSessionName(file.name),
-        learningSessionSize: "25"
+        learningSessionSize: "50"
       });
       setImportMessage(`Loaded ${formatCardCount(payload.flashcards.length)} from ${file.name}. Review before importing.`);
     } catch (requestError) {
@@ -948,7 +1027,29 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
         />
       ) : null}
 
-      <div className="flashcards-dashboard-grid">
+      <div className="dashboard-mode-toggle" role="tablist" aria-label="Flashcards dashboard views">
+        <button
+          className={dashboardMode === "sessions" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={dashboardMode === "sessions"}
+          onClick={() => setDashboardMode("sessions")}
+        >
+          Learning sessions
+        </button>
+        <button
+          className={dashboardMode === "cards" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={dashboardMode === "cards"}
+          onClick={() => setDashboardMode("cards")}
+        >
+          Flashcards
+        </button>
+      </div>
+
+      <div className="flashcards-dashboard-grid single-panel">
+        {dashboardMode === "cards" ? (
         <section className="panel flashcard-board" aria-label="Flashcard records">
           <div className="panel-heading">
             <div>
@@ -997,7 +1098,28 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                 ))}
               </select>
             </label>
+
+            <label>
+              Sort
+              <select
+                value={filters.sort}
+                onChange={(event) => updateFilters({ sort: event.target.value as FlashcardSort })}
+              >
+                <option value="priority">Priority</option>
+                <option value="last-practiced-oldest">Never / oldest practiced</option>
+                <option value="last-practiced-newest">Newest practiced</option>
+                <option value="created-newest">Newest created</option>
+                <option value="title">Title</option>
+              </select>
+            </label>
           </div>
+
+          <TagFilterPanel
+            availableTags={flashcardAvailableTags}
+            selectedTag={filters.tag}
+            emptyLabel="No card tags match this search yet."
+            onSelectTag={(tag) => updateFilters({ tag })}
+          />
 
           {isLoadingCards ? (
             <p className="empty-state">Loading flashcards...</p>
@@ -1022,6 +1144,13 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                     <span className="flashcard-question-preview">{flashcard.question}</span>
                     <span className="tag-row compact">
                       {flashcard.tags.length ? flashcard.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
+                    </span>
+                    <span className="session-membership-row">
+                      {(flashcard.learningSessions ?? []).length
+                        ? (flashcard.learningSessions ?? []).slice(0, 3).map((session) => (
+                            <span key={session.id}>{session.name}</span>
+                          ))
+                        : <span>No learning sessions</span>}
                     </span>
                   </span>
                   <span className="flashcard-record-side">
@@ -1048,7 +1177,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
             <p className="empty-state">No flashcards match the current filters.</p>
           )}
         </section>
-
+        ) : (
         <section className="panel flashcard-session-board" aria-labelledby="flashcard-decks-title">
           <div className="panel-heading">
             <div>
@@ -1061,12 +1190,33 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
             <label>
               Search sessions
               <input
-                value={deckSearch}
-                onChange={(event) => updateDeckSearch(event.target.value)}
+                value={deckFilters.search}
+                onChange={(event) => updateDeckFilters({ search: event.target.value })}
                 placeholder="session name, description, card, tag..."
               />
             </label>
+
+            <label>
+              Sort
+              <select
+                value={deckFilters.sort}
+                onChange={(event) => updateDeckFilters({ sort: event.target.value as LearningSessionSort })}
+              >
+                <option value="priority">Priority</option>
+                <option value="last-practiced-oldest">Never / oldest practiced</option>
+                <option value="last-practiced-newest">Newest practiced</option>
+                <option value="created-newest">Newest created</option>
+                <option value="name">Name</option>
+              </select>
+            </label>
           </div>
+
+          <TagFilterPanel
+            availableTags={deckAvailableTags}
+            selectedTag={deckFilters.tag}
+            emptyLabel="No learning session tags match this search yet."
+            onSelectTag={(tag) => updateDeckFilters({ tag })}
+          />
 
           {isLoadingDecks ? (
             <p className="empty-state">Loading learning sessions...</p>
@@ -1085,6 +1235,10 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                         {deck.description ? <small>{deck.description}</small> : null}
                       </div>
                       <span className="flashcard-count-badge">{deck.cardCount} cards</span>
+                    </div>
+
+                    <div className="tag-row compact">
+                      {deck.tags.length ? deck.tags.slice(0, 8).map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
                     </div>
 
                     <div className="session-metrics" aria-label={`${deck.name} session metrics`}>
@@ -1140,6 +1294,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
             <p className="empty-state">Create flashcards before saving a learning session.</p>
           )}
         </section>
+        )}
       </div>
     </section>
   );
@@ -1153,6 +1308,60 @@ interface PageHeadingProps {
   title: string;
   /** Returns to the dashboard. */
   onBack: () => void;
+}
+
+/**
+ * Props accepted by the collapsible tag filter.
+ */
+interface TagFilterPanelProps {
+  /** Tags available for the current server-backed search. */
+  availableTags: string[];
+  /** Currently selected tag. */
+  selectedTag: string;
+  /** Text shown when no tags are available. */
+  emptyLabel: string;
+  /** Selects a tag value. */
+  onSelectTag: (tag: string) => void;
+}
+
+/**
+ * Renders collapsible hashtag filters.
+ *
+ * @param props - Component props.
+ * @returns A collapsible tag filter panel.
+ */
+function TagFilterPanel(props: TagFilterPanelProps) {
+  return (
+    <details className="collapsible-filter-panel">
+      <summary>
+        <span>Hashtags</span>
+        {props.selectedTag ? <strong>#{props.selectedTag}</strong> : <small>{props.availableTags.length} available</small>}
+      </summary>
+      {props.availableTags.length ? (
+        <div className="tag-filter-list" aria-label="Tag filters">
+          <button
+            className={!props.selectedTag ? "active" : ""}
+            type="button"
+            onClick={() => props.onSelectTag("")}
+          >
+            All tags
+          </button>
+          {props.availableTags.map((tag) => (
+            <button
+              className={props.selectedTag === tag ? "active" : ""}
+              type="button"
+              key={tag}
+              onClick={() => props.onSelectTag(tag)}
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-state compact-empty">{props.emptyLabel}</p>
+      )}
+    </details>
+  );
 }
 
 /**
@@ -1879,7 +2088,7 @@ function toImportLearningSessionRequest(form: FlashcardImportSessionForm) {
   return {
     createLearningSessions: form.createLearningSessions,
     learningSessionName: form.learningSessionName.trim(),
-    learningSessionSize: Number.isFinite(sessionSize) ? sessionSize : 25
+    learningSessionSize: Number.isFinite(sessionSize) ? sessionSize : 50
   };
 }
 

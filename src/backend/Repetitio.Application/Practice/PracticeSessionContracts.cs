@@ -38,6 +38,31 @@ public sealed record CreatePracticeSessionRequest
     public int? Confidence { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether requirements were clarified during the session.
+    /// </summary>
+    public bool ClarifiedRequirements { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether edge cases were found during the session.
+    /// </summary>
+    public bool FoundEdgeCases { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether complexity was explained during the session.
+    /// </summary>
+    public bool ExplainedComplexity { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the solution was tested during the session.
+    /// </summary>
+    public bool TestedSolution { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether tradeoffs were communicated during the session.
+    /// </summary>
+    public bool CommunicatedTradeoffs { get; init; }
+
+    /// <summary>
     /// Gets the optional next review date selected for the practiced item.
     /// </summary>
     public DateTime? NextReviewAt { get; init; }
@@ -122,6 +147,31 @@ public sealed record PracticeSessionResponse
     /// Gets the confidence value from 1 to 5.
     /// </summary>
     public int? Confidence { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether requirements were clarified during the session.
+    /// </summary>
+    public required bool ClarifiedRequirements { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether edge cases were found during the session.
+    /// </summary>
+    public required bool FoundEdgeCases { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether complexity was explained during the session.
+    /// </summary>
+    public required bool ExplainedComplexity { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the solution was tested during the session.
+    /// </summary>
+    public required bool TestedSolution { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether tradeoffs were communicated during the session.
+    /// </summary>
+    public required bool CommunicatedTradeoffs { get; init; }
 
     /// <summary>
     /// Gets the approach used during the session.

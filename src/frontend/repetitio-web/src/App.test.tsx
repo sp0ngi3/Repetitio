@@ -17,6 +17,7 @@ import {
   getDashboard,
   getDsaProblemTemplate,
   getDsaProblems,
+  getFlashcard,
   getFlashcardDeck,
   getFlashcardDecks,
   getFlashcards,
@@ -69,6 +70,7 @@ vi.mock("./api", () => ({
   getDashboard: vi.fn(),
   getDsaProblemTemplate: vi.fn(),
   getDsaProblems: vi.fn(),
+  getFlashcard: vi.fn(),
   getFlashcardDeck: vi.fn(),
   getFlashcardDecks: vi.fn(),
   getFlashcards: vi.fn(),
@@ -96,6 +98,8 @@ const dashboard: Dashboard = {
   dueReviewCount: 0,
   neverPracticedCount: 0,
   dueReviews: [],
+  interviewPlan: [],
+  weaknessMap: [],
   recentPractice: []
 };
 
@@ -205,6 +209,7 @@ const flashcards: Flashcard[] = [
     lastPracticedAt: null,
     nextReviewAt: null,
     tags: ["system-design"],
+    learningSessions: [{ id: "deck-1", name: "Interview flashcards" }],
     totalReviews: 0,
     knownReviews: 0,
     practiceSessions: []
@@ -222,6 +227,7 @@ const flashcards: Flashcard[] = [
     lastPracticedAt: null,
     nextReviewAt: null,
     tags: ["binary-search"],
+    learningSessions: [{ id: "deck-1", name: "Interview flashcards" }],
     totalReviews: 1,
     knownReviews: 1,
     practiceSessions: []
@@ -239,6 +245,7 @@ const flashcards: Flashcard[] = [
     lastPracticedAt: null,
     nextReviewAt: null,
     tags: ["generated"],
+    learningSessions: [],
     totalReviews: 0,
     knownReviews: 0,
     practiceSessions: []
@@ -261,7 +268,8 @@ const flashcardDecks: FlashcardDeck[] = [
     lastPracticedAt: "2026-08-30T12:00:00Z",
     nextReviewAt: "2026-09-06T12:00:00Z",
     createdAt: "2026-08-30T12:00:00Z",
-    updatedAt: "2026-08-30T12:00:00Z"
+    updatedAt: "2026-08-30T12:00:00Z",
+    tags: ["system-design", "binary-search", "generated"]
   }
 ];
 
@@ -280,7 +288,8 @@ const flashcardDeckSummaries: FlashcardDeckSummary[] = flashcardDecks.map((deck)
   lastPracticedAt: deck.lastPracticedAt,
   nextReviewAt: deck.nextReviewAt,
   createdAt: deck.createdAt,
-  updatedAt: deck.updatedAt
+  updatedAt: deck.updatedAt,
+  tags: deck.tags
 }));
 
 /**
@@ -325,6 +334,11 @@ const dsaProblems: DsaProblem[] = [
         durationMs: 1500000,
         outcome: "Completed",
         confidence: 3,
+        clarifiedRequirements: true,
+        foundEdgeCases: true,
+        explainedComplexity: true,
+        testedSolution: false,
+        communicatedTradeoffs: false,
         approach: "Use stack pop checks for every closer.",
         notes: "Missed the odd length shortcut.",
         sourceCode: "public bool IsValid(string s) => true;",
@@ -392,6 +406,11 @@ const systemDesignProblems: SystemDesignProblem[] = [
         durationMs: 2700000,
         outcome: "Completed",
         confidence: 3,
+        clarifiedRequirements: true,
+        foundEdgeCases: false,
+        explainedComplexity: false,
+        testedSolution: false,
+        communicatedTradeoffs: true,
         prompt: "Design a distributed rate limiter for user API requests.",
         notes: "Covered core flow.",
         sourceCode: null,
@@ -473,6 +492,7 @@ beforeEach(() => {
   vi.mocked(getLearningItems).mockResolvedValue(learningItems);
   vi.mocked(getDsaProblems).mockResolvedValue(dsaProblems);
   vi.mocked(getDsaProblemTemplate).mockResolvedValue(dsaTemplate);
+  vi.mocked(getFlashcard).mockResolvedValue(flashcards[0]);
   vi.mocked(getFlashcards).mockImplementation(async (filters = {}) => {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 10;
@@ -489,6 +509,7 @@ beforeEach(() => {
 
     return {
       items: filteredCards.slice(start, start + pageSize),
+      tags: [...new Set(filteredCards.flatMap((card) => card.tags))].sort(),
       totalCount: filteredCards.length,
       page,
       pageSize
@@ -508,6 +529,7 @@ beforeEach(() => {
 
     return {
       items: filteredDecks.slice(start, start + pageSize),
+      tags: [...new Set(filteredDecks.flatMap((deck) => deck.tags))].sort(),
       totalCount: filteredDecks.length,
       page,
       pageSize
@@ -618,6 +640,36 @@ describe("App", () => {
 
     expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeInTheDocument();
     expect(await screen.findByText("Learning areas")).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that Overview practice recommendations can open their source item.
+   */
+  it("opens a daily plan item from Overview", async () => {
+    vi.mocked(getDashboard).mockResolvedValueOnce({
+      ...dashboard,
+      interviewPlan: [
+        {
+          id: "dsa-1",
+          title: "Valid Parentheses",
+          type: "Dsa",
+          tags: ["stack"],
+          reason: "Low confidence",
+          lastPracticedAt: "2026-08-24T12:00:00Z",
+          nextReviewAt: "2026-09-06T12:00:00Z",
+          confidence: 3,
+          totalAttempts: 1
+        }
+      ]
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Valid Parentheses")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+
+    expect(await screen.findByRole("heading", { name: "Attempt problem" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Approach")).toBeInTheDocument();
   });
 
   /**
@@ -768,7 +820,9 @@ describe("App", () => {
       fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
 
       expect(await screen.findByRole("heading", { name: "Cards" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("tab", { name: "Flashcards" }));
       expect(screen.getByRole("button", { name: /CAP theorem/i })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("tab", { name: "Learning sessions" }));
       expect(screen.getByText("Interview flashcards")).toBeInTheDocument();
 
       expect(screen.getByRole("checkbox", { name: "Shuffle" })).toBeChecked();
@@ -979,7 +1033,7 @@ describe("App", () => {
       ],
       createLearningSessions: false,
       learningSessionName: "Imported flashcards",
-      learningSessionSize: 25
+      learningSessionSize: 50
     });
   });
 
@@ -1004,7 +1058,8 @@ describe("App", () => {
           lastPracticedAt: null,
           nextReviewAt: null,
           createdAt: "2026-09-03T12:00:00Z",
-          updatedAt: "2026-09-03T12:00:00Z"
+          updatedAt: "2026-09-03T12:00:00Z",
+          tags: ["networking"]
         },
         {
           id: "deck-import-2",
@@ -1018,7 +1073,8 @@ describe("App", () => {
           lastPracticedAt: null,
           nextReviewAt: null,
           createdAt: "2026-09-03T12:00:00Z",
-          updatedAt: "2026-09-03T12:00:00Z"
+          updatedAt: "2026-09-03T12:00:00Z",
+          tags: ["networking"]
         }
       ]
     });
@@ -1071,6 +1127,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Flashcards" }));
 
     expect(await screen.findByText("Showing 1-10 of 13")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Generated Flashcard 9/i })).not.toBeInTheDocument();

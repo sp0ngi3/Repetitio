@@ -48,6 +48,31 @@ public sealed class PracticeSession
     public int? Confidence { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether requirements were clarified during the attempt.
+    /// </summary>
+    public bool ClarifiedRequirements { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether edge cases were found during the attempt.
+    /// </summary>
+    public bool FoundEdgeCases { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether complexity was explained during the attempt.
+    /// </summary>
+    public bool ExplainedComplexity { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the solution was tested during the attempt.
+    /// </summary>
+    public bool TestedSolution { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether tradeoffs were communicated during the attempt.
+    /// </summary>
+    public bool CommunicatedTradeoffs { get; set; }
+
+    /// <summary>
     /// Gets or sets the approach used during the attempt.
     /// </summary>
     public string? Approach { get; set; }

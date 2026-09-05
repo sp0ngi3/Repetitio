@@ -265,6 +265,14 @@ h3 {
   margin-bottom: 16px;
 }
 
+.dashboard-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
 .metric-card,
 .panel,
 .item-card {
@@ -340,10 +348,52 @@ textarea {
   list-style: none;
 }
 
+.weakness-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
 .list-row {
   border: 1px solid #e1e6eb;
   border-radius: 8px;
   padding: 12px;
+}
+
+.today-plan-row,
+.weakness-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.overview-row-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.weakness-row {
+  border: 1px solid #e1e6eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.weakness-row strong,
+.weakness-row span,
+.weakness-row small {
+  display: block;
+}
+
+.weakness-row span,
+.weakness-row small {
+  color: #65717b;
+  font-size: 0.86rem;
 }
 
 .list-row strong,
@@ -884,6 +934,31 @@ textarea {
   margin-top: 12px;
 }
 
+.scorecard-fieldset {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.scorecard-fieldset legend {
+  padding: 0 6px;
+  color: #35424d;
+  font-weight: 900;
+}
+
+.scorecard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px 12px;
+}
+
+.scorecard-summary {
+  margin-top: 12px;
+}
+
 .history-field {
   border: 1px solid #e1e6eb;
   border-radius: 8px;
@@ -1055,6 +1130,35 @@ textarea {
   align-items: start;
 }
 
+.flashcards-dashboard-grid.single-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dashboard-mode-toggle {
+  display: inline-flex;
+  gap: 4px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  padding: 4px;
+  background: #f7fafc;
+}
+
+.dashboard-mode-toggle button {
+  width: auto;
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 14px;
+  color: #51606c;
+  background: transparent;
+  font-weight: 900;
+}
+
+.dashboard-mode-toggle button.active {
+  color: #1f2428;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(40, 52, 62, 0.1);
+}
+
 .flashcard-import-panel {
   display: grid;
   gap: 12px;
@@ -1142,9 +1246,72 @@ textarea {
 
 .flashcard-filter-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(140px, 180px) minmax(140px, 180px);
+  grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(140px, 180px));
   gap: 12px;
   align-items: end;
+}
+
+.collapsible-filter-panel {
+  border: 1px solid #dfe6ec;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fbfcfe;
+}
+
+.collapsible-filter-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  color: #35424d;
+  font-weight: 900;
+}
+
+.collapsible-filter-panel summary small,
+.collapsible-filter-panel summary strong {
+  color: #65717b;
+  font-size: 0.84rem;
+}
+
+.tag-filter-list,
+.scorecard-summary,
+.session-membership-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-filter-list {
+  margin-top: 12px;
+}
+
+.tag-filter-list button {
+  width: auto;
+  border: 1px solid #d5dee6;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #41505d;
+  background: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.tag-filter-list button.active {
+  border-color: #8ac5ff;
+  color: #0c497a;
+  background: #e8f4ff;
+}
+
+.session-membership-row span,
+.scorecard-summary span {
+  border: 1px solid #dfe6ec;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #65717b;
+  background: #fbfcfe;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .flashcard-count-badge {
@@ -2204,7 +2371,13 @@ textarea {
 [data-theme="dark"] .flashcard-session-card,
 [data-theme="dark"] .flashcard-import-draft,
 [data-theme="dark"] .flashcard-import-panel pre,
-[data-theme="dark"] .study-score-strip span {
+[data-theme="dark"] .study-score-strip span,
+[data-theme="dark"] .dashboard-mode-toggle,
+[data-theme="dark"] .collapsible-filter-panel,
+[data-theme="dark"] .scorecard-fieldset,
+[data-theme="dark"] .session-membership-row span,
+[data-theme="dark"] .scorecard-summary span,
+[data-theme="dark"] .weakness-row {
   border-color: #2f3b45;
   color: #e8edf2;
   background:
@@ -2288,6 +2461,8 @@ textarea {
 [data-theme="dark"] .secondary-button,
 [data-theme="dark"] .danger-button,
 [data-theme="dark"] .tag-filter-chip,
+[data-theme="dark"] .tag-filter-list button,
+[data-theme="dark"] .dashboard-mode-toggle button,
 [data-theme="dark"] .pagination-button,
 [data-theme="dark"] .note-area-tabs button {
   border-color: #35424d;
@@ -2298,6 +2473,8 @@ textarea {
 [data-theme="dark"] .app-nav button.active,
 [data-theme="dark"] .secondary-button,
 [data-theme="dark"] .tag-filter-chip.active,
+[data-theme="dark"] .tag-filter-list button.active,
+[data-theme="dark"] .dashboard-mode-toggle button.active,
 [data-theme="dark"] .note-area-tabs button.active {
   border-color: #5aa2ee;
   color: #081018;
@@ -2332,6 +2509,8 @@ textarea {
 [data-theme="dark"] .eyebrow,
 [data-theme="dark"] .metric-card span,
 [data-theme="dark"] .list-row span,
+[data-theme="dark"] .weakness-row span,
+[data-theme="dark"] .weakness-row small,
 [data-theme="dark"] .item-card p,
 [data-theme="dark"] .record-header,
 [data-theme="dark"] .record-row small,
@@ -2356,6 +2535,8 @@ textarea {
 [data-theme="dark"] .memory-peek,
 [data-theme="dark"] .attempt-history-entry,
 [data-theme="dark"] .history-field,
+[data-theme="dark"] .scorecard-fieldset,
+[data-theme="dark"] .collapsible-filter-panel,
 [data-theme="dark"] .solution-meta span,
 [data-theme="dark"] .card-picker-toolbar > span,
 [data-theme="dark"] .selected-card-strip,
@@ -2378,6 +2559,9 @@ textarea {
 [data-theme="dark"] .picker-row,
 [data-theme="dark"] .problem-row,
 [data-theme="dark"] .basics-filter-panel,
+[data-theme="dark"] .collapsible-filter-panel,
+[data-theme="dark"] .scorecard-fieldset,
+[data-theme="dark"] .weakness-row,
 [data-theme="dark"] .pagination-bar,
 [data-theme="dark"] .problem-tabs,
 [data-theme="dark"] .memory-peek,
@@ -2414,7 +2598,9 @@ textarea {
 }
 
 [data-theme="dark"] .count-strip span,
-[data-theme="dark"] .tag-row span {
+[data-theme="dark"] .tag-row span,
+[data-theme="dark"] .session-membership-row span,
+[data-theme="dark"] .scorecard-summary span {
   border-color: #35424d;
   color: #dce5ec;
   background: #1d252c;

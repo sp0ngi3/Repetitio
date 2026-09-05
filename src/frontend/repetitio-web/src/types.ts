@@ -99,6 +99,16 @@ export interface CreatePracticeSessionRequest {
   outcome: PracticeOutcome;
   /** Confidence value from 1 to 5. */
   confidence?: number | null;
+  /** Whether requirements were clarified during the attempt. */
+  clarifiedRequirements?: boolean;
+  /** Whether edge cases were found during the attempt. */
+  foundEdgeCases?: boolean;
+  /** Whether complexity was explained during the attempt. */
+  explainedComplexity?: boolean;
+  /** Whether the solution was tested during the attempt. */
+  testedSolution?: boolean;
+  /** Whether tradeoffs were communicated during the attempt. */
+  communicatedTradeoffs?: boolean;
   /** Optional next review date selected for the practiced item. */
   nextReviewAt?: string;
   /** Approach used during the attempt. */
@@ -249,6 +259,16 @@ export interface PracticeSession {
   outcome: PracticeOutcome;
   /** Confidence value from 1 to 5. */
   confidence?: number | null;
+  /** Whether requirements were clarified during the attempt. */
+  clarifiedRequirements: boolean;
+  /** Whether edge cases were found during the attempt. */
+  foundEdgeCases: boolean;
+  /** Whether complexity was explained during the attempt. */
+  explainedComplexity: boolean;
+  /** Whether the solution was tested during the attempt. */
+  testedSolution: boolean;
+  /** Whether tradeoffs were communicated during the attempt. */
+  communicatedTradeoffs: boolean;
   /** Approach used during the attempt. */
   approach?: string | null;
   /** Prompt used during the attempt. */
@@ -281,8 +301,54 @@ export interface Dashboard {
   neverPracticedCount: number;
   /** Items due for review. */
   dueReviews: DueReviewItem[];
+  /** Short prioritized interview practice plan. */
+  interviewPlan: InterviewPlanItem[];
+  /** Practice weakness summaries grouped by tag. */
+  weaknessMap: WeaknessTag[];
   /** Recent practice sessions. */
   recentPractice: PracticeSession[];
+}
+
+/**
+ * Represents one recommended practice item for today.
+ */
+export interface InterviewPlanItem {
+  /** Unique learning item identifier. */
+  id: string;
+  /** Display title. */
+  title: string;
+  /** Learning domain. */
+  type: LearningItemType;
+  /** Assigned tag names. */
+  tags: string[];
+  /** Why this item was selected. */
+  reason: string;
+  /** Last practice date and time. */
+  lastPracticedAt?: string | null;
+  /** Next review date and time. */
+  nextReviewAt?: string | null;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
+  /** Total recorded practice attempts. */
+  totalAttempts: number;
+}
+
+/**
+ * Represents a tag-level weakness summary.
+ */
+export interface WeaknessTag {
+  /** Tag name. */
+  tag: string;
+  /** Number of learning items with this tag. */
+  itemCount: number;
+  /** Average confidence across tagged items. */
+  averageConfidence?: number | null;
+  /** Number of failed or partial attempts. */
+  failedOrPartialAttempts: number;
+  /** Most recent practice date and time. */
+  lastPracticedAt?: string | null;
+  /** Recent improvement notes for this tag. */
+  improveNextSamples: string[];
 }
 
 /**
@@ -677,12 +743,24 @@ export interface Flashcard {
   nextReviewAt?: string | null;
   /** Assigned tag names. */
   tags: string[];
+  /** Saved learning sessions that contain this flashcard. */
+  learningSessions: FlashcardDeckMembership[];
   /** Total recorded reviews. */
   totalReviews: number;
   /** Total known reviews. */
   knownReviews: number;
   /** Practice sessions recorded for the flashcard. */
   practiceSessions: PracticeSession[];
+}
+
+/**
+ * Represents one saved learning session that contains a flashcard.
+ */
+export interface FlashcardDeckMembership {
+  /** Saved learning session identifier. */
+  id: string;
+  /** Saved learning session name. */
+  name: string;
 }
 
 /**
@@ -727,6 +805,8 @@ export interface FlashcardDeck {
   createdAt: string;
   /** Last update date and time. */
   updatedAt: string;
+  /** Tag names represented by this saved learning session. */
+  tags: string[];
 }
 
 /**
@@ -757,6 +837,8 @@ export interface FlashcardDeckSummary {
   createdAt: string;
   /** Last update date and time. */
   updatedAt: string;
+  /** Tag names represented by this saved learning session. */
+  tags: string[];
 }
 
 /**
@@ -765,6 +847,8 @@ export interface FlashcardDeckSummary {
 export interface PagedFlashcardResponse {
   /** Flashcards on the current page. */
   items: Flashcard[];
+  /** Tag facets for the current search and fixed filters. */
+  tags: string[];
   /** Total number of matching flashcards. */
   totalCount: number;
   /** Current one-based page number. */
@@ -779,6 +863,8 @@ export interface PagedFlashcardResponse {
 export interface PagedFlashcardDeckResponse {
   /** Saved learning sessions on the current page. */
   items: FlashcardDeckSummary[];
+  /** Tag facets for the current search. */
+  tags: string[];
   /** Total number of matching saved learning sessions. */
   totalCount: number;
   /** Current one-based page number. */

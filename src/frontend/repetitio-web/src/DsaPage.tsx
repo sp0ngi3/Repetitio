@@ -1,5 +1,11 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
+  AttemptScorecard,
+  AttemptScorecardSummary,
+  emptyAttemptScorecard,
+  type AttemptScorecardValue
+} from "./AttemptScorecard";
+import {
   createDsaProblem,
   createDsaSolution,
   createPracticeSession,
@@ -89,7 +95,7 @@ interface DsaProblemForm {
 /**
  * Represents the local editable DSA attempt form state.
  */
-interface DsaAttemptForm {
+interface DsaAttemptForm extends AttemptScorecardValue {
   /** Attempt outcome. */
   outcome: PracticeOutcome;
   /** Confidence value as form text. */
@@ -145,10 +151,16 @@ const emptySolutionForm: CreateDsaSolutionRequest = {
  * Props accepted by the DSA page.
  */
 interface DsaPageProps {
+  /** Learning item id to open from the Overview page. */
+  focusItemId?: string | null;
+  /** Changes when the same focused item should be reopened. */
+  focusNonce?: number | null;
   /** Default review schedule for new practice attempts. */
   reviewSchedulePreset: ReviewSchedulePreset;
   /** Called after DSA changes that should update parent dashboard data. */
   onChanged?: () => Promise<void> | void;
+  /** Called after the focused item has been opened. */
+  onFocusHandled?: () => void;
 }
 
 /**
@@ -157,7 +169,7 @@ interface DsaPageProps {
  * @param props - Component props.
  * @returns The DSA page.
  */
-export function DsaPage({ reviewSchedulePreset, onChanged }: DsaPageProps) {
+export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChanged, onFocusHandled }: DsaPageProps) {
   const [view, setView] = useState<DsaView>("dashboard");
   const [problems, setProblems] = useState<DsaProblem[]>([]);
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
@@ -204,6 +216,19 @@ export function DsaPage({ reviewSchedulePreset, onChanged }: DsaPageProps) {
   useEffect(() => {
     void loadProblems();
   }, [filters.difficulty, filters.search, filters.status]);
+
+  useEffect(() => {
+    if (!focusItemId) {
+      return;
+    }
+
+    const focusedProblem = problems.find((problem) => problem.id === focusItemId);
+
+    if (focusedProblem) {
+      openProblem(focusedProblem);
+      onFocusHandled?.();
+    }
+  }, [focusItemId, focusNonce, problems]);
 
   useEffect(() => {
     /**
@@ -787,6 +812,11 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
               />
             </label>
 
+            <AttemptScorecard
+              value={props.attemptForm}
+              onChange={(key, value) => props.onAttemptChange(key, value)}
+            />
+
             <label>
               Approach
               <textarea
@@ -1139,6 +1169,7 @@ function AttemptHistory(props: AttemptHistoryProps) {
                 </span>
                 <span>{formatAttemptMeta(session)}</span>
               </summary>
+              <AttemptScorecardSummary value={session} />
               {hasAnyText(session.approach, session.notes, session.whatHelped, session.whatWasDifficult, session.improveNext) ? (
                 <div className="attempt-history-grid">
                   <HistoryField label="Approach" value={session.approach} />
@@ -1316,6 +1347,11 @@ function toPracticeRequest(problemId: string, form: DsaAttemptForm, sourceCode?:
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
     nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
+    clarifiedRequirements: form.clarifiedRequirements,
+    foundEdgeCases: form.foundEdgeCases,
+    explainedComplexity: form.explainedComplexity,
+    testedSolution: form.testedSolution,
+    communicatedTradeoffs: form.communicatedTradeoffs,
     approach: form.approach.trim(),
     notes: form.notes.trim(),
     sourceCode: sourceCode?.trim() || undefined,
@@ -1337,6 +1373,7 @@ function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): Dsa
     confidence: "",
     durationMinutes: "",
     nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
+    ...emptyAttemptScorecard,
     notes: "",
     whatHelped: "",
     whatWasDifficult: "",

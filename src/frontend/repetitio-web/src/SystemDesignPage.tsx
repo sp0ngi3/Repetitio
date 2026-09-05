@@ -1,5 +1,11 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
+  AttemptScorecard,
+  AttemptScorecardSummary,
+  emptyAttemptScorecard,
+  type AttemptScorecardValue
+} from "./AttemptScorecard";
+import {
   createPracticeSession,
   createSystemDesignProblem,
   deleteSystemDesignProblem,
@@ -87,7 +93,7 @@ interface SystemDesignProblemForm {
 /**
  * Represents the local editable System Design attempt form state.
  */
-interface SystemDesignAttemptForm {
+interface SystemDesignAttemptForm extends AttemptScorecardValue {
   /** Attempt outcome. */
   outcome: PracticeOutcome;
   /** Confidence value as form text. */
@@ -134,10 +140,16 @@ const emptyProblemForm: SystemDesignProblemForm = {
  * Props accepted by the System Design page.
  */
 interface SystemDesignPageProps {
+  /** Learning item id to open from the Overview page. */
+  focusItemId?: string | null;
+  /** Changes when the same focused item should be reopened. */
+  focusNonce?: number | null;
   /** Default review schedule for new practice attempts. */
   reviewSchedulePreset: ReviewSchedulePreset;
   /** Called after System Design changes that should update parent dashboard data. */
   onChanged?: () => Promise<void> | void;
+  /** Called after the focused item has been opened. */
+  onFocusHandled?: () => void;
 }
 
 /**
@@ -146,7 +158,13 @@ interface SystemDesignPageProps {
  * @param props - Component props.
  * @returns The System Design page.
  */
-export function SystemDesignPage({ reviewSchedulePreset, onChanged }: SystemDesignPageProps) {
+export function SystemDesignPage({
+  focusItemId,
+  focusNonce,
+  reviewSchedulePreset,
+  onChanged,
+  onFocusHandled
+}: SystemDesignPageProps) {
   const [view, setView] = useState<SystemDesignView>("dashboard");
   const [problems, setProblems] = useState<SystemDesignProblem[]>([]);
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
@@ -194,6 +212,19 @@ export function SystemDesignPage({ reviewSchedulePreset, onChanged }: SystemDesi
   useEffect(() => {
     void loadProblems();
   }, [filters.difficulty, filters.search, filters.status]);
+
+  useEffect(() => {
+    if (!focusItemId) {
+      return;
+    }
+
+    const focusedProblem = problems.find((problem) => problem.id === focusItemId);
+
+    if (focusedProblem) {
+      openProblem(focusedProblem);
+      onFocusHandled?.();
+    }
+  }, [focusItemId, focusNonce, problems]);
 
   useEffect(() => {
     /**
@@ -759,6 +790,11 @@ function SystemDesignDetailPage(props: SystemDesignDetailPageProps) {
               />
             </label>
 
+            <AttemptScorecard
+              value={props.attemptForm}
+              onChange={(key, value) => props.onAttemptChange(key, value)}
+            />
+
             <MarkdownEditor
               label="Prompt"
               value={props.attemptForm.prompt}
@@ -1068,6 +1104,7 @@ function SystemDesignAttemptHistory(props: SystemDesignAttemptHistoryProps) {
                 </span>
                 <span>{formatAttemptMeta(session)}</span>
               </summary>
+              <AttemptScorecardSummary value={session} />
               {hasText(session.prompt) ? (
                 <div className="history-entry-actions">
                   <button className="secondary-button" type="button" onClick={() => props.onUsePrompt(session.prompt ?? "")}>
@@ -1290,6 +1327,11 @@ function toPracticeRequest(problemId: string, form: SystemDesignAttemptForm): Cr
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
     nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
+    clarifiedRequirements: form.clarifiedRequirements,
+    foundEdgeCases: form.foundEdgeCases,
+    explainedComplexity: form.explainedComplexity,
+    testedSolution: form.testedSolution,
+    communicatedTradeoffs: form.communicatedTradeoffs,
     prompt: form.prompt.trim(),
     notes: form.notes.trim() || form.reflectionMarkdown.trim(),
     whatHelped: form.whatHelped.trim(),
@@ -1310,6 +1352,7 @@ function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): Sys
     confidence: "",
     durationMinutes: "",
     nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
+    ...emptyAttemptScorecard,
     prompt: "",
     notes: "",
     reflectionMarkdown: "",
