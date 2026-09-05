@@ -167,7 +167,48 @@ public sealed record WeaknessTagResponse
     public DateTime? LastPracticedAt { get; init; }
 
     /// <summary>
+    /// Gets the concrete item to open when drilling this tag.
+    /// </summary>
+    public WeaknessDrillTargetResponse? DrillTarget { get; init; }
+
+    /// <summary>
     /// Gets recent improvement notes for this tag.
     /// </summary>
     public required IReadOnlyCollection<string> ImproveNextSamples { get; init; }
+}
+
+/// <summary>
+/// Represents the concrete learning item to open for a weakness tag.
+/// </summary>
+public sealed record WeaknessDrillTargetResponse
+{
+    /// <summary>
+    /// Gets the unique learning item identifier.
+    /// </summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>
+    /// Gets the learning item title.
+    /// </summary>
+    public required string Title { get; init; }
+
+    /// <summary>
+    /// Gets the learning item type.
+    /// </summary>
+    public required LearningItemType Type { get; init; }
+
+    /// <summary>
+    /// Gets the date and time when the item was last practiced.
+    /// </summary>
+    public DateTime? LastPracticedAt { get; init; }
+
+    /// <summary>
+    /// Gets the next review date and time.
+    /// </summary>
+    public DateTime? NextReviewAt { get; init; }
+
+    /// <summary>
+    /// Gets the current confidence value from 1 to 5.
+    /// </summary>
+    public int? Confidence { get; init; }
 }

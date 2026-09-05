@@ -162,48 +162,6 @@ export function App() {
   }
 
   /**
-   * Opens the highest-priority item represented by a weakness tag.
-   *
-   * @param tag - Weakness tag to drill.
-   */
-  function openWeaknessTag(tag: string) {
-    const normalizedTag = tag.toLowerCase();
-    const candidates = [
-      ...items
-        .filter((item) => item.tags.some((itemTag) => itemTag.toLowerCase() === normalizedTag))
-        .map((item) => ({
-          id: item.id,
-          type: item.type,
-          confidence: item.confidence,
-          lastPracticedAt: item.lastPracticedAt,
-          nextReviewAt: item.nextReviewAt,
-          totalAttempts: item.totalAttempts
-        })),
-      ...basicExercises
-        .filter((exercise) => exercise.tags.some((itemTag) => itemTag.toLowerCase() === normalizedTag))
-        .map((exercise) => ({
-          id: exercise.learningItemId,
-          type: "Basics" as const,
-          confidence: exercise.confidence,
-          lastPracticedAt: exercise.lastPracticedAt,
-          nextReviewAt: exercise.nextReviewAt,
-          totalAttempts: exercise.totalAttempts
-        }))
-    ];
-
-    const bestCandidate = candidates
-      .map((candidate) => ({
-        ...candidate,
-        score: calculateOverviewTargetScore(candidate)
-      }))
-      .sort((left, right) => right.score - left.score)[0];
-
-    if (bestCandidate) {
-      openLearningTarget(bestCandidate);
-    }
-  }
-
-  /**
    * Clears a handled deep-link target.
    */
   function clearFocusedLearningTarget() {
@@ -278,7 +236,6 @@ export function App() {
           dashboard={dashboard}
           groupedCounts={groupedCounts}
           onOpenItem={openLearningTarget}
-          onOpenWeaknessTag={openWeaknessTag}
         />
       ) : null}
 
@@ -385,8 +342,6 @@ interface OverviewPageProps {
   groupedCounts: Record<LearningItemType, number>;
   /** Opens a concrete learning item in its owning module. */
   onOpenItem: (target: { id: string; type: LearningItemType }) => void;
-  /** Opens a high-priority item for a weakness tag. */
-  onOpenWeaknessTag: (tag: string) => void;
 }
 
 /**
@@ -470,7 +425,12 @@ function OverviewPage(props: OverviewPageProps) {
                     <button
                       className="secondary-button compact-button"
                       type="button"
-                      onClick={() => props.onOpenWeaknessTag(weakness.tag)}
+                      disabled={!weakness.drillTarget}
+                      onClick={() => {
+                        if (weakness.drillTarget) {
+                          props.onOpenItem(weakness.drillTarget);
+                        }
+                      }}
                     >
                       Drill
                     </button>
@@ -613,46 +573,6 @@ function toAppPage(type: LearningItemType): AppPage {
   }
 
   return "basics";
-}
-
-/**
- * Scores candidate items when opening a weakness tag.
- *
- * @param candidate - Potential item to drill.
- * @returns Higher score for more useful practice targets.
- */
-function calculateOverviewTargetScore(candidate: {
-  confidence?: number | null;
-  lastPracticedAt?: string | null;
-  nextReviewAt?: string | null;
-  totalAttempts: number;
-}) {
-  const now = Date.now();
-  let score = 0;
-
-  if (candidate.nextReviewAt && new Date(candidate.nextReviewAt).getTime() <= now) {
-    score += 100;
-  }
-
-  if (!candidate.lastPracticedAt) {
-    score += 80;
-  } else if (new Date(candidate.lastPracticedAt).getTime() <= now - 21 * 24 * 60 * 60 * 1000) {
-    score += 35;
-  }
-
-  if (!candidate.confidence) {
-    score += 20;
-  } else if (candidate.confidence <= 2) {
-    score += 45;
-  } else if (candidate.confidence === 3) {
-    score += 20;
-  }
-
-  if (candidate.totalAttempts === 0) {
-    score += 15;
-  }
-
-  return score;
 }
 
 /**

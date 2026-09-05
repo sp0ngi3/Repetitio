@@ -347,8 +347,28 @@ export interface WeaknessTag {
   failedOrPartialAttempts: number;
   /** Most recent practice date and time. */
   lastPracticedAt?: string | null;
+  /** Concrete item to open for this weakness tag. */
+  drillTarget?: WeaknessDrillTarget | null;
   /** Recent improvement notes for this tag. */
   improveNextSamples: string[];
+}
+
+/**
+ * Represents the concrete learning item to open for a weakness tag.
+ */
+export interface WeaknessDrillTarget {
+  /** Unique learning item identifier. */
+  id: string;
+  /** Display title. */
+  title: string;
+  /** Learning domain. */
+  type: LearningItemType;
+  /** Last practice date and time. */
+  lastPracticedAt?: string | null;
+  /** Next review date and time. */
+  nextReviewAt?: string | null;
+  /** Current confidence value from 1 to 5. */
+  confidence?: number | null;
 }
 
 /**

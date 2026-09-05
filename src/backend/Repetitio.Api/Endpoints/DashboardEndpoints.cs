@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Repetitio.Application.Basics;
 using Repetitio.Application.Dashboard;
 using Repetitio.Domain.LearningItems;
 using Repetitio.Domain.Practice;
@@ -38,37 +39,41 @@ public static class DashboardEndpoints
         var today = now.Date;
         var weekStart = today.AddDays(-6);
 
-        var dueReviews = await dbContext.LearningItems
-            .AsNoTracking()
-            .Where(item => item.NextReviewAt != null && item.NextReviewAt <= now)
-            .OrderBy(item => item.NextReviewAt)
-            .ThenBy(item => item.Title)
-            .Take(10)
-            .ToListAsync();
-
-        var recentPractice = await dbContext.PracticeSessions
-            .AsNoTracking()
-            .Include(session => session.LearningItem)
-            .OrderByDescending(session => session.CreatedAt)
-            .Take(10)
-            .ToListAsync();
-
+        var openableLearningItemIds = await GetOpenableLearningItemIdsAsync(dbContext);
         var learningItems = await dbContext.LearningItems
             .AsNoTracking()
             .Include(item => item.Tags)
             .ThenInclude(itemTag => itemTag.Tag)
             .Include(item => item.PracticeSessions)
             .ToListAsync();
+        var openableLearningItems = learningItems
+            .Where(item => openableLearningItemIds.Contains(item.Id))
+            .ToArray();
+
+        var dueReviews = openableLearningItems
+            .Where(item => item.NextReviewAt != null && item.NextReviewAt <= now)
+            .OrderBy(item => item.NextReviewAt)
+            .ThenBy(item => item.Title)
+            .Take(10)
+            .ToArray();
+
+        var recentPractice = await dbContext.PracticeSessions
+            .AsNoTracking()
+            .Include(session => session.LearningItem)
+            .Where(session => openableLearningItemIds.Contains(session.LearningItemId))
+            .OrderByDescending(session => session.CreatedAt)
+            .Take(10)
+            .ToListAsync();
 
         var response = new DashboardResponse
         {
             PracticesToday = await dbContext.PracticeSessions.CountAsync(session => session.CreatedAt >= today),
             PracticesThisWeek = await dbContext.PracticeSessions.CountAsync(session => session.CreatedAt >= weekStart),
-            DueReviewCount = await dbContext.LearningItems.CountAsync(item => item.NextReviewAt != null && item.NextReviewAt <= now),
-            NeverPracticedCount = await dbContext.LearningItems.CountAsync(item => item.LastPracticedAt == null),
+            DueReviewCount = openableLearningItems.Count(item => item.NextReviewAt != null && item.NextReviewAt <= now),
+            NeverPracticedCount = openableLearningItems.Count(item => item.LastPracticedAt == null),
             DueReviews = dueReviews.Select(ApiMappings.ToDueReviewResponse).ToArray(),
-            InterviewPlan = CreateInterviewPlan(learningItems, now),
-            WeaknessMap = CreateWeaknessMap(learningItems),
+            InterviewPlan = CreateInterviewPlan(openableLearningItems, now),
+            WeaknessMap = CreateWeaknessMap(openableLearningItems, now),
             RecentPractice = recentPractice.Select(ApiMappings.ToResponse).ToArray()
         };
 
@@ -117,7 +122,7 @@ public static class DashboardEndpoints
     /// </summary>
     /// <param name="items">Learning items to summarize.</param>
     /// <returns>Tag-level weakness summaries.</returns>
-    private static IReadOnlyCollection<WeaknessTagResponse> CreateWeaknessMap(IEnumerable<LearningItem> items)
+    private static IReadOnlyCollection<WeaknessTagResponse> CreateWeaknessMap(IEnumerable<LearningItem> items, DateTime now)
     {
         return items
             .SelectMany(item => item.Tags.Select(itemTag => new { Tag = itemTag.Tag.Name, Item = item }))
@@ -140,6 +145,7 @@ public static class DashboardEndpoints
                     AverageConfidence = confidenceValues.Length == 0 ? null : Math.Round(confidenceValues.Average(), 1),
                     FailedOrPartialAttempts = failedOrPartial,
                     LastPracticedAt = groupedItems.Max(item => item.LastPracticedAt),
+                    DrillTarget = CreateWeaknessDrillTarget(groupedItems, now),
                     ImproveNextSamples = groupedItems
                         .SelectMany(item => item.PracticeSessions)
                         .OrderByDescending(session => session.CreatedAt)
@@ -157,6 +163,51 @@ public static class DashboardEndpoints
             .ThenBy(summary => summary.LastPracticedAt ?? DateTime.MinValue)
             .Take(8)
             .ToArray();
+    }
+
+    /// <summary>
+    /// Gets learning item identifiers that can be opened through a concrete module screen.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <returns>Openable learning item identifiers.</returns>
+    private static async Task<HashSet<Guid>> GetOpenableLearningItemIdsAsync(RepetitioDbContext dbContext)
+    {
+        var ids = BasicExerciseCatalog.GetAll()
+            .Select(exercise => BasicExerciseIds.CreateLearningItemId(exercise.Slug))
+            .ToHashSet();
+
+        ids.UnionWith(await dbContext.DsaProblems.AsNoTracking().Select(problem => problem.LearningItemId).ToArrayAsync());
+        ids.UnionWith(await dbContext.SystemDesignProblems.AsNoTracking().Select(problem => problem.LearningItemId).ToArrayAsync());
+        ids.UnionWith(await dbContext.Flashcards.AsNoTracking().Select(flashcard => flashcard.LearningItemId).ToArrayAsync());
+
+        return ids;
+    }
+
+    /// <summary>
+    /// Selects the best concrete item to drill for a weakness tag.
+    /// </summary>
+    /// <param name="items">Existing tagged learning items.</param>
+    /// <param name="now">The current timestamp.</param>
+    /// <returns>The drill target for this tag.</returns>
+    private static WeaknessDrillTargetResponse? CreateWeaknessDrillTarget(IEnumerable<LearningItem> items, DateTime now)
+    {
+        var item = items
+            .OrderByDescending(candidate => CalculatePlanScore(candidate, now))
+            .ThenBy(candidate => candidate.LastPracticedAt ?? DateTime.MinValue)
+            .ThenBy(candidate => candidate.Title)
+            .FirstOrDefault();
+
+        return item is null
+            ? null
+            : new WeaknessDrillTargetResponse
+            {
+                Id = item.Id,
+                Title = item.Title,
+                Type = item.Type,
+                LastPracticedAt = item.LastPracticedAt,
+                NextReviewAt = item.NextReviewAt,
+                Confidence = item.Confidence
+            };
     }
 
     /// <summary>
