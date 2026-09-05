@@ -720,6 +720,10 @@ describe("App", () => {
    */
   it("renders flashcards and starts a learning session", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.mocked(getFlashcardDeck).mockResolvedValueOnce({
+      ...flashcardDecks[0],
+      cards: flashcards.slice(0, 2)
+    });
 
     try {
       render(<App />);
@@ -730,12 +734,15 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: /CAP theorem/i })).toBeInTheDocument();
       expect(screen.getByText("Interview flashcards")).toBeInTheDocument();
 
-      fireEvent.change(screen.getByDisplayValue("25"), { target: { value: "1" } });
+      expect(screen.getByRole("checkbox", { name: "Shuffle" })).toBeChecked();
       fireEvent.click(screen.getByRole("button", { name: "Start" }));
       fireEvent.click(await screen.findByRole("button", { name: "Flip" }));
 
       expect(screen.getByText(/low-high search interval/i)).toBeInTheDocument();
 
+      fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
+      fireEvent.click(screen.getByRole("button", { name: "Flip" }));
+      expect(screen.getByText(/consistency, availability, and partition tolerance/i)).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
 
       expect(completeFlashcardSession).toHaveBeenCalledWith({
@@ -745,12 +752,60 @@ describe("App", () => {
             flashcardId: "flashcard-2",
             knewAnswer: true,
             confidence: 4
+          },
+          {
+            flashcardId: "flashcard-1",
+            knewAnswer: true,
+            confidence: 4
           }
         ]
       });
     } finally {
       randomSpy.mockRestore();
     }
+  });
+
+  /**
+   * Verifies that saved Flashcard learning sessions can run in their saved order.
+   */
+  it("starts a learning session without shuffling", async () => {
+    vi.mocked(getFlashcardDeck).mockResolvedValueOnce({
+      ...flashcardDecks[0],
+      cards: flashcards.slice(0, 2)
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+
+    expect(await screen.findByText("Interview flashcards")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Shuffle" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Flip" }));
+
+    expect(screen.getByText(/consistency, availability, and partition tolerance/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
+    fireEvent.click(screen.getByRole("button", { name: "Flip" }));
+    expect(screen.getByText(/low-high search interval/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
+
+    expect(completeFlashcardSession).toHaveBeenCalledWith({
+      deckId: "deck-1",
+      reviews: [
+        {
+          flashcardId: "flashcard-1",
+          knewAnswer: true,
+          confidence: 4
+        },
+        {
+          flashcardId: "flashcard-2",
+          knewAnswer: true,
+          confidence: 4
+        }
+      ]
+    });
   });
 
   /**
@@ -1016,7 +1071,23 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Edit learning session" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
-    expect(deleteFlashcardDeck).toHaveBeenCalledWith("deck-1");
+    expect(deleteFlashcardDeck).toHaveBeenCalledWith("deck-1", false);
+  });
+
+  /**
+   * Verifies that deleting a saved learning session can also delete its flashcards.
+   */
+  it("deletes a saved flashcard learning session with its cards when selected", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("heading", { name: "Edit learning session" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Also delete the flashcards in this session" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(deleteFlashcardDeck).toHaveBeenCalledWith("deck-1", true);
   });
 
   /**

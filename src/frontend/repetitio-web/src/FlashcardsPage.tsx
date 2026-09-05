@@ -82,6 +82,8 @@ interface FlashcardDeckForm {
   defaultSessionSize: string;
   /** Selected flashcard identifiers. */
   selectedCardIds: string[];
+  /** Whether deleting the saved session should also delete its flashcards. */
+  deleteCardsWithSession: boolean;
 }
 
 /**
@@ -124,6 +126,8 @@ interface StudySession {
   deck: FlashcardDeck;
   /** Cards selected for this run. */
   cards: Flashcard[];
+  /** Whether cards were randomized for this run. */
+  isShuffled: boolean;
   /** Current zero-based card index. */
   index: number;
   /** Whether the explanation side is visible. */
@@ -152,7 +156,8 @@ const emptyDeckForm: FlashcardDeckForm = {
   name: "",
   description: "",
   defaultSessionSize: "25",
-  selectedCardIds: []
+  selectedCardIds: [],
+  deleteCardsWithSession: false
 };
 
 /**
@@ -226,7 +231,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
   const [pickerTotalCount, setPickerTotalCount] = useState(0);
   const [pickerSearch, setPickerSearch] = useState("");
   const [studySession, setStudySession] = useState<StudySession | null>(null);
-  const [sessionSizes, setSessionSizes] = useState<Record<string, string>>({});
+  const [sessionShuffleModes, setSessionShuffleModes] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [deckPage, setDeckPage] = useState(1);
   const [pickerPage, setPickerPage] = useState(1);
@@ -705,8 +710,10 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
     setError(null);
 
     try {
-      await deleteFlashcardDeck(selectedDeck.id);
+      await deleteFlashcardDeck(selectedDeck.id, deckForm.deleteCardsWithSession);
+      await loadFlashcards();
       await loadDecks();
+      await props.onChanged();
       returnToDashboard();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to delete flashcard session.");
@@ -726,9 +733,8 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
 
     try {
       const deck = await getFlashcardDeck(deckSummary.id);
-      const sizeText = sessionSizes[deck.id] ?? String(deck.defaultSessionSize || 25);
-      const size = Number(sizeText);
-      const cards = selectStudyCards(deck.cards, Number.isFinite(size) && size > 0 ? size : 25);
+      const isShuffled = sessionShuffleModes[deck.id] ?? true;
+      const cards = selectStudyCards(deck.cards, isShuffled);
 
       if (cards.length === 0) {
         setError("This saved session has no flashcards.");
@@ -738,6 +744,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
       setStudySession({
         deck,
         cards,
+        isShuffled,
         index: 0,
         isFlipped: false,
         reviews: []
@@ -1096,13 +1103,15 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                     </div>
 
                     <div className="flashcard-session-actions">
-                      <label>
-                        Cards
+                      <label className="checkbox-row session-shuffle-toggle">
                         <input
-                          inputMode="numeric"
-                          value={sessionSizes[deck.id] ?? String(deck.defaultSessionSize || 25)}
-                          onChange={(event) => setSessionSizes({ ...sessionSizes, [deck.id]: event.target.value })}
+                          checked={sessionShuffleModes[deck.id] ?? true}
+                          type="checkbox"
+                          onChange={(event) =>
+                            setSessionShuffleModes({ ...sessionShuffleModes, [deck.id]: event.target.checked })
+                          }
                         />
+                        <span>Shuffle</span>
                       </label>
                       <div className="editor-actions compact-actions">
                         <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void startStudy(deck)}>
@@ -1639,9 +1648,19 @@ function FlashcardDeckFormPanel(props: FlashcardDeckFormPanelProps) {
           {props.isSaving ? "Saving..." : "Save learning session"}
         </button>
         {props.selectedDeck ? (
-          <button className="danger-button" type="button" onClick={props.onDelete} disabled={props.isSaving}>
-            Delete
-          </button>
+          <div className="delete-session-options">
+            <label className="checkbox-row">
+              <input
+                checked={props.form.deleteCardsWithSession}
+                type="checkbox"
+                onChange={(event) => props.onChange("deleteCardsWithSession", event.target.checked)}
+              />
+              <span>Also delete the flashcards in this session</span>
+            </label>
+            <button className="danger-button" type="button" onClick={props.onDelete} disabled={props.isSaving}>
+              Delete
+            </button>
+          </div>
         ) : null}
       </div>
     </form>
@@ -1688,7 +1707,8 @@ function StudySessionPage(props: StudySessionPageProps) {
         <div className="flashcard-study-meta">
           <div>
             <p className="eyebrow">
-              Card {props.session.index + 1}/{props.session.cards.length}
+              Card {props.session.index + 1}/{props.session.cards.length} ·{" "}
+              {props.session.isShuffled ? "Shuffled" : "In order"}
             </p>
             <h3 id="flashcard-study-title">{card.title}</h3>
           </div>
@@ -1772,7 +1792,8 @@ function createFlashcardDeckForm(deck: FlashcardDeck): FlashcardDeckForm {
     name: deck.name,
     description: deck.description ?? "",
     defaultSessionSize: String(deck.defaultSessionSize || 25),
-    selectedCardIds: deck.cards.map((card) => card.id)
+    selectedCardIds: deck.cards.map((card) => card.id),
+    deleteCardsWithSession: false
   };
 }
 
@@ -2021,14 +2042,14 @@ function formatCardCount(count: number) {
 }
 
 /**
- * Selects a randomized subset for one study run.
+ * Selects a subset for one study run.
  *
  * @param cards - Available deck cards.
- * @param size - Requested study run size.
+ * @param isShuffled - Whether the selected cards should be randomized.
  * @returns Selected cards for this run.
  */
-function selectStudyCards(cards: Flashcard[], size: number) {
-  return shuffleFlashcards(cards).slice(0, size);
+function selectStudyCards(cards: Flashcard[], isShuffled: boolean) {
+  return isShuffled ? shuffleFlashcards(cards) : [...cards];
 }
 
 /**

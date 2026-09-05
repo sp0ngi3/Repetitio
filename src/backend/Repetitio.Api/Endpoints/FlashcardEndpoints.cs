@@ -488,17 +488,34 @@ public static class FlashcardEndpoints
     /// </summary>
     /// <param name="dbContext">The database context.</param>
     /// <param name="id">The deck identifier.</param>
+    /// <param name="deleteCards">Whether to delete every flashcard selected in the deck.</param>
     /// <returns>No content when the deck was deleted.</returns>
-    private static async Task<IResult> DeleteDeckAsync(RepetitioDbContext dbContext, Guid id)
+    private static async Task<IResult> DeleteDeckAsync(RepetitioDbContext dbContext, Guid id, bool deleteCards = false)
     {
-        var deck = await dbContext.FlashcardDecks.FirstOrDefaultAsync(savedDeck => savedDeck.Id == id);
+        var deck = await dbContext.FlashcardDecks
+            .Include(savedDeck => savedDeck.Cards)
+            .FirstOrDefaultAsync(savedDeck => savedDeck.Id == id);
 
         if (deck is null)
         {
             return Results.NotFound();
         }
 
+        var cardIds = deleteCards
+            ? deck.Cards.Select(deckCard => deckCard.FlashcardLearningItemId).Distinct().ToArray()
+            : [];
+
         dbContext.FlashcardDecks.Remove(deck);
+
+        if (cardIds.Length > 0)
+        {
+            var learningItems = await dbContext.LearningItems
+                .Where(learningItem => cardIds.Contains(learningItem.Id) && learningItem.Type == LearningItemType.Flashcard)
+                .ToListAsync();
+
+            dbContext.LearningItems.RemoveRange(learningItems);
+        }
+
         await dbContext.SaveChangesAsync();
 
         return Results.NoContent();

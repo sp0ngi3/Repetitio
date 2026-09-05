@@ -1415,6 +1415,34 @@ textarea {
   margin-bottom: 0;
 }
 
+.flashcard-session-actions .session-shuffle-toggle {
+  width: auto;
+  min-height: 42px;
+  align-items: center;
+  padding-bottom: 1px;
+  color: #52616c;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.session-shuffle-toggle span {
+  white-space: nowrap;
+}
+
+.delete-session-options {
+  display: grid;
+  gap: 8px;
+  min-width: min(100%, 360px);
+  justify-items: end;
+}
+
+.delete-session-options .checkbox-row {
+  justify-content: flex-end;
+  color: #6d2f2a;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
 .date-chip.strong-date {
   border-color: #b9d5f0;
   color: #225f9f;

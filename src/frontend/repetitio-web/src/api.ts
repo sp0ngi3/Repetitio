@@ -432,10 +432,12 @@ export function updateFlashcardDeck(id: string, request: SaveFlashcardDeckReques
  * Deletes a saved flashcard deck.
  *
  * @param id - Deck identifier.
+ * @param deleteCards - Whether to also delete every flashcard selected in the deck.
  * @returns A promise that resolves when deletion completes.
  */
-export async function deleteFlashcardDeck(id: string): Promise<void> {
-  const response = await fetch(`${apiBaseUrl}/api/flashcards/decks/${id}`, {
+export async function deleteFlashcardDeck(id: string, deleteCards = false): Promise<void> {
+  const query = deleteCards ? "?deleteCards=true" : "";
+  const response = await fetch(`${apiBaseUrl}/api/flashcards/decks/${id}${query}`, {
     method: "DELETE"
   });
 
