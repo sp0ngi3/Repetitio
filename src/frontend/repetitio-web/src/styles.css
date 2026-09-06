@@ -1024,6 +1024,22 @@ textarea {
   gap: 8px;
 }
 
+.external-url-editor {
+  display: grid;
+  gap: 7px;
+}
+
+.external-url-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.external-url-controls input {
+  min-width: 0;
+}
+
 .flashcard-form {
   display: grid;
   gap: 14px;

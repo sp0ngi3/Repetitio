@@ -711,7 +711,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
       <PageBackHeader eyebrow="DSA problem" title={props.problem.title} onBack={props.onBack} />
       {props.error ? <p className="error-banner">{props.error}</p> : null}
       <div className="coding-layout">
-        <ProblemEditorPanel form={props.problemForm} onChange={props.onProblemChange}>
+        <ProblemEditorPanel form={props.problemForm} onChange={props.onProblemChange} showExternalUrlTools>
           <div className="editor-actions">
             <button className="secondary-button" type="button" onClick={props.onSaveMetadata} disabled={props.isSaving}>
               Save metadata
@@ -969,6 +969,8 @@ interface ProblemEditorPanelProps {
   form: DsaProblemForm;
   /** Optional action content. */
   children?: ReactNode;
+  /** Whether external URL controls should be shown inside the editor. */
+  showExternalUrlTools?: boolean;
   /** Updates one form field. */
   onChange: <K extends keyof DsaProblemForm>(key: K, value: DsaProblemForm[K]) => void;
 }
@@ -998,6 +1000,13 @@ function ProblemEditorPanel(props: ProblemEditorPanelProps) {
           placeholder="Longest Substring Without Repeating Characters"
         />
       </label>
+
+      {props.showExternalUrlTools ? (
+        <ExternalUrlEditor
+          value={props.form.externalUrl}
+          onChange={(value) => props.onChange("externalUrl", value)}
+        />
+      ) : null}
 
       <label>
         Problem statement
@@ -1030,6 +1039,45 @@ function ProblemEditorPanel(props: ProblemEditorPanelProps) {
         </label>
       </div>
     </section>
+  );
+}
+
+interface ExternalUrlEditorProps {
+  /** Current external URL value. */
+  value: string;
+  /** Updates the external URL field. */
+  onChange: (value: string) => void;
+}
+
+/**
+ * Renders an editable external URL with an open action.
+ *
+ * @param props - Component props.
+ * @returns External URL controls.
+ */
+function ExternalUrlEditor(props: ExternalUrlEditorProps) {
+  const hasUrl = props.value.trim().length > 0;
+
+  return (
+    <label className="external-url-editor">
+      External URL
+      <div className="external-url-controls">
+        <input
+          inputMode="url"
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+          placeholder="https://..."
+        />
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => openExternalUrl(props.value)}
+          disabled={!hasUrl}
+        >
+          Open link
+        </button>
+      </div>
+    </label>
   );
 }
 
@@ -1486,6 +1534,37 @@ function hasText(value?: string | null) {
  */
 function hasAnyText(...values: Array<string | null | undefined>) {
   return values.some(hasText);
+}
+
+/**
+ * Opens an external problem URL in a new browser tab.
+ *
+ * @param value - User-provided URL.
+ */
+function openExternalUrl(value: string) {
+  const url = toOpenableExternalUrl(value);
+
+  if (!url) {
+    return;
+  }
+
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/**
+ * Normalizes an external URL for browser opening.
+ *
+ * @param value - User-provided URL.
+ * @returns Openable URL, or an empty string when missing.
+ */
+function toOpenableExternalUrl(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
 /**

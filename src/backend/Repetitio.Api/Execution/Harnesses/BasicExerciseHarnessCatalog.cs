@@ -13,6 +13,16 @@ public static class BasicExerciseHarnessCatalog
     {
         return
         [
+            new BasicExerciseHarness("kadane-maximum-subarray", """
+        results.Add(RunInt("example mixed", 8, () => Solution.MaxSubArray([2, -3, 4, -2, 2, 1, -1, 4])));
+        results.Add(RunInt("single negative", -1, () => Solution.MaxSubArray([-1])));
+        results.Add(RunInt("all negative keeps largest", -2, () => Solution.MaxSubArray([-5, -2, -8])));
+        results.Add(RunInt("all positive takes whole array", 10, () => Solution.MaxSubArray([1, 2, 3, 4])));
+        results.Add(RunInt("restart after loss", 6, () => Solution.MaxSubArray([5, -10, 6])));
+        results.Add(RunInt("all zero", 0, () => Solution.MaxSubArray([0, 0, 0])));
+        results.Add(RunInt("classic kadane", 6, () => Solution.MaxSubArray([-2, 1, -3, 4, -1, 2, 1, -5, 4])));
+        results.Add(RunInt("prefix remains useful", 147, () => Solution.MaxSubArray([100, -1, -2, 50])));
+"""),
             new BasicExerciseHarness("linked-list-insert-at-head", """
         results.Add(RunList("insert head into empty", [1], () => Solution.InsertAtHead(BuildList([]), 1)));
         results.Add(RunList("insert head into existing", [1, 2, 3], () => Solution.InsertAtHead(BuildList([2, 3]), 1)));
@@ -128,6 +138,289 @@ public static class BasicExerciseHarnessCatalog
         results.Add(RunInt("last value", 4, () => Solution.Search([-10, -3, 0, 5, 9], 9)));
         results.Add(RunInt("between values missing", -1, () => Solution.Search([2, 5, 7, 11, 15], 6)));
         results.Add(RunInt("right half found", 3, () => Solution.Search([2, 5, 7, 11, 15], 11)));
+"""),
+            new BasicExerciseHarness("binary-search-tree-search-node", """
+        TreeNode BuildSearchTree()
+        {
+            return new TreeNode
+            {
+                Value = 8,
+                Left = new TreeNode
+                {
+                    Value = 3,
+                    Left = new TreeNode { Value = 1 },
+                    Right = new TreeNode
+                    {
+                        Value = 6,
+                        Left = new TreeNode { Value = 4 },
+                        Right = new TreeNode { Value = 7 }
+                    }
+                },
+                Right = new TreeNode
+                {
+                    Value = 10,
+                    Right = new TreeNode
+                    {
+                        Value = 14,
+                        Left = new TreeNode { Value = 13 }
+                    }
+                }
+            };
+        }
+
+        results.Add(RunBool("empty tree", false, () => Solution.SearchNode(null, 5)));
+        results.Add(RunBool("root found", true, () => Solution.SearchNode(BuildSearchTree(), 8)));
+        results.Add(RunBool("left leaf found", true, () => Solution.SearchNode(BuildSearchTree(), 1)));
+        results.Add(RunBool("right subtree found", true, () => Solution.SearchNode(BuildSearchTree(), 13)));
+        results.Add(RunBool("missing between nodes", false, () => Solution.SearchNode(BuildSearchTree(), 5)));
+        results.Add(RunBool("missing greater than max", false, () => Solution.SearchNode(BuildSearchTree(), 15)));
+        results.Add(RunBool("single found", true, () => Solution.SearchNode(new TreeNode { Value = 42 }, 42)));
+        results.Add(RunBool("single missing", false, () => Solution.SearchNode(new TreeNode { Value = 42 }, 7)));
+"""),
+            new BasicExerciseHarness("binary-search-tree-insert-node", """
+        TreeNode BuildSearchTree()
+        {
+            return new TreeNode
+            {
+                Value = 8,
+                Left = new TreeNode
+                {
+                    Value = 3,
+                    Left = new TreeNode { Value = 1 },
+                    Right = new TreeNode
+                    {
+                        Value = 6,
+                        Left = new TreeNode { Value = 4 },
+                        Right = new TreeNode { Value = 7 }
+                    }
+                },
+                Right = new TreeNode
+                {
+                    Value = 10,
+                    Right = new TreeNode
+                    {
+                        Value = 14,
+                        Left = new TreeNode { Value = 13 }
+                    }
+                }
+            };
+        }
+
+        int[] InOrder(TreeNode? root)
+        {
+            var values = new List<int>();
+
+            void Walk(TreeNode? node)
+            {
+                if (node is null)
+                {
+                    return;
+                }
+
+                Walk(node.Left);
+                values.Add(node.Value);
+                Walk(node.Right);
+            }
+
+            Walk(root);
+            return values.ToArray();
+        }
+
+        results.Add(RunArray("insert into empty", [5], () => InOrder(Solution.Insert(null, 5))));
+        results.Add(RunArray("insert left subtree", [1, 3, 4, 5, 6, 7, 8, 10, 13, 14], () => InOrder(Solution.Insert(BuildSearchTree(), 5))));
+        results.Add(RunArray("insert new minimum", [0, 1, 3, 4, 6, 7, 8, 10, 13, 14], () => InOrder(Solution.Insert(BuildSearchTree(), 0))));
+        results.Add(RunArray("insert new maximum", [1, 3, 4, 6, 7, 8, 10, 13, 14, 15], () => InOrder(Solution.Insert(BuildSearchTree(), 15))));
+        results.Add(RunArray("duplicate unchanged", [1, 3, 4, 6, 7, 8, 10, 13, 14], () => InOrder(Solution.Insert(BuildSearchTree(), 6))));
+"""),
+            new BasicExerciseHarness("binary-search-tree-min-value-node", """
+        TreeNode BuildSearchTree()
+        {
+            return new TreeNode
+            {
+                Value = 8,
+                Left = new TreeNode
+                {
+                    Value = 3,
+                    Left = new TreeNode { Value = 1 },
+                    Right = new TreeNode
+                    {
+                        Value = 6,
+                        Left = new TreeNode { Value = 4 },
+                        Right = new TreeNode { Value = 7 }
+                    }
+                },
+                Right = new TreeNode
+                {
+                    Value = 10,
+                    Right = new TreeNode
+                    {
+                        Value = 14,
+                        Left = new TreeNode { Value = 13 }
+                    }
+                }
+            };
+        }
+
+        results.Add(RunInt("full tree minimum", 1, () => Solution.MinValueNode(BuildSearchTree()).Value));
+        results.Add(RunInt("root is minimum", 8, () => Solution.MinValueNode(new TreeNode { Value = 8, Right = new TreeNode { Value = 10 } }).Value));
+        results.Add(RunInt("single node", 42, () => Solution.MinValueNode(new TreeNode { Value = 42 }).Value));
+        results.Add(RunInt("deep left chain", -5, () => Solution.MinValueNode(new TreeNode { Value = 5, Left = new TreeNode { Value = 2, Left = new TreeNode { Value = -5 } } }).Value));
+"""),
+            new BasicExerciseHarness("binary-search-tree-remove-node", """
+        TreeNode BuildSearchTree()
+        {
+            return new TreeNode
+            {
+                Value = 8,
+                Left = new TreeNode
+                {
+                    Value = 3,
+                    Left = new TreeNode { Value = 1 },
+                    Right = new TreeNode
+                    {
+                        Value = 6,
+                        Left = new TreeNode { Value = 4 },
+                        Right = new TreeNode { Value = 7 }
+                    }
+                },
+                Right = new TreeNode
+                {
+                    Value = 10,
+                    Right = new TreeNode
+                    {
+                        Value = 14,
+                        Left = new TreeNode { Value = 13 }
+                    }
+                }
+            };
+        }
+
+        int[] InOrder(TreeNode? root)
+        {
+            var values = new List<int>();
+
+            void Walk(TreeNode? node)
+            {
+                if (node is null)
+                {
+                    return;
+                }
+
+                Walk(node.Left);
+                values.Add(node.Value);
+                Walk(node.Right);
+            }
+
+            Walk(root);
+            return values.ToArray();
+        }
+
+        results.Add(RunArray("remove from empty", [], () => InOrder(Solution.Remove(null, 5))));
+        results.Add(RunArray("remove leaf", [3, 4, 6, 7, 8, 10, 13, 14], () => InOrder(Solution.Remove(BuildSearchTree(), 1))));
+        results.Add(RunArray("remove one child", [1, 3, 4, 6, 7, 8, 10, 13], () => InOrder(Solution.Remove(BuildSearchTree(), 14))));
+        results.Add(RunArray("remove two children", [1, 4, 6, 7, 8, 10, 13, 14], () => InOrder(Solution.Remove(BuildSearchTree(), 3))));
+        results.Add(RunArray("remove root", [1, 3, 4, 6, 7, 10, 13, 14], () => InOrder(Solution.Remove(BuildSearchTree(), 8))));
+        results.Add(RunArray("missing unchanged", [1, 3, 4, 6, 7, 8, 10, 13, 14], () => InOrder(Solution.Remove(BuildSearchTree(), 99))));
+"""),
+            new BasicExerciseHarness("binary-tree-inorder-traversal", """
+        TreeNode BuildTree()
+        {
+            return new TreeNode
+            {
+                Value = 1,
+                Left = new TreeNode
+                {
+                    Value = 2,
+                    Left = new TreeNode { Value = 4 },
+                    Right = new TreeNode { Value = 5 }
+                },
+                Right = new TreeNode
+                {
+                    Value = 3,
+                    Right = new TreeNode { Value = 6 }
+                }
+            };
+        }
+
+        results.Add(RunConsoleLines("balanced tree", ["4", "2", "5", "1", "3", "6"], () => Solution.InOrder(BuildTree())));
+        results.Add(RunConsoleLines("empty tree", [], () => Solution.InOrder(null)));
+        results.Add(RunConsoleLines("single node", ["7"], () => Solution.InOrder(new TreeNode { Value = 7 })));
+        results.Add(RunConsoleLines("left chain", ["1", "2", "3"], () => Solution.InOrder(new TreeNode { Value = 3, Left = new TreeNode { Value = 2, Left = new TreeNode { Value = 1 } } })));
+"""),
+            new BasicExerciseHarness("binary-tree-preorder-traversal", """
+        TreeNode BuildTree()
+        {
+            return new TreeNode
+            {
+                Value = 1,
+                Left = new TreeNode
+                {
+                    Value = 2,
+                    Left = new TreeNode { Value = 4 },
+                    Right = new TreeNode { Value = 5 }
+                },
+                Right = new TreeNode
+                {
+                    Value = 3,
+                    Right = new TreeNode { Value = 6 }
+                }
+            };
+        }
+
+        results.Add(RunConsoleLines("balanced tree", ["1", "2", "4", "5", "3", "6"], () => Solution.PreOrder(BuildTree())));
+        results.Add(RunConsoleLines("empty tree", [], () => Solution.PreOrder(null)));
+        results.Add(RunConsoleLines("single node", ["7"], () => Solution.PreOrder(new TreeNode { Value = 7 })));
+        results.Add(RunConsoleLines("left chain", ["3", "2", "1"], () => Solution.PreOrder(new TreeNode { Value = 3, Left = new TreeNode { Value = 2, Left = new TreeNode { Value = 1 } } })));
+"""),
+            new BasicExerciseHarness("binary-tree-postorder-traversal", """
+        TreeNode BuildTree()
+        {
+            return new TreeNode
+            {
+                Value = 1,
+                Left = new TreeNode
+                {
+                    Value = 2,
+                    Left = new TreeNode { Value = 4 },
+                    Right = new TreeNode { Value = 5 }
+                },
+                Right = new TreeNode
+                {
+                    Value = 3,
+                    Right = new TreeNode { Value = 6 }
+                }
+            };
+        }
+
+        results.Add(RunConsoleLines("balanced tree", ["4", "5", "2", "6", "3", "1"], () => Solution.PostOrder(BuildTree())));
+        results.Add(RunConsoleLines("empty tree", [], () => Solution.PostOrder(null)));
+        results.Add(RunConsoleLines("single node", ["7"], () => Solution.PostOrder(new TreeNode { Value = 7 })));
+        results.Add(RunConsoleLines("left chain", ["1", "2", "3"], () => Solution.PostOrder(new TreeNode { Value = 3, Left = new TreeNode { Value = 2, Left = new TreeNode { Value = 1 } } })));
+"""),
+            new BasicExerciseHarness("binary-tree-breadth-first-search", """
+        TreeNode BuildTree()
+        {
+            return new TreeNode
+            {
+                Value = 1,
+                Left = new TreeNode
+                {
+                    Value = 2,
+                    Left = new TreeNode { Value = 4 },
+                    Right = new TreeNode { Value = 5 }
+                },
+                Right = new TreeNode
+                {
+                    Value = 3,
+                    Right = new TreeNode { Value = 6 }
+                }
+            };
+        }
+
+        results.Add(RunConsoleLines("balanced tree", ["level 0: ", "1", "", "level 1: ", "2", "3", "", "level 2: ", "4", "5", "6"], () => Solution.BfsTraversal(BuildTree())));
+        results.Add(RunConsoleLines("empty tree", [], () => Solution.BfsTraversal(null)));
+        results.Add(RunConsoleLines("single node", ["level 0: ", "7"], () => Solution.BfsTraversal(new TreeNode { Value = 7 })));
+        results.Add(RunConsoleLines("left chain", ["level 0: ", "3", "", "level 1: ", "2", "", "level 2: ", "1"], () => Solution.BfsTraversal(new TreeNode { Value = 3, Left = new TreeNode { Value = 2, Left = new TreeNode { Value = 1 } } })));
 """)
         ];
     }

@@ -43,7 +43,7 @@ public sealed class BasicExerciseCatalogTests
 
         Assert.Contains("reverse-linked-list", slugs);
         Assert.DoesNotContain("two-pointers-two-sum-sorted", slugs);
-        Assert.DoesNotContain("kadane-maximum-subarray", slugs);
+        Assert.Contains("kadane-maximum-subarray", slugs);
         Assert.DoesNotContain("kadane-max-subarray-range", slugs);
         Assert.DoesNotContain("prefix-sum-range-query", slugs);
         Assert.DoesNotContain("prefix-sum-pivot-index", slugs);
@@ -65,6 +65,14 @@ public sealed class BasicExerciseCatalogTests
         Assert.Contains("radix-sort", slugs);
         Assert.DoesNotContain("sorting-algorithms", slugs);
         Assert.Contains("binary-search-sorted-array", slugs);
+        Assert.Contains("binary-search-tree-search-node", slugs);
+        Assert.Contains("binary-search-tree-insert-node", slugs);
+        Assert.Contains("binary-search-tree-min-value-node", slugs);
+        Assert.Contains("binary-search-tree-remove-node", slugs);
+        Assert.Contains("binary-tree-inorder-traversal", slugs);
+        Assert.Contains("binary-tree-preorder-traversal", slugs);
+        Assert.Contains("binary-tree-postorder-traversal", slugs);
+        Assert.Contains("binary-tree-breadth-first-search", slugs);
         Assert.DoesNotContain("binary-search-first-passing-version", slugs);
     }
 

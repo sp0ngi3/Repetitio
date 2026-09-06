@@ -37,6 +37,7 @@ public sealed class BasicExerciseHarness : IBasicExerciseHarness
         return $$"""
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 
@@ -140,9 +141,40 @@ public static class RepetitioTestHarness
         }
     }
 
+    private static RepetitioTestResult RunConsoleLines(string name, string[] expected, Action action)
+    {
+        var originalOutput = Console.Out;
+
+        try
+        {
+            using var writer = new StringWriter();
+            Console.SetOut(writer);
+            action();
+            Console.Out.Flush();
+
+            var actualText = writer.ToString().Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
+            var actual = actualText.Length == 0 ? [] : actualText.Split('\n');
+
+            return new RepetitioTestResult(name, actual.SequenceEqual(expected), FormatLines(expected), FormatLines(actual), null);
+        }
+        catch (Exception exception)
+        {
+            return CreateExceptionResult(name, FormatLines(expected), exception);
+        }
+        finally
+        {
+            Console.SetOut(originalOutput);
+        }
+    }
+
     private static string FormatArray(int[] values)
     {
         return "[" + string.Join(",", values) + "]";
+    }
+
+    private static string FormatLines(string[] values)
+    {
+        return values.Length == 0 ? "no output" : string.Join(", ", values);
     }
 
     private static string FormatNullable(int? value)

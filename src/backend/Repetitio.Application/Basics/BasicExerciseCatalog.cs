@@ -31,6 +31,7 @@ public static class BasicExerciseCatalog
     /// </summary>
     private static readonly BasicExerciseResponse[] Exercises =
     [
+        ArrayTechniqueExercises.KadaneMaximumSubarray,
         ReverseLinkedListExercise.Definition,
         LinkedListTechniqueExercises.LinkedListInsertAtHead,
         LinkedListTechniqueExercises.LinkedListInsertAtEnd,
@@ -44,6 +45,14 @@ public static class BasicExerciseCatalog
         SortingExercises.QuickSort,
         SortingExercises.BucketSort,
         SortingExercises.RadixSort,
-        BinarySearchExercises.SearchSortedArray
+        BinarySearchExercises.SearchSortedArray,
+        BinarySearchExercises.SearchBinarySearchTreeNode,
+        BinarySearchExercises.InsertBinarySearchTreeNode,
+        BinarySearchExercises.MinBinarySearchTreeNode,
+        BinarySearchExercises.RemoveBinarySearchTreeNode,
+        BinaryTreeTraversalExercises.InOrderTraversal,
+        BinaryTreeTraversalExercises.PreOrderTraversal,
+        BinaryTreeTraversalExercises.PostOrderTraversal,
+        BinaryTreeTraversalExercises.BreadthFirstSearchTraversal
     ];
 }
