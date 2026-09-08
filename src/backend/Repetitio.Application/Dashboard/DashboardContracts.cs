@@ -83,6 +83,16 @@ public sealed record DueReviewItemResponse
     /// Gets the current confidence value from 1 to 5.
     /// </summary>
     public int? Confidence { get; init; }
+
+    /// <summary>
+    /// Gets the saved flashcard learning session to open for due flashcard reviews.
+    /// </summary>
+    public Guid? LearningSessionId { get; init; }
+
+    /// <summary>
+    /// Gets the saved flashcard learning session name to open for due flashcard reviews.
+    /// </summary>
+    public string? LearningSessionName { get; init; }
 }
 
 /// <summary>

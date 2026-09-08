@@ -237,6 +237,10 @@ export interface DueReviewItem {
   nextReviewAt?: string | null;
   /** Current confidence value from 1 to 5. */
   confidence?: number | null;
+  /** Saved learning session to open for due flashcard reviews. */
+  learningSessionId?: string | null;
+  /** Saved learning session name to open for due flashcard reviews. */
+  learningSessionName?: string | null;
 }
 
 /**

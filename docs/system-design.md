@@ -8,13 +8,16 @@ Deployment model: Localhost with Docker Compose
 
 Repetitio is a local-first learning platform for practicing and revisiting core software engineering fundamentals. Its main purpose is to build a durable personal practice history.
 
-The application focuses on three domains:
+The application currently focuses on four learning domains:
 
 - Basics
 - Data Structures & Algorithms
 - System Design
+- Flashcards
 
 Repetitio should help the user understand what they practiced, what they have avoided, what is due for review, and how their confidence changes over time.
+
+The planned next expansion is a local-first knowledge artifact layer. This would add a personal Repositorium/wiki, editable functional drawings, local image storage, and reusable links between learning materials and practice items. See `docs/knowledge-artifacts.md` for the dedicated plan.
 
 The initial version is intentionally designed as a single-user localhost system. No cloud infrastructure is required for the MVP.
 
@@ -28,6 +31,8 @@ The product should optimize for:
 - Fast startup
 - Simple backups
 - Durable practice history
+- Portable learning materials
+- Importable and exportable artifacts
 - Low operational overhead
 
 The product should avoid early complexity such as authentication, microservices, distributed databases, message brokers, real-time collaboration, and cloud synchronization.
@@ -167,6 +172,47 @@ Automatic evaluation of system design answers is out of scope for the MVP. The g
 Practice -> Reflect -> Save -> Review -> Repeat
 ```
 
+### 3.4 Flashcards
+
+Flashcards store question/explanation cards and saved learning sessions. A saved learning session is a deck-like group of flashcards that can be reviewed in order or shuffled.
+
+Flashcards should support:
+
+- Searchable card dashboard
+- Searchable saved learning session dashboard
+- Saved learning sessions containing selected cards
+- Batch import with optional split learning sessions
+- Review of all cards in a session
+- Review of only previously missed cards in a session
+- Due review links that open the learning session instead of a detached card editor when possible
+
+### 3.5 Planned Knowledge Artifacts
+
+The planned artifact layer should let the user store learning materials that support practice:
+
+- Repositorium / Wiki pages
+- Functional drawing documents
+- Local image assets
+- Links between artifacts and existing modules
+
+The most important design decision is to build this as one shared system rather than as separate attachments inside each module.
+
+Conceptual model:
+
+```text
+KnowledgePage
+DrawingDocument
+MediaAsset
+      |
+      v
+ArtifactLink
+      |
+      v
+DSA / System Design / Basics / Flashcards / Learning Sessions / Wiki
+```
+
+This makes it possible to attach the same diagram, note, or image to multiple problems and topics.
+
 ## 4. Practice Model
 
 Everything in Repetitio revolves around practice sessions. A learning item represents something that can be practiced. Every time the user works on that item, a new practice session is recorded.
@@ -282,6 +328,9 @@ The initial system should use a modular monolith architecture.
 | Basics                       |
 | DSA                          |
 | System Design                |
+| Flashcards                   |
+| Repositorium                 |
+| Drawing Editor               |
 | Review Queue                 |
 +--------------+---------------+
                |
@@ -294,6 +343,8 @@ The initial system should use a modular monolith architecture.
 | Basics Module                |
 | DSA Module                   |
 | System Design Module         |
+| Flashcards Module            |
+| Knowledge Artifacts Module   |
 | Review Module                |
 | Backup Module                |
 +-------+--------------+-------+
@@ -304,7 +355,7 @@ The initial system should use a modular monolith architecture.
 |    SQLite    |  |   Code Runner   |
 |              |  |                 |
 | repetitio.db |  | Compile C#      |
-|              |  | Run tests       |
+| local assets |  | Run tests       |
 |              |  | Benchmark       |
 +--------------+  +-----------------+
 ```
@@ -433,6 +484,8 @@ The project should use a host bind mount:
 ```text
 data/
   repetitio.db
+  assets/
+    images/
 ```
 
 Docker concept:
@@ -455,6 +508,8 @@ The following directories should normally not be committed:
 - data/
 - backups/
 
+Planned local media assets should live under the persistent `data/` tree. SQLite should store metadata and relationships, while larger binary files should stay on disk.
+
 ## 12. Backup and Restore
 
 The UI should provide explicit backup functionality from Settings:
@@ -475,7 +530,10 @@ Possible backup structure:
 repetitio-backup-2026-08-30.zip
 +-- manifest.json
 +-- repetitio.db
-+-- attachments/
++-- assets/
+|   +-- images/
++-- drawings/
+    +-- previews/
 ```
 
 Example manifest:
@@ -504,10 +562,14 @@ Import should:
 2. Validate the backup.
 3. Verify the schema version.
 4. Create a backup of the current database.
-5. Replace or restore the imported database.
-6. Restart or reload the database connection.
+5. Validate referenced artifact files when the backup contains media.
+6. Replace or restore the imported database.
+7. Restore local artifact files.
+8. Restart or reload the database connection.
 
 A corrupted or incompatible backup must never overwrite the current database without validation.
+
+For the planned artifact system, import and export must include wiki pages, drawing JSON, media metadata, artifact links, image files, and generated drawing previews if they exist. If an imported artifact link points to a target that no longer exists, the system should preserve the artifact and avoid redirecting the user to an empty screen. The link can be skipped, marked orphaned, or surfaced for cleanup.
 
 The Docker Compose setup bind-mounts both persistent runtime directories:
 
@@ -576,3 +638,19 @@ Reason: Destroying containers should never destroy learning history.
 ### Decision 7: Keep repetition logic simple initially
 
 Reason: The important part is building the practice habit and collecting historical data. A sophisticated spaced-repetition algorithm can be introduced later.
+
+### Decision 8: Add knowledge artifacts as a shared layer
+
+Reason: Notes, diagrams, and images should be reusable across DSA, System Design, Basics, Flashcards, saved learning sessions, and wiki pages.
+
+### Decision 9: Store drawing source as JSON
+
+Reason: Functional drawings must remain editable. A generated preview image is useful, but it should not be the source of truth.
+
+### Decision 10: Store image files locally and metadata in SQLite
+
+Reason: The app stays local-first, the database stays smaller, and export/import can validate the physical files explicitly.
+
+### Decision 11: Keep artifacts portable through backup endpoints
+
+Reason: The user's learning system should survive moving machines, reinstalling the app, and restoring from backup. New artifact features are not complete until export, validate, and import support them.

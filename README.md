@@ -17,6 +17,8 @@ The current Basics catalog contains 13 executable C# exercises. It includes Reve
 
 Flashcards are stored in the same SQLite database as the rest of the system, so export, import, validation, and pre-import safety backups include cards, saved flashcard sessions, and review history.
 
+The planned next expansion is a local-first knowledge/artifact system: a private Repositorium or wiki, editable functional drawings, and local image storage. The intent is to make Repetitio more than a practice tracker: it should become a personal interview preparation knowledge base where notes, diagrams, images, problems, basics exercises, flashcards, and saved learning sessions can all be connected.
+
 ## Product Goals
 
 Repetitio should help answer questions like:
@@ -29,8 +31,25 @@ Repetitio should help answer questions like:
 - What helped me solve a problem?
 - How confident am I with this topic?
 - When did I last implement this algorithm from memory?
+- Which notes, diagrams, and images explain this topic best?
+- Which learning materials are connected to this problem or session?
 
 The application is intentionally local, single-user, and lightweight. The MVP does not require authentication, cloud infrastructure, distributed systems, or multi-user features.
+
+## Planned Knowledge Artifacts
+
+Repetitio is expected to grow toward a shared artifact model instead of separate one-off features. The planned modules are:
+
+- Repositorium / Wiki: personal markdown pages with headings, definitions, tags, wiki-style links, and backlinks.
+- Functional Drawing: editable diagrams similar in spirit to Excalidraw or draw.io, stored as structured JSON so they remain editable.
+- Local Image Storage: locally stored images with metadata in SQLite, so screenshots, sketches, and reference images can be reused across the app.
+- Artifact Links: a shared linking layer that can attach wiki pages, drawings, and images to DSA problems, System Design problems, Basics exercises, Flashcards, saved learning sessions, and other knowledge pages.
+
+This is not meant to replace practice sessions. It should support them. A System Design attempt could link to a drawing, a DSA problem could link to an explanation page, a Basics exercise could link to a visual memory aid, and a flashcard deck could link to the source material it was created from.
+
+All of these artifacts must remain local-first and portable. They should be included in export, import, validation, and backup flows. Database records should capture structure and relationships, while large binary image files should be stored locally on disk and referenced by metadata in the database.
+
+See [docs/knowledge-artifacts.md](docs/knowledge-artifacts.md) for the proposed plan and decisions.
 
 ## Running Locally
 
@@ -85,6 +104,8 @@ Open Settings in the frontend to export or import data.
 - Import Data validates the uploaded backup, writes a pre-import backup to `backups/`, and restores the validated SQLite database.
 
 The backup archive contains `manifest.json` and `repetitio.db`.
+
+Future artifact-aware backups should also include local media files, drawing previews if generated, and a manifest section that verifies those files. Import should restore both the SQLite records and the local files, while handling missing or obsolete links safely.
 
 ## Testing
 

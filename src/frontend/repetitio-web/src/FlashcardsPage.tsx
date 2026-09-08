@@ -3,6 +3,7 @@ import {
   completeFlashcardSession,
   createFlashcard,
   createFlashcardDeck,
+  createMissedFlashcardDeckSession,
   deleteFlashcard,
   deleteFlashcardDeck,
   getFlashcard,
@@ -238,6 +239,8 @@ const flashcardImportExample = JSON.stringify(
 interface FlashcardsPageProps {
   /** Flashcard id to open from the Overview page. */
   focusCardId?: string | null;
+  /** Saved learning session id to start from the Overview page. */
+  focusDeckId?: string | null;
   /** Changes when the same focused card should be reopened. */
   focusNonce?: number | null;
   /** Called after flashcard practice changes global progress data. */
@@ -425,6 +428,19 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
 
     void openFocusedCard();
   }, [props.focusCardId, props.focusNonce]);
+
+  useEffect(() => {
+    if (!props.focusDeckId) {
+      return;
+    }
+
+    async function openFocusedDeck() {
+      await startStudyByDeckId(props.focusDeckId!);
+      props.onFocusHandled?.();
+    }
+
+    void openFocusedDeck();
+  }, [props.focusDeckId, props.focusNonce]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, flashcardPageCount));
@@ -807,11 +823,20 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
    * @param deckSummary - Deck summary to study.
    */
   async function startStudy(deckSummary: FlashcardDeckSummary) {
+    await startStudyByDeckId(deckSummary.id);
+  }
+
+  /**
+   * Starts a study run from a saved deck identifier.
+   *
+   * @param deckId - Deck identifier to study.
+   */
+  async function startStudyByDeckId(deckId: string) {
     setIsSaving(true);
     setError(null);
 
     try {
-      const deck = await getFlashcardDeck(deckSummary.id);
+      const deck = await getFlashcardDeck(deckId);
       const isShuffled = sessionShuffleModes[deck.id] ?? true;
       const cards = selectStudyCards(deck.cards, isShuffled);
 
@@ -831,6 +856,43 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
       setView("study");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to start flashcard session.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  /**
+   * Creates and starts a normal learning session from cards missed in a saved deck.
+   *
+   * @param deckSummary - Source saved learning session summary.
+   */
+  async function startMissedStudy(deckSummary: FlashcardDeckSummary) {
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const deck = await createMissedFlashcardDeckSession(deckSummary.id);
+      const isShuffled = sessionShuffleModes[deckSummary.id] ?? true;
+      const cards = selectStudyCards(deck.cards, isShuffled);
+
+      if (cards.length === 0) {
+        setError("This saved session has no previously missed flashcards.");
+        return;
+      }
+
+      setSessionShuffleModes((current) => ({ ...current, [deck.id]: isShuffled }));
+      await loadDecks();
+      setStudySession({
+        deck,
+        cards,
+        isShuffled,
+        index: 0,
+        isFlipped: false,
+        reviews: []
+      });
+      setView("study");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to start missed flashcards review.");
     } finally {
       setIsSaving(false);
     }
@@ -1270,6 +1332,14 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                       <div className="editor-actions compact-actions">
                         <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void startStudy(deck)}>
                           Start
+                        </button>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={isSaving || !hasMissedDeckReviews(deck)}
+                          onClick={() => void startMissedStudy(deck)}
+                        >
+                          Review missed
                         </button>
                         <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void openEditDeck(deck)}>
                           Edit
@@ -2456,6 +2526,16 @@ function calculateKnownRate(flashcards: Flashcard[]) {
  */
 function calculateDeckKnownRate(deck: FlashcardDeckSummary) {
   return deck.totalReviews === 0 ? "0%" : `${Math.round((deck.knownReviews / deck.totalReviews) * 100)}%`;
+}
+
+/**
+ * Returns whether a saved learning session has at least one missed review.
+ *
+ * @param deck - Saved learning session summary.
+ * @returns True when any submitted review was missed.
+ */
+function hasMissedDeckReviews(deck: FlashcardDeckSummary) {
+  return deck.totalReviews > deck.knownReviews;
 }
 
 /**

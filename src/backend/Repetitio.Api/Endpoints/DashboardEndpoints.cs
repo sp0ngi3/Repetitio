@@ -56,6 +56,7 @@ public static class DashboardEndpoints
             .ThenBy(item => item.Title)
             .Take(10)
             .ToArray();
+        var flashcardSessionTargets = await GetFlashcardSessionTargetsAsync(dbContext, dueReviews);
 
         var recentPractice = await dbContext.PracticeSessions
             .AsNoTracking()
@@ -71,13 +72,68 @@ public static class DashboardEndpoints
             PracticesThisWeek = await dbContext.PracticeSessions.CountAsync(session => session.CreatedAt >= weekStart),
             DueReviewCount = openableLearningItems.Count(item => item.NextReviewAt != null && item.NextReviewAt <= now),
             NeverPracticedCount = openableLearningItems.Count(item => item.LastPracticedAt == null),
-            DueReviews = dueReviews.Select(ApiMappings.ToDueReviewResponse).ToArray(),
+            DueReviews = dueReviews.Select(item =>
+            {
+                flashcardSessionTargets.TryGetValue(item.Id, out var target);
+                return ApiMappings.ToDueReviewResponse(item, target?.Id, target?.Name);
+            }).ToArray(),
             InterviewPlan = CreateInterviewPlan(openableLearningItems, now),
             WeaknessMap = CreateWeaknessMap(openableLearningItems, now),
             RecentPractice = recentPractice.Select(ApiMappings.ToResponse).ToArray()
         };
 
         return Results.Ok(response);
+    }
+
+    /// <summary>
+    /// Gets the best saved learning session target for each due flashcard.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="dueReviews">The currently displayed due review items.</param>
+    /// <returns>A lookup from flashcard learning item id to saved learning session target.</returns>
+    private static async Task<Dictionary<Guid, FlashcardLearningSessionTarget>> GetFlashcardSessionTargetsAsync(
+        RepetitioDbContext dbContext,
+        IReadOnlyCollection<LearningItem> dueReviews)
+    {
+        var flashcardIds = dueReviews
+            .Where(item => item.Type == LearningItemType.Flashcard)
+            .Select(item => item.Id)
+            .ToArray();
+
+        if (flashcardIds.Length == 0)
+        {
+            return new Dictionary<Guid, FlashcardLearningSessionTarget>();
+        }
+
+        var candidates = await dbContext.FlashcardDeckCards
+            .AsNoTracking()
+            .Where(deckCard => flashcardIds.Contains(deckCard.FlashcardLearningItemId))
+            .Select(deckCard => new
+            {
+                FlashcardId = deckCard.FlashcardLearningItemId,
+                deckCard.Deck.Id,
+                deckCard.Deck.Name,
+                deckCard.Deck.NextReviewAt,
+                deckCard.Deck.LastPracticedAt
+            })
+            .ToListAsync();
+
+        return candidates
+            .GroupBy(candidate => candidate.FlashcardId)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var target = group
+                        .OrderBy(candidate => candidate.NextReviewAt is null)
+                        .ThenBy(candidate => candidate.NextReviewAt)
+                        .ThenBy(candidate => candidate.LastPracticedAt is not null)
+                        .ThenBy(candidate => candidate.LastPracticedAt)
+                        .ThenBy(candidate => candidate.Name)
+                        .First();
+
+                    return new FlashcardLearningSessionTarget(target.Id, target.Name);
+                });
     }
 
     /// <summary>
@@ -280,4 +336,9 @@ public static class DashboardEndpoints
 
         return "Needs calibration";
     }
+
+    /// <summary>
+    /// Represents a saved flashcard learning session target from Overview.
+    /// </summary>
+    private sealed record FlashcardLearningSessionTarget(Guid Id, string Name);
 }

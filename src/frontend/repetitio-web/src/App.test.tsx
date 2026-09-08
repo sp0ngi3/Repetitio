@@ -5,6 +5,7 @@ import {
   completeFlashcardSession,
   createFlashcard,
   createFlashcardDeck,
+  createMissedFlashcardDeckSession,
   createNotePage,
   createPracticeSession,
   deleteFlashcard,
@@ -52,6 +53,7 @@ vi.mock("./api", () => ({
   completeFlashcardSession: vi.fn(),
   createFlashcard: vi.fn(),
   createFlashcardDeck: vi.fn(),
+  createMissedFlashcardDeckSession: vi.fn(),
   createNotePage: vi.fn(),
   createDsaProblem: vi.fn(),
   createDsaSolution: vi.fn(),
@@ -591,6 +593,15 @@ beforeEach(() => {
   vi.mocked(updateFlashcard).mockResolvedValue(flashcards[0]);
   vi.mocked(deleteFlashcard).mockResolvedValue();
   vi.mocked(createFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
+  vi.mocked(createMissedFlashcardDeckSession).mockResolvedValue({
+    ...flashcardDecks[0],
+    id: "deck-missed-1",
+    name: "Interview flashcards - missed review",
+    cards: flashcards.slice(0, 1),
+    totalRuns: 0,
+    totalReviews: 0,
+    knownReviews: 0
+  });
   vi.mocked(updateFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
   vi.mocked(deleteFlashcardDeck).mockResolvedValue();
   vi.mocked(completeFlashcardSession).mockResolvedValue({
@@ -670,6 +681,41 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Attempt problem" })).toBeInTheDocument();
     expect(screen.getByLabelText("Approach")).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that due flashcards from Overview open their learning session instead of the card editor.
+   */
+  it("opens a due flashcard through its learning session from Overview", async () => {
+    vi.mocked(getDashboard).mockResolvedValueOnce({
+      ...dashboard,
+      dueReviewCount: 1,
+      dueReviews: [
+        {
+          id: "flashcard-1",
+          title: "CAP theorem",
+          type: "Flashcard",
+          lastPracticedAt: "2026-08-30T12:00:00Z",
+          nextReviewAt: "2026-09-06T12:00:00Z",
+          confidence: 2,
+          learningSessionId: "deck-1",
+          learningSessionName: "Interview flashcards"
+        }
+      ]
+    });
+    vi.mocked(getFlashcardDeck).mockResolvedValueOnce({
+      ...flashcardDecks[0],
+      cards: flashcards.slice(0, 1)
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("CAP theorem")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open session" }));
+
+    expect(getFlashcardDeck).toHaveBeenCalledWith("deck-1");
+    expect(await screen.findByRole("heading", { name: "CAP theorem" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Flip" })).toBeInTheDocument();
   });
 
   /**
@@ -892,6 +938,36 @@ describe("App", () => {
         },
         {
           flashcardId: "flashcard-2",
+          knewAnswer: true,
+          confidence: 4
+        }
+      ]
+    });
+  });
+
+  /**
+   * Verifies that missed flashcards from a saved session become a normal learning session.
+   */
+  it("creates and starts a missed-card learning session", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+
+    expect(await screen.findByText("Interview flashcards")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Review missed" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Flip" }));
+
+    expect(createMissedFlashcardDeckSession).toHaveBeenCalledWith("deck-1");
+    expect(screen.getByText(/consistency, availability, and partition tolerance/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
+
+    expect(completeFlashcardSession).toHaveBeenCalledWith({
+      deckId: "deck-missed-1",
+      reviews: [
+        {
+          flashcardId: "flashcard-1",
           knewAnswer: true,
           confidence: 4
         }

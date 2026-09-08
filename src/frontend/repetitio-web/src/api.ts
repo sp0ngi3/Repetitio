@@ -440,6 +440,18 @@ export function createFlashcardDeck(request: SaveFlashcardDeckRequest): Promise<
 }
 
 /**
+ * Creates a saved learning session from cards previously missed in a deck.
+ *
+ * @param id - Source deck identifier.
+ * @returns The created missed-card learning session.
+ */
+export function createMissedFlashcardDeckSession(id: string): Promise<FlashcardDeck> {
+  return requestJson<FlashcardDeck>(`/api/flashcards/decks/${id}/missed-session`, {
+    method: "POST"
+  });
+}
+
+/**
  * Updates a saved flashcard deck.
  *
  * @param id - Deck identifier.

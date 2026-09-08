@@ -42,6 +42,7 @@ public static class FlashcardEndpoints
         group.MapGet("/decks", GetDecksAsync).WithName("GetFlashcardDecks");
         group.MapGet("/decks/{id:guid}", GetDeckAsync).WithName("GetFlashcardDeck");
         group.MapPost("/decks", CreateDeckAsync).WithName("CreateFlashcardDeck");
+        group.MapPost("/decks/{id:guid}/missed-session", CreateMissedDeckSessionAsync).WithName("CreateMissedFlashcardDeckSession");
         group.MapPut("/decks/{id:guid}", UpdateDeckAsync).WithName("UpdateFlashcardDeck");
         group.MapDelete("/decks/{id:guid}", DeleteDeckAsync).WithName("DeleteFlashcardDeck");
         group.MapPost("/sessions/complete", CompleteSessionAsync).WithName("CompleteFlashcardSession");
@@ -434,6 +435,56 @@ public static class FlashcardEndpoints
         };
 
         AddDeckCards(deck, uniqueCardIds);
+        dbContext.FlashcardDecks.Add(deck);
+        await dbContext.SaveChangesAsync();
+
+        var created = await DeckQuery(dbContext).FirstAsync(savedDeck => savedDeck.Id == deck.Id);
+        return Results.Created($"/api/flashcards/decks/{deck.Id}", ToDeckResponse(created));
+    }
+
+    /// <summary>
+    /// Creates a normal saved learning session from cards missed in a source deck.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="id">The source deck identifier.</param>
+    /// <returns>The created missed-card learning session.</returns>
+    private static async Task<IResult> CreateMissedDeckSessionAsync(RepetitioDbContext dbContext, Guid id)
+    {
+        var sourceDeck = await DeckQuery(dbContext)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(savedDeck => savedDeck.Id == id);
+
+        if (sourceDeck is null)
+        {
+            return Results.NotFound();
+        }
+
+        var missedCardIds = sourceDeck.Cards
+            .OrderBy(deckCard => deckCard.SortOrder)
+            .Where(deckCard => sourceDeck.Reviews.Any(review =>
+                review.FlashcardLearningItemId == deckCard.FlashcardLearningItemId
+                && !review.KnewAnswer))
+            .Select(deckCard => deckCard.FlashcardLearningItemId)
+            .Distinct()
+            .ToArray();
+
+        if (missedCardIds.Length == 0)
+        {
+            return Results.BadRequest("This learning session has no previously missed flashcards.");
+        }
+
+        var now = DateTime.UtcNow;
+        var deck = new FlashcardDeck
+        {
+            Id = Guid.NewGuid(),
+            Name = $"{sourceDeck.Name} - missed review {now:yyyy-MM-dd HH:mm}",
+            Description = $"Flashcards previously missed in {sourceDeck.Name}.",
+            DefaultSessionSize = Math.Min(sourceDeck.DefaultSessionSize, missedCardIds.Length),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        AddDeckCards(deck, missedCardIds);
         dbContext.FlashcardDecks.Add(deck);
         await dbContext.SaveChangesAsync();
 

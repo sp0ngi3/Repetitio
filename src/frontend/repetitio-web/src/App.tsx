@@ -21,11 +21,21 @@ type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | 
 /**
  * Internal navigation target for opening a concrete learning item.
  */
-interface FocusedLearningTarget {
+interface LearningNavigationTarget {
   /** Learning item identifier. */
   id: string;
   /** Learning item type. */
   type: LearningItemType;
+  /** Saved learning session to open when the target is a due flashcard. */
+  learningSessionId?: string | null;
+  /** Saved learning session name to open when the target is a due flashcard. */
+  learningSessionName?: string | null;
+}
+
+/**
+ * Internal navigation target for opening a concrete learning item.
+ */
+interface FocusedLearningTarget extends LearningNavigationTarget {
   /** Unique value that allows reopening the same item twice. */
   nonce: number;
 }
@@ -156,7 +166,7 @@ export function App() {
    *
    * @param target - Item type and identifier.
    */
-  function openLearningTarget(target: { id: string; type: LearningItemType }) {
+  function openLearningTarget(target: LearningNavigationTarget) {
     setFocusedLearningTarget({ ...target, nonce: Date.now() });
     setActivePage(toAppPage(target.type));
   }
@@ -272,7 +282,12 @@ export function App() {
 
       {activePage === "flashcards" ? (
         <FlashcardsPage
-          focusCardId={focusedLearningTarget?.type === "Flashcard" ? focusedLearningTarget.id : null}
+          focusCardId={
+            focusedLearningTarget?.type === "Flashcard" && !focusedLearningTarget.learningSessionId
+              ? focusedLearningTarget.id
+              : null
+          }
+          focusDeckId={focusedLearningTarget?.type === "Flashcard" ? focusedLearningTarget.learningSessionId : null}
           focusNonce={focusedLearningTarget?.type === "Flashcard" ? focusedLearningTarget.nonce : null}
           onChanged={refreshData}
           onFocusHandled={clearFocusedLearningTarget}
@@ -341,7 +356,7 @@ interface OverviewPageProps {
   /** Learning item counts grouped by type. */
   groupedCounts: Record<LearningItemType, number>;
   /** Opens a concrete learning item in its owning module. */
-  onOpenItem: (target: { id: string; type: LearningItemType }) => void;
+  onOpenItem: (target: LearningNavigationTarget) => void;
 }
 
 /**
@@ -469,7 +484,7 @@ function OverviewPage(props: OverviewPageProps) {
                 <div className="overview-row-actions">
                   <span className="confidence">{item.confidence ? `${item.confidence}/5` : "No confidence"}</span>
                   <button className="secondary-button compact-button" type="button" onClick={() => props.onOpenItem(item)}>
-                    Open
+                    {item.type === "Flashcard" && item.learningSessionId ? "Open session" : "Open"}
                   </button>
                 </div>
               </li>

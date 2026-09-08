@@ -39,6 +39,6 @@ public static class ReviewEndpoints
             .ThenBy(item => item.Title)
             .ToListAsync();
 
-        return Results.Ok(dueItems.Select(ApiMappings.ToDueReviewResponse));
+        return Results.Ok(dueItems.Select(item => ApiMappings.ToDueReviewResponse(item)));
     }
 }

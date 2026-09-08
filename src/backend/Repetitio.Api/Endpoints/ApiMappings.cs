@@ -97,7 +97,10 @@ internal static class ApiMappings
     /// </summary>
     /// <param name="item">The learning item.</param>
     /// <returns>The due review response.</returns>
-    public static DueReviewItemResponse ToDueReviewResponse(LearningItem item)
+    public static DueReviewItemResponse ToDueReviewResponse(
+        LearningItem item,
+        Guid? learningSessionId = null,
+        string? learningSessionName = null)
     {
         ArgumentNullException.ThrowIfNull(item);
 
@@ -108,7 +111,9 @@ internal static class ApiMappings
             Type = item.Type,
             LastPracticedAt = item.LastPracticedAt,
             NextReviewAt = item.NextReviewAt,
-            Confidence = item.Confidence
+            Confidence = item.Confidence,
+            LearningSessionId = learningSessionId,
+            LearningSessionName = learningSessionName
         };
     }
 }
