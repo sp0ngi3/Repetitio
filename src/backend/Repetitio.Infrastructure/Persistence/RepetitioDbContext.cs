@@ -6,6 +6,7 @@ using Repetitio.Domain.Notes;
 using Repetitio.Domain.Practice;
 using Repetitio.Domain.SystemDesign;
 using Repetitio.Domain.Tags;
+using Repetitio.Domain.Wiki;
 
 namespace Repetitio.Infrastructure.Persistence;
 
@@ -82,6 +83,11 @@ public sealed class RepetitioDbContext : DbContext
     /// Gets the note pages table.
     /// </summary>
     public DbSet<NotePage> NotePages => Set<NotePage>();
+
+    /// <summary>
+    /// Gets the wiki pages table.
+    /// </summary>
+    public DbSet<WikiPage> WikiPages => Set<WikiPage>();
 
     /// <summary>
     /// Configures the database model.
@@ -292,6 +298,34 @@ public sealed class RepetitioDbContext : DbContext
             entity.Property(notePage => notePage.UpdatedAt).IsRequired();
             entity.HasIndex(notePage => notePage.Area);
             entity.HasIndex(notePage => new { notePage.Area, notePage.SortOrder });
+        });
+
+        modelBuilder.Entity<WikiPage>(entity =>
+        {
+            entity.HasKey(wikiPage => wikiPage.Id);
+            entity.Property(wikiPage => wikiPage.Title).HasMaxLength(240).IsRequired();
+            entity.Property(wikiPage => wikiPage.Slug).HasMaxLength(180).IsRequired();
+            entity.Property(wikiPage => wikiPage.Path).HasMaxLength(1200).IsRequired();
+            entity.Property(wikiPage => wikiPage.Depth).IsRequired();
+            entity.Property(wikiPage => wikiPage.SortOrder).IsRequired();
+            entity.Property(wikiPage => wikiPage.Summary).HasMaxLength(2000);
+            entity.Property(wikiPage => wikiPage.ContentMarkdown).HasMaxLength(200000).IsRequired();
+            entity.Property(wikiPage => wikiPage.IsArchived).IsRequired();
+            entity.Property(wikiPage => wikiPage.CreatedAt).IsRequired();
+            entity.Property(wikiPage => wikiPage.UpdatedAt).IsRequired();
+            entity.HasIndex(wikiPage => wikiPage.ParentId);
+            entity.HasIndex(wikiPage => wikiPage.Title);
+            entity.HasIndex(wikiPage => wikiPage.Slug);
+            entity.HasIndex(wikiPage => wikiPage.Path).IsUnique();
+            entity.HasIndex(wikiPage => wikiPage.Depth);
+            entity.HasIndex(wikiPage => wikiPage.IsArchived);
+            entity.HasIndex(wikiPage => wikiPage.UpdatedAt);
+            entity.HasIndex(wikiPage => new { wikiPage.ParentId, wikiPage.SortOrder });
+            entity.HasIndex(wikiPage => new { wikiPage.ParentId, wikiPage.Slug }).IsUnique();
+            entity.HasOne(wikiPage => wikiPage.Parent)
+                .WithMany(wikiPage => wikiPage.Children)
+                .HasForeignKey(wikiPage => wikiPage.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

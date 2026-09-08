@@ -28,7 +28,8 @@ public sealed class BackupArchiveValidator
         "FlashcardDecks",
         "FlashcardDeckCards",
         "FlashcardReviews",
-        "NotePages"
+        "NotePages",
+        "WikiPages"
     ];
 
     /// <summary>

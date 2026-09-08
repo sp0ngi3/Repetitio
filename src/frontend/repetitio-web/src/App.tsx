@@ -6,6 +6,7 @@ import { DsaPage } from "./DsaPage";
 import { FlashcardsPage } from "./FlashcardsPage";
 import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
+import { WikiPage } from "./WikiPage";
 import {
   readInitialReviewSchedulePreset,
   saveReviewSchedulePreset,
@@ -16,7 +17,7 @@ import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from ".
 /**
  * Application page identifiers.
  */
-type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "notes" | "settings";
+type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "wiki" | "notes" | "settings";
 
 /**
  * Internal navigation target for opening a concrete learning item.
@@ -225,6 +226,9 @@ export function App() {
             >
               Flashcards
             </button>
+            <button className={activePage === "wiki" ? "active" : ""} type="button" onClick={() => setActivePage("wiki")}>
+              Wiki
+            </button>
             <button className={activePage === "notes" ? "active" : ""} type="button" onClick={() => setActivePage("notes")}>
               Notes
             </button>
@@ -295,6 +299,8 @@ export function App() {
       ) : null}
 
       {activePage === "notes" ? <NotesPage /> : null}
+
+      {activePage === "wiki" ? <WikiPage /> : null}
 
       {activePage === "settings" ? (
         <SettingsPage

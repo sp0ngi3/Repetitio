@@ -1026,3 +1026,131 @@ export interface UpdateNotePageRequest extends CreateNotePageRequest {
   /** Manual display order inside the notebook area. */
   sortOrder: number;
 }
+
+/**
+ * Represents one wiki page returned by the API.
+ */
+export interface WikiPage {
+  /** Unique wiki page identifier. */
+  id: string;
+  /** Optional parent wiki page identifier. */
+  parentId?: string | null;
+  /** Page title. */
+  title: string;
+  /** URL-friendly slug unique within the parent page. */
+  slug: string;
+  /** Slash-separated wiki path. */
+  path: string;
+  /** Zero-based tree depth. */
+  depth: number;
+  /** Manual display order inside the parent page. */
+  sortOrder: number;
+  /** Short page summary. */
+  summary?: string | null;
+  /** Editable markdown content. */
+  contentMarkdown: string;
+  /** Whether the page is archived. */
+  isArchived: boolean;
+  /** Number of direct child pages. */
+  childCount: number;
+  /** Creation date and time. */
+  createdAt: string;
+  /** Last update date and time. */
+  updatedAt: string;
+}
+
+/**
+ * Represents one wiki page in the navigation tree.
+ */
+export interface WikiTreeNode {
+  /** Unique wiki page identifier. */
+  id: string;
+  /** Optional parent wiki page identifier. */
+  parentId?: string | null;
+  /** Page title. */
+  title: string;
+  /** Slash-separated wiki path. */
+  path: string;
+  /** Zero-based tree depth. */
+  depth: number;
+  /** Manual display order inside the parent page. */
+  sortOrder: number;
+  /** Last update date and time. */
+  updatedAt: string;
+}
+
+/**
+ * Represents the payload used to create a wiki page.
+ */
+export interface CreateWikiPageRequest {
+  /** Optional parent wiki page identifier. */
+  parentId?: string | null;
+  /** Page title. */
+  title: string;
+  /** Optional URL-friendly slug. */
+  slug?: string;
+  /** Short page summary. */
+  summary?: string;
+  /** Editable markdown content. */
+  contentMarkdown?: string;
+}
+
+/**
+ * Represents the payload used to update a wiki page.
+ */
+export interface UpdateWikiPageRequest extends CreateWikiPageRequest {
+  /** Manual display order inside the parent page. */
+  sortOrder: number;
+  /** Whether the page is archived. */
+  isArchived: boolean;
+}
+
+/**
+ * Represents one nested wiki page in an import payload.
+ */
+export interface ImportWikiPageNodeRequest {
+  /** Page title. */
+  title: string;
+  /** Optional URL-friendly slug. */
+  slug?: string;
+  /** Short page summary. */
+  summary?: string;
+  /** Editable markdown content. */
+  contentMarkdown?: string;
+  /** Nested child pages. */
+  children?: ImportWikiPageNodeRequest[];
+}
+
+/**
+ * Represents a batch wiki import payload.
+ */
+export interface ImportWikiPagesRequest {
+  /** Optional parent page identifier for imported root nodes. */
+  parentId?: string | null;
+  /** Imported root pages. */
+  pages: ImportWikiPageNodeRequest[];
+}
+
+/**
+ * Represents a batch wiki import result.
+ */
+export interface ImportWikiPagesResponse {
+  /** Number of imported pages including children. */
+  importedCount: number;
+  /** Imported root pages. */
+  rootPages: WikiPage[];
+}
+
+/**
+ * Represents a paged wiki API response.
+ */
+export interface PagedWikiPageResponse {
+  /** Wiki pages on the current page. */
+  items: WikiPage[];
+  /** Total number of matching wiki pages. */
+  totalCount: number;
+  /** Current one-based page number. */
+  page: number;
+  /** Number of requested wiki pages per page. */
+  pageSize: number;
+}

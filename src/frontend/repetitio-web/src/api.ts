@@ -29,15 +29,22 @@ import type {
   SystemDesignProblem,
   SystemDesignProblemTemplate,
   ImportBackupResult,
+  ImportWikiPagesRequest,
+  ImportWikiPagesResponse,
   CreateNotePageRequest,
   PagedFlashcardDeckResponse,
   PagedFlashcardResponse,
+  PagedWikiPageResponse,
   NoteArea,
   NotePage,
   UpdateDsaProblemRequest,
   UpdateFlashcardRequest,
   UpdateNotePageRequest,
-  UpdateSystemDesignProblemRequest
+  UpdateSystemDesignProblemRequest,
+  CreateWikiPageRequest,
+  UpdateWikiPageRequest,
+  WikiPage,
+  WikiTreeNode
 } from "./types";
 
 /**
@@ -540,6 +547,128 @@ export function updateNotePage(id: string, request: UpdateNotePageRequest): Prom
  */
 export async function deleteNotePage(id: string): Promise<void> {
   const response = await fetch(`${apiBaseUrl}/api/notes/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+}
+
+/**
+ * Loads wiki pages with optional search, filters, sorting, and pagination.
+ *
+ * @param filters - Optional wiki page filters.
+ * @returns Paged wiki pages.
+ */
+export function getWikiPages(filters: {
+  search?: string;
+  parentId?: string | null;
+  includeArchived?: boolean;
+  sort?: "updated-newest" | "updated-oldest" | "title" | "tree";
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<PagedWikiPageResponse> {
+  const query = new URLSearchParams();
+
+  if (filters.search?.trim()) {
+    query.set("search", filters.search.trim());
+  }
+
+  if (filters.parentId) {
+    query.set("parentId", filters.parentId);
+  }
+
+  if (filters.includeArchived) {
+    query.set("includeArchived", "true");
+  }
+
+  if (filters.sort) {
+    query.set("sort", filters.sort);
+  }
+
+  if (filters.page) {
+    query.set("page", String(filters.page));
+  }
+
+  if (filters.pageSize) {
+    query.set("pageSize", String(filters.pageSize));
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return requestJson<PagedWikiPageResponse>(`/api/wiki${suffix}`);
+}
+
+/**
+ * Loads the wiki navigation tree.
+ *
+ * @param includeArchived - Whether archived pages should be included.
+ * @returns Wiki tree nodes.
+ */
+export function getWikiTree(includeArchived = false): Promise<WikiTreeNode[]> {
+  const suffix = includeArchived ? "?includeArchived=true" : "";
+  return requestJson<WikiTreeNode[]>(`/api/wiki/tree${suffix}`);
+}
+
+/**
+ * Loads one wiki page.
+ *
+ * @param id - Wiki page identifier.
+ * @returns The matching wiki page.
+ */
+export function getWikiPage(id: string): Promise<WikiPage> {
+  return requestJson<WikiPage>(`/api/wiki/${id}`);
+}
+
+/**
+ * Creates a wiki page.
+ *
+ * @param request - Wiki page creation payload.
+ * @returns The created wiki page.
+ */
+export function createWikiPage(request: CreateWikiPageRequest): Promise<WikiPage> {
+  return requestJson<WikiPage>("/api/wiki", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Imports a nested wiki page tree.
+ *
+ * @param request - Batch wiki import payload.
+ * @returns Batch import summary.
+ */
+export function importWikiPages(request: ImportWikiPagesRequest): Promise<ImportWikiPagesResponse> {
+  return requestJson<ImportWikiPagesResponse>("/api/wiki/batch", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Updates a wiki page.
+ *
+ * @param id - Wiki page identifier.
+ * @param request - Wiki page update payload.
+ * @returns The updated wiki page.
+ */
+export function updateWikiPage(id: string, request: UpdateWikiPageRequest): Promise<WikiPage> {
+  return requestJson<WikiPage>(`/api/wiki/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Deletes a wiki page and its descendants.
+ *
+ * @param id - Wiki page identifier.
+ * @returns A promise that resolves when deletion completes.
+ */
+export async function deleteWikiPage(id: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/wiki/${id}`, {
     method: "DELETE"
   });
 
