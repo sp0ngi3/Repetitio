@@ -27,6 +27,7 @@ import {
   getNotePages,
   getSystemDesignProblemTemplate,
   getSystemDesignProblems,
+  importDsaProblems,
   importFlashcardsBatch,
   importBackup,
   updateDsaProblem,
@@ -83,6 +84,7 @@ vi.mock("./api", () => ({
   getNotePages: vi.fn(),
   getSystemDesignProblemTemplate: vi.fn(),
   getSystemDesignProblems: vi.fn(),
+  importDsaProblems: vi.fn(),
   importFlashcardsBatch: vi.fn(),
   updateDsaProblem: vi.fn(),
   updateFlashcard: vi.fn(),
@@ -509,6 +511,26 @@ beforeEach(() => {
     expectedTimeComplexity: request.expectedTimeComplexity || null,
     expectedSpaceComplexity: request.expectedSpaceComplexity || null
   }));
+  vi.mocked(importDsaProblems).mockResolvedValue({
+    requestedCount: 2,
+    importedCount: 2,
+    problemIds: ["dsa-import-1", "dsa-import-2"],
+    problems: [
+      {
+        ...dsaProblems[0],
+        id: "dsa-import-1",
+        title: "Two Sum",
+        tags: ["arrays", "hash-map"]
+      },
+      {
+        ...dsaProblems[0],
+        id: "dsa-import-2",
+        title: "Maximum Subarray",
+        difficulty: "Medium",
+        tags: ["arrays", "kadane"]
+      }
+    ]
+  });
   vi.mocked(getFlashcard).mockResolvedValue(flashcards[0]);
   vi.mocked(getFlashcards).mockImplementation(async (filters = {}) => {
     const page = filters.page ?? 1;
@@ -1387,6 +1409,64 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Add problem" })).toBeInTheDocument();
     expect(screen.getByLabelText("Problem statement")).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that DSA problems can be imported from batch JSON.
+   */
+  it("imports DSA problems from batch JSON", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "DSA" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Batch import" }));
+
+    expect(await screen.findByRole("heading", { name: "Import problems" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "JSON structure" }));
+    expect(screen.getAllByText(/expectedTimeComplexity/i).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("JSON problems"), {
+      target: {
+        value: JSON.stringify({
+          problems: [
+            {
+              title: "Two Sum",
+              difficulty: "Easy",
+              tags: "arrays, hash-map",
+              problemStatement: "Find two numbers adding to target.",
+              expectedTimeComplexity: "O(n)",
+              expectedSpaceComplexity: "O(n)"
+            },
+            {
+              title: "Maximum Subarray",
+              difficulty: "Medium",
+              tags: ["arrays", "kadane"]
+            }
+          ]
+        })
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import problems" }));
+
+    await waitFor(() => {
+      expect(importDsaProblems).toHaveBeenCalledWith({
+        problems: [
+          expect.objectContaining({
+            title: "Two Sum",
+            difficulty: "Easy",
+            tags: ["arrays", "hash-map"],
+            problemStatement: "Find two numbers adding to target.",
+            expectedTimeComplexity: "O(n)",
+            expectedSpaceComplexity: "O(n)"
+          }),
+          expect.objectContaining({
+            title: "Maximum Subarray",
+            difficulty: "Medium",
+            tags: ["arrays", "kadane"]
+          })
+        ]
+      });
+    });
+    expect(await screen.findByText("Imported 2 DSA problems.")).toBeInTheDocument();
   });
 
   /**

@@ -19,6 +19,8 @@ import type {
   Flashcard,
   FlashcardDeck,
   HealthStatus,
+  ImportDsaProblemsRequest,
+  ImportDsaProblemsResponse,
   ImportFlashcardBatchRequest,
   ImportFlashcardBatchResponse,
   LearningDifficulty,
@@ -218,6 +220,19 @@ export function getDsaProblemTemplate(): Promise<DsaProblemTemplate> {
  */
 export function createDsaProblem(request: CreateDsaProblemRequest): Promise<DsaProblem> {
   return requestJson<DsaProblem>("/api/dsa", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+/**
+ * Imports many DSA problems from one JSON payload.
+ *
+ * @param request - Batch import payload.
+ * @returns Batch import summary.
+ */
+export function importDsaProblems(request: ImportDsaProblemsRequest): Promise<ImportDsaProblemsResponse> {
+  return requestJson<ImportDsaProblemsResponse>("/api/dsa/batch", {
     method: "POST",
     body: JSON.stringify(request)
   });

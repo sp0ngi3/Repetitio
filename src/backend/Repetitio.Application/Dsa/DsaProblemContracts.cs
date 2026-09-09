@@ -121,6 +121,104 @@ public sealed record UpdateDsaProblemRequest : CreateDsaProblemRequest
 }
 
 /// <summary>
+/// Represents one new DSA problem in a batch import payload.
+/// </summary>
+public sealed record ImportDsaProblemRequest
+{
+    /// <summary>
+    /// Gets the problem title.
+    /// </summary>
+    public required string Title { get; init; }
+
+    /// <summary>
+    /// Gets the optional problem description.
+    /// </summary>
+    public string? Description { get; init; }
+
+    /// <summary>
+    /// Gets the problem source, such as LeetCode or a book.
+    /// </summary>
+    public string? Source { get; init; }
+
+    /// <summary>
+    /// Gets the external problem URL.
+    /// </summary>
+    public string? ExternalUrl { get; init; }
+
+    /// <summary>
+    /// Gets the problem difficulty.
+    /// </summary>
+    public LearningDifficulty Difficulty { get; init; } = LearningDifficulty.Unknown;
+
+    /// <summary>
+    /// Gets the tag names that should be assigned to the problem.
+    /// </summary>
+    public IReadOnlyCollection<string> Tags { get; init; } = [];
+
+    /// <summary>
+    /// Gets the problem statement or prompt.
+    /// </summary>
+    public string? ProblemStatement { get; init; }
+
+    /// <summary>
+    /// Gets the test cases captured before solving.
+    /// </summary>
+    public string? TestCases { get; init; }
+
+    /// <summary>
+    /// Gets assumptions or constraints known before solving.
+    /// </summary>
+    public string? Assumptions { get; init; }
+
+    /// <summary>
+    /// Gets the expected time complexity when known from the prompt or source.
+    /// </summary>
+    public string? ExpectedTimeComplexity { get; init; }
+
+    /// <summary>
+    /// Gets the expected space complexity when known from the prompt or source.
+    /// </summary>
+    public string? ExpectedSpaceComplexity { get; init; }
+}
+
+/// <summary>
+/// Represents the request payload for importing many DSA problems.
+/// </summary>
+public sealed record ImportDsaProblemsRequest
+{
+    /// <summary>
+    /// Gets the problems to import.
+    /// </summary>
+    public required IReadOnlyCollection<ImportDsaProblemRequest> Problems { get; init; }
+}
+
+/// <summary>
+/// Represents the result of importing many DSA problems.
+/// </summary>
+public sealed record ImportDsaProblemsResponse
+{
+    /// <summary>
+    /// Gets the number of problems requested by the import.
+    /// </summary>
+    public required int RequestedCount { get; init; }
+
+    /// <summary>
+    /// Gets the number of problems created by the import.
+    /// </summary>
+    public required int ImportedCount { get; init; }
+
+    /// <summary>
+    /// Gets imported DSA problem identifiers.
+    /// </summary>
+    public required IReadOnlyCollection<Guid> ProblemIds { get; init; }
+
+    /// <summary>
+    /// Gets imported DSA problems.
+    /// </summary>
+    public required IReadOnlyCollection<DsaProblemResponse> Problems { get; init; }
+}
+
+/// <summary>
 /// Represents a DSA problem returned by the API.
 /// </summary>
 public sealed record DsaProblemResponse

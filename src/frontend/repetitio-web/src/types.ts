@@ -438,6 +438,56 @@ export interface UpdateDsaProblemRequest extends CreateDsaProblemRequest {
 }
 
 /**
+ * Represents one new DSA problem in a batch import payload.
+ */
+export interface ImportDsaProblemRequest {
+  /** Problem title. */
+  title: string;
+  /** Optional short description. */
+  description?: string;
+  /** Problem source, such as LeetCode or a book. */
+  source?: string;
+  /** External problem URL. */
+  externalUrl?: string;
+  /** Rough problem difficulty. */
+  difficulty: LearningDifficulty;
+  /** Tag names to assign. */
+  tags: string[];
+  /** Problem statement or prompt. */
+  problemStatement?: string;
+  /** Test cases captured before solving. */
+  testCases?: string;
+  /** Assumptions or constraints known before solving. */
+  assumptions?: string;
+  /** Expected time complexity when known from the prompt or source. */
+  expectedTimeComplexity?: string;
+  /** Expected space complexity when known from the prompt or source. */
+  expectedSpaceComplexity?: string;
+}
+
+/**
+ * Represents the payload used to import many DSA problems.
+ */
+export interface ImportDsaProblemsRequest {
+  /** DSA problems to import. */
+  problems: ImportDsaProblemRequest[];
+}
+
+/**
+ * Represents the result of importing many DSA problems.
+ */
+export interface ImportDsaProblemsResponse {
+  /** Number of problems requested by the import. */
+  requestedCount: number;
+  /** Number of problems created by the import. */
+  importedCount: number;
+  /** Imported DSA problem identifiers. */
+  problemIds: string[];
+  /** Imported DSA problems. */
+  problems: DsaProblem[];
+}
+
+/**
  * Represents the payload used to save a DSA solution.
  */
 export interface CreateDsaSolutionRequest {

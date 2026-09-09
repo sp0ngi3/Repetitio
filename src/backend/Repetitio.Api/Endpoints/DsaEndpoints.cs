@@ -13,6 +13,8 @@ namespace Repetitio.Api.Endpoints;
 /// </summary>
 public static class DsaEndpoints
 {
+    private const int MaxBatchImportSize = 250;
+
     /// <summary>
     /// Adds DSA endpoints to the application.
     /// </summary>
@@ -28,6 +30,7 @@ public static class DsaEndpoints
         group.MapGet("/template", () => Results.Ok(DsaProblemTemplateResponse.Create())).WithName("GetDsaProblemTemplate");
         group.MapGet("/{id:guid}", GetDsaProblemAsync).WithName("GetDsaProblem");
         group.MapPost("/", CreateDsaProblemAsync).WithName("CreateDsaProblem");
+        group.MapPost("/batch", ImportDsaProblemsBatchAsync).WithName("ImportDsaProblemsBatch");
         group.MapPut("/{id:guid}", UpdateDsaProblemAsync).WithName("UpdateDsaProblem");
         group.MapDelete("/{id:guid}", DeleteDsaProblemAsync).WithName("DeleteDsaProblem");
         group.MapPost("/{id:guid}/solutions", CreateDsaSolutionAsync).WithName("CreateDsaSolution");
@@ -108,48 +111,72 @@ public static class DsaEndpoints
         }
 
         var now = DateTime.UtcNow;
-        var item = new LearningItem
-        {
-            Id = Guid.NewGuid(),
-            Type = LearningItemType.Dsa,
-            Title = request.Title.Trim(),
-            Description = TrimOptional(request.Description),
-            Status = LearningItemStatus.NotStarted,
-            Difficulty = request.Difficulty,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
+        var problem = CreateDsaProblemEntity(request, now);
 
-        var problem = new DsaProblem
-        {
-            LearningItemId = item.Id,
-            LearningItem = item,
-            Source = TrimOptional(request.Source),
-            ExternalUrl = TrimOptional(request.ExternalUrl),
-            ProblemStatement = TrimOptional(request.ProblemStatement),
-            TestCases = TrimOptional(request.TestCases),
-            Assumptions = TrimOptional(request.Assumptions),
-            Approach = TrimOptional(request.Approach),
-            Notes = TrimOptional(request.Notes),
-            WhatHelped = TrimOptional(request.WhatHelped),
-            WhatWasDifficult = TrimOptional(request.WhatWasDifficult),
-            ImproveNext = TrimOptional(request.ImproveNext),
-            KnowledgeChecklist = TrimOptional(request.KnowledgeChecklist),
-            QuestionsToAsk = TrimOptional(request.QuestionsToAsk),
-            MissedMentalSteps = TrimOptional(request.MissedMentalSteps),
-            ExpectedTimeComplexity = TrimOptional(request.ExpectedTimeComplexity),
-            ExpectedSpaceComplexity = TrimOptional(request.ExpectedSpaceComplexity),
-            CreatedAt = now,
-            UpdatedAt = now
-        };
+        await TagAttachment.AttachTagsAsync(dbContext, problem.LearningItem, request.Tags, now);
 
-        await TagAttachment.AttachTagsAsync(dbContext, item, request.Tags, now);
-
-        dbContext.LearningItems.Add(item);
+        dbContext.LearningItems.Add(problem.LearningItem);
         dbContext.DsaProblems.Add(problem);
         await dbContext.SaveChangesAsync();
 
-        return Results.Created($"/api/dsa/{item.Id}", ToResponse(problem));
+        return Results.Created($"/api/dsa/{problem.LearningItemId}", ToResponse(problem));
+    }
+
+    /// <summary>
+    /// Imports many DSA problems from one JSON payload.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="request">The batch import request.</param>
+    /// <returns>The batch import summary.</returns>
+    private static async Task<IResult> ImportDsaProblemsBatchAsync(
+        RepetitioDbContext dbContext,
+        ImportDsaProblemsRequest request)
+    {
+        var requestedProblems = request.Problems ?? [];
+        var requestedCount = requestedProblems.Count;
+
+        if (requestedCount == 0)
+        {
+            return Results.BadRequest("At least one DSA problem is required.");
+        }
+
+        if (requestedCount > MaxBatchImportSize)
+        {
+            return Results.BadRequest($"A single DSA import can contain at most {MaxBatchImportSize} problems.");
+        }
+
+        var validation = ValidateDsaProblemBatchRequest(requestedProblems);
+
+        if (validation is not null)
+        {
+            return Results.BadRequest(validation);
+        }
+
+        var now = DateTime.UtcNow;
+        var importedProblems = new List<DsaProblem>(requestedCount);
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+        foreach (var importProblem in requestedProblems)
+        {
+            var problem = CreateDsaProblemEntity(ToCreateDsaProblemRequest(importProblem), now);
+
+            await TagAttachment.AttachTagsAsync(dbContext, problem.LearningItem, importProblem.Tags, now);
+            dbContext.LearningItems.Add(problem.LearningItem);
+            dbContext.DsaProblems.Add(problem);
+            importedProblems.Add(problem);
+        }
+
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Results.Ok(new ImportDsaProblemsResponse
+        {
+            RequestedCount = requestedCount,
+            ImportedCount = importedProblems.Count,
+            ProblemIds = importedProblems.Select(problem => problem.LearningItemId).ToArray(),
+            Problems = importedProblems.Select(ToResponse).ToArray()
+        });
     }
 
     /// <summary>
@@ -390,6 +417,100 @@ public static class DsaEndpoints
             TimeComplexity = solution.TimeComplexity,
             SpaceComplexity = solution.SpaceComplexity,
             CreatedAt = solution.CreatedAt
+        };
+    }
+
+    /// <summary>
+    /// Creates a DSA problem entity and its underlying learning item.
+    /// </summary>
+    /// <param name="request">The create request.</param>
+    /// <param name="now">The timestamp to use for created and updated fields.</param>
+    /// <returns>A new DSA problem entity.</returns>
+    private static DsaProblem CreateDsaProblemEntity(CreateDsaProblemRequest request, DateTime now)
+    {
+        var item = new LearningItem
+        {
+            Id = Guid.NewGuid(),
+            Type = LearningItemType.Dsa,
+            Title = request.Title.Trim(),
+            Description = TrimOptional(request.Description),
+            Status = LearningItemStatus.NotStarted,
+            Difficulty = request.Difficulty,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        return new DsaProblem
+        {
+            LearningItemId = item.Id,
+            LearningItem = item,
+            Source = TrimOptional(request.Source),
+            ExternalUrl = TrimOptional(request.ExternalUrl),
+            ProblemStatement = TrimOptional(request.ProblemStatement),
+            TestCases = TrimOptional(request.TestCases),
+            Assumptions = TrimOptional(request.Assumptions),
+            Approach = TrimOptional(request.Approach),
+            Notes = TrimOptional(request.Notes),
+            WhatHelped = TrimOptional(request.WhatHelped),
+            WhatWasDifficult = TrimOptional(request.WhatWasDifficult),
+            ImproveNext = TrimOptional(request.ImproveNext),
+            KnowledgeChecklist = TrimOptional(request.KnowledgeChecklist),
+            QuestionsToAsk = TrimOptional(request.QuestionsToAsk),
+            MissedMentalSteps = TrimOptional(request.MissedMentalSteps),
+            ExpectedTimeComplexity = TrimOptional(request.ExpectedTimeComplexity),
+            ExpectedSpaceComplexity = TrimOptional(request.ExpectedSpaceComplexity),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    /// <summary>
+    /// Validates all DSA problems in a batch import.
+    /// </summary>
+    /// <param name="problems">The requested problems.</param>
+    /// <returns>An error message when the batch is invalid.</returns>
+    private static string? ValidateDsaProblemBatchRequest(IEnumerable<ImportDsaProblemRequest?> problems)
+    {
+        var index = 0;
+
+        foreach (var problem in problems)
+        {
+            if (problem is null)
+            {
+                return $"problems[{index}] is required.";
+            }
+
+            if (!EndpointValidation.HasText(problem.Title))
+            {
+                return $"problems[{index}].title is required.";
+            }
+
+            index++;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Converts a batch import problem into the regular create payload, leaving attempt-only fields empty.
+    /// </summary>
+    /// <param name="request">The import problem request.</param>
+    /// <returns>The matching create problem request.</returns>
+    private static CreateDsaProblemRequest ToCreateDsaProblemRequest(ImportDsaProblemRequest request)
+    {
+        return new CreateDsaProblemRequest
+        {
+            Title = request.Title,
+            Description = request.Description,
+            Source = request.Source,
+            ExternalUrl = request.ExternalUrl,
+            Difficulty = request.Difficulty,
+            Tags = request.Tags,
+            ProblemStatement = request.ProblemStatement,
+            TestCases = request.TestCases,
+            Assumptions = request.Assumptions,
+            ExpectedTimeComplexity = request.ExpectedTimeComplexity,
+            ExpectedSpaceComplexity = request.ExpectedSpaceComplexity
         };
     }
 

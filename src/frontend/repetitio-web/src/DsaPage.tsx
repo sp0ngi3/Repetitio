@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AttemptScorecard,
   AttemptScorecardSummary,
@@ -13,6 +13,7 @@ import {
   deleteDsaProblem,
   getDsaProblemTemplate,
   getDsaProblems,
+  importDsaProblems,
   updateDsaProblem
 } from "./api";
 import { getPracticeAgeClass, getReviewDueClass } from "./practiceAge";
@@ -24,6 +25,8 @@ import type {
   CreatePracticeSessionRequest,
   DsaProblem,
   DsaProblemTemplate,
+  ImportDsaProblemRequest,
+  ImportDsaProblemsRequest,
   LearningDifficulty,
   LearningItemStatus,
   PracticeOutcome,
@@ -49,7 +52,7 @@ const outcomes: PracticeOutcome[] = ["Completed", "Passed", "Partial", "Failed"]
 /**
  * DSA page view modes.
  */
-type DsaView = "dashboard" | "new" | "detail";
+type DsaView = "dashboard" | "new" | "detail" | "import";
 
 /**
  * Represents DSA list filters.
@@ -148,6 +151,28 @@ const emptySolutionForm: CreateDsaSolutionRequest = {
   spaceComplexity: ""
 };
 
+const dsaBatchImportSample = JSON.stringify(
+  {
+    problems: [
+      {
+        title: "Two Sum",
+        description: "Find two numbers that add up to the target.",
+        source: "LeetCode",
+        externalUrl: "https://leetcode.com/problems/two-sum/",
+        difficulty: "Easy",
+        tags: ["arrays", "hash-map"],
+        problemStatement: "Given nums and target, return indices of the two numbers such that they add up to target.",
+        testCases: "nums = [2,7,11,15], target = 9 => [0,1]",
+        assumptions: "Exactly one solution exists. The same element cannot be used twice.",
+        expectedTimeComplexity: "O(n)",
+        expectedSpaceComplexity: "O(n)"
+      }
+    ]
+  },
+  null,
+  2
+);
+
 /**
  * Props accepted by the DSA page.
  */
@@ -184,6 +209,10 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
   const [problemForm, setProblemForm] = useState<DsaProblemForm>(emptyProblemForm);
   const [attemptForm, setAttemptForm] = useState<DsaAttemptForm>(() => createEmptyAttemptForm(reviewSchedulePreset));
   const [solutionForm, setSolutionForm] = useState<CreateDsaSolutionRequest>(emptySolutionForm);
+  const [batchJson, setBatchJson] = useState(dsaBatchImportSample);
+  const [batchFileName, setBatchFileName] = useState<string | null>(null);
+  const [batchResult, setBatchResult] = useState<string | null>(null);
+  const [showBatchStructure, setShowBatchStructure] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -255,6 +284,17 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
     setAttemptForm(createEmptyAttemptForm(reviewSchedulePreset));
     setSolutionForm(emptySolutionForm);
     setView("new");
+    setBatchResult(null);
+    setError(null);
+  }
+
+  /**
+   * Opens the DSA batch import page.
+   */
+  function openBatchImport() {
+    setSelectedProblemId(null);
+    setView("import");
+    setBatchResult(null);
     setError(null);
   }
 
@@ -339,6 +379,60 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
       setError(requestError instanceof Error ? requestError.message : "Unable to create DSA problem.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  /**
+   * Imports multiple DSA problems from the batch JSON editor.
+   *
+   * @param event - The form submission event.
+   */
+  async function handleBatchImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setIsSaving(true);
+    setBatchResult(null);
+    setError(null);
+
+    try {
+      const request = parseDsaBatchImport(batchJson);
+      const result = await importDsaProblems(request);
+
+      setBatchResult(`Imported ${formatProblemCount(result.importedCount)}.`);
+      setBatchFileName(null);
+      setBatchJson(dsaBatchImportSample);
+      await loadProblems();
+      await onChanged?.();
+      setView("dashboard");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to import DSA problems.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  /**
+   * Loads a JSON file into the batch import editor.
+   *
+   * @param event - File input change event.
+   */
+  async function handleBatchFileSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0] ?? null;
+    event.currentTarget.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setBatchFileName(file.name);
+    setBatchResult(null);
+    setError(null);
+
+    try {
+      setBatchJson(await file.text());
+      setBatchResult(`Loaded ${file.name}. Review the JSON and import when ready.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to read JSON file.");
     }
   }
 
@@ -435,10 +529,13 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
           isLoading={isLoading}
           problems={problems}
           onAdd={openNewProblem}
+          onImport={openBatchImport}
           onFiltersChange={setFilters}
           onOpen={openProblem}
         />
       ) : null}
+
+      {batchResult ? <p className="success-banner">{batchResult}</p> : null}
 
       {view === "new" ? (
         <DsaProblemCreatePage
@@ -448,6 +545,20 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
           onBack={returnToDashboard}
           onChange={updateProblemForm}
           onSubmit={handleCreateProblem}
+        />
+      ) : null}
+
+      {view === "import" ? (
+        <DsaBatchImportPage
+          batchFileName={batchFileName}
+          batchJson={batchJson}
+          isSaving={isSaving}
+          showBatchStructure={showBatchStructure}
+          onBack={returnToDashboard}
+          onBatchFileSelected={handleBatchFileSelected}
+          onBatchJsonChange={setBatchJson}
+          onSubmit={handleBatchImport}
+          onToggleBatchStructure={() => setShowBatchStructure((isShown) => !isShown)}
         />
       ) : null}
 
@@ -484,6 +595,8 @@ interface DsaDashboardProps {
   problems: DsaProblem[];
   /** Opens the add page. */
   onAdd: () => void;
+  /** Opens the batch import page. */
+  onImport: () => void;
   /** Updates list filters. */
   onFiltersChange: (filters: DsaFilters) => void;
   /** Opens a problem detail page. */
@@ -509,9 +622,14 @@ function DsaDashboard(props: DsaDashboardProps) {
           <p className="eyebrow">DSA dashboard</p>
           <h2 id="dsa-title">Problems</h2>
         </div>
-        <button className="secondary-button" type="button" onClick={props.onAdd}>
-          Add problem
-        </button>
+        <div className="editor-actions">
+          <button className="secondary-button" type="button" onClick={props.onImport}>
+            Batch import
+          </button>
+          <button className="secondary-button" type="button" onClick={props.onAdd}>
+            Add problem
+          </button>
+        </div>
       </div>
 
       <div className="panel tracker-toolbar" aria-label="DSA filters">
@@ -613,6 +731,95 @@ function DsaDashboard(props: DsaDashboardProps) {
           <p className="empty-state">No DSA problems yet.</p>
         )}
       </section>
+    </>
+  );
+}
+
+interface DsaBatchImportPageProps {
+  /** Current batch import JSON text. */
+  batchJson: string;
+  /** Loaded JSON file name. */
+  batchFileName: string | null;
+  /** Whether an import is saving. */
+  isSaving: boolean;
+  /** Whether the JSON reference panel is visible. */
+  showBatchStructure: boolean;
+  /** Returns to the dashboard. */
+  onBack: () => void;
+  /** Handles JSON file selection. */
+  onBatchFileSelected: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  /** Updates the batch JSON text. */
+  onBatchJsonChange: (value: string) => void;
+  /** Submits the import. */
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  /** Toggles the JSON reference panel. */
+  onToggleBatchStructure: () => void;
+}
+
+/**
+ * Renders the DSA batch import page.
+ *
+ * @param props - Component props.
+ * @returns The DSA batch import page.
+ */
+function DsaBatchImportPage(props: DsaBatchImportPageProps) {
+  return (
+    <>
+      <PageBackHeader eyebrow="DSA batch import" title="Import problems" onBack={props.onBack} />
+      <main className="wiki-document wiki-import-view" aria-label="DSA batch import">
+        <form onSubmit={props.onSubmit}>
+          <header className="wiki-special-header">
+            <div>
+              <span>JSON import</span>
+              <h1>Batch import</h1>
+            </div>
+            <div className="wiki-import-actions">
+              <label className="secondary-button file-action-button">
+                Choose JSON
+                <input
+                  accept="application/json,.json"
+                  disabled={props.isSaving}
+                  type="file"
+                  onChange={(event) => void props.onBatchFileSelected(event)}
+                />
+              </label>
+              <button className="secondary-button compact-button" type="button" onClick={props.onToggleBatchStructure}>
+                JSON structure
+              </button>
+              <button className="primary-button compact-button" type="submit" disabled={props.isSaving}>
+                {props.isSaving ? "Importing..." : "Import problems"}
+              </button>
+            </div>
+          </header>
+
+          <div className={props.showBatchStructure ? "wiki-import-layout" : "wiki-import-layout without-reference"}>
+            <section>
+              {props.batchFileName ? (
+                <p className="wiki-import-file-note">Loaded file: {props.batchFileName}</p>
+              ) : null}
+              <label>
+                JSON problems
+                <span className="wiki-field-hint">
+                  Paste an array of problems or an object with a problems array. Each problem uses the same fields as Add problem.
+                </span>
+                <textarea
+                  aria-label="JSON problems"
+                  className="wiki-import-textarea"
+                  value={props.batchJson}
+                  onChange={(event) => props.onBatchJsonChange(event.target.value)}
+                />
+              </label>
+            </section>
+
+            {props.showBatchStructure ? (
+              <aside className="wiki-import-reference">
+                <strong>JSON structure</strong>
+                <pre>{dsaBatchImportSample}</pre>
+              </aside>
+            ) : null}
+          </div>
+        </form>
+      </main>
     </>
   );
 }
@@ -1581,6 +1788,69 @@ function toOpenableExternalUrl(value: string) {
 }
 
 /**
+ * Parses a DSA batch import JSON payload.
+ *
+ * @param contents - Raw JSON contents.
+ * @returns Normalized DSA batch import request.
+ */
+function parseDsaBatchImport(contents: string): ImportDsaProblemsRequest {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(contents);
+  } catch {
+    throw new Error("Import file must contain valid JSON.");
+  }
+
+  const rawProblems = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed) && Array.isArray(parsed.problems)
+      ? parsed.problems
+      : null;
+
+  if (!rawProblems || rawProblems.length === 0) {
+    throw new Error("JSON must contain a non-empty problems array, or be a non-empty array of problems.");
+  }
+
+  return {
+    problems: rawProblems.map((problem, index) => normalizeImportedDsaProblem(problem, index + 1))
+  };
+}
+
+/**
+ * Normalizes one imported DSA problem.
+ *
+ * @param value - Raw problem value.
+ * @param index - One-based import index.
+ * @returns DSA problem create request.
+ */
+function normalizeImportedDsaProblem(value: unknown, index: number): ImportDsaProblemRequest {
+  if (!isRecord(value)) {
+    throw new Error(`Problem ${index} must be an object.`);
+  }
+
+  const title = readOptionalImportString(value.title);
+
+  if (!title) {
+    throw new Error(`Problem ${index} is missing title.`);
+  }
+
+  return {
+    title,
+    description: readOptionalImportString(value.description),
+    source: readOptionalImportString(value.source),
+    externalUrl: readOptionalImportString(value.externalUrl),
+    difficulty: readImportDifficulty(value.difficulty, index),
+    tags: readImportTags(value.tags, index),
+    problemStatement: readOptionalImportString(value.problemStatement),
+    testCases: readOptionalImportString(value.testCases),
+    assumptions: readOptionalImportString(value.assumptions),
+    expectedTimeComplexity: readOptionalImportString(value.expectedTimeComplexity),
+    expectedSpaceComplexity: readOptionalImportString(value.expectedSpaceComplexity)
+  };
+}
+
+/**
  * Parses comma-separated tags.
  *
  * @param value - Raw tag text.
@@ -1591,6 +1861,78 @@ function parseTags(value: string) {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+/**
+ * Reads optional text from an imported JSON value.
+ *
+ * @param value - Raw JSON field.
+ * @returns Trimmed text when present.
+ */
+function readOptionalImportString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Reads DSA difficulty from an imported JSON value.
+ *
+ * @param value - Raw JSON field.
+ * @param index - One-based import index.
+ * @returns Normalized difficulty.
+ */
+function readImportDifficulty(value: unknown, index: number): LearningDifficulty {
+  if (value === undefined || value === null || value === "") {
+    return "Unknown";
+  }
+
+  if (typeof value !== "string" || !difficulties.includes(value as LearningDifficulty)) {
+    throw new Error(`Problem ${index} has invalid difficulty. Use Unknown, Easy, Medium, or Hard.`);
+  }
+
+  return value as LearningDifficulty;
+}
+
+/**
+ * Reads tag names from an imported JSON value.
+ *
+ * @param value - Raw JSON field.
+ * @param index - One-based import index.
+ * @returns Normalized tag names.
+ */
+function readImportTags(value: unknown, index: number) {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+
+  if (typeof value === "string") {
+    return parseTags(value);
+  }
+
+  if (Array.isArray(value) && value.every((tag) => typeof tag === "string")) {
+    return value.map((tag) => tag.trim()).filter(Boolean);
+  }
+
+  throw new Error(`Problem ${index} has invalid tags. Use an array of strings or a comma-separated string.`);
+}
+
+/**
+ * Formats a DSA problem count.
+ *
+ * @param count - Number of problems.
+ * @returns Human-readable count text.
+ */
+function formatProblemCount(count: number) {
+  return count === 1 ? "1 DSA problem" : `${count} DSA problems`;
+}
+
+/**
+ * Checks whether a value is a plain JSON object.
+ *
+ * @param value - Unknown JSON value.
+ * @returns True when the value is an object record.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
