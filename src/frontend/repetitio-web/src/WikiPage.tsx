@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   createWikiPage,
   deleteWikiPage,
@@ -750,6 +750,27 @@ function WikiEditor(props: {
   onDelete: () => void;
   onCancel: () => void;
 }) {
+  const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const preview = useMemo(() => renderMarkdown(props.form.contentMarkdown), [props.form.contentMarkdown]);
+
+  function insertSnippet(snippet: string, fallbackSelection = "") {
+    const textarea = sourceTextareaRef.current;
+    const insertion = insertMarkdownSnippet(
+      props.form.contentMarkdown,
+      snippet,
+      textarea?.selectionStart ?? props.form.contentMarkdown.length,
+      textarea?.selectionEnd ?? props.form.contentMarkdown.length,
+      fallbackSelection
+    );
+
+    props.onUpdate("contentMarkdown", insertion.value);
+
+    requestAnimationFrame(() => {
+      sourceTextareaRef.current?.focus();
+      sourceTextareaRef.current?.setSelectionRange(insertion.selectionStart, insertion.selectionEnd);
+    });
+  }
+
   return (
     <main className="wiki-document wiki-edit-view" aria-label="Wiki editor">
       <form onSubmit={props.onSubmit}>
@@ -813,12 +834,50 @@ function WikiEditor(props: {
 
         <label className="wiki-wide-label">
           Article source
-          <textarea
-            className="wiki-source-textarea"
-            value={props.form.contentMarkdown}
-            onChange={(event) => props.onUpdate("contentMarkdown", event.target.value)}
-            placeholder="Use headings, bullet points, comparison tables, code snippets and links."
-          />
+          <div className="wiki-editor-workspace">
+            <section className="wiki-source-panel" aria-label="Markdown source editor">
+              <div className="wiki-markdown-toolbar" aria-label="Markdown helpers">
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("## {{selection}}\n\nWrite the core idea here.", "New section")}>
+                  Heading
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("### {{selection}}\n\nAdd a focused detail here.", "Subsection")}>
+                  Subheading
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("- Key point\n- Important edge case\n- Interview signal")}>
+                  List
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("[{{selection}}](wiki-slug-or-url)", "Related article")}>
+                  Link
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("> {{selection}}", "Short definition or quote.")}>
+                  Quote
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("```csharp\n{{selection}}\n```", "// Paste code here")}>
+                  Code
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("| Topic | Notes |\n| --- | --- |\n|  |  |")}>
+                  Table
+                </button>
+              </div>
+              <textarea
+                ref={sourceTextareaRef}
+                className="wiki-source-textarea"
+                value={props.form.contentMarkdown}
+                onChange={(event) => props.onUpdate("contentMarkdown", event.target.value)}
+                placeholder="Use headings, bullet points, comparison tables, code snippets and links."
+              />
+            </section>
+            <aside className="wiki-editor-preview" aria-label="Markdown preview">
+              <div className="wiki-preview-heading">
+                <span>Live preview</span>
+                <strong>{props.form.title || "Untitled article"}</strong>
+              </div>
+              <div className="official-wiki-content">
+                {props.form.summary.trim() ? <p className="wiki-lead">{props.form.summary}</p> : null}
+                {preview.nodes.length ? preview.nodes : <p className="empty-state">Nothing to preview yet.</p>}
+              </div>
+            </aside>
+          </div>
         </label>
 
         <footer className="wiki-edit-footer">
@@ -1044,6 +1103,42 @@ function toCreateWikiPageRequest(form: WikiForm): CreateWikiPageRequest {
     slug: form.slug.trim() || undefined,
     summary: form.summary.trim() || undefined,
     contentMarkdown: form.contentMarkdown
+  };
+}
+
+interface MarkdownInsertion {
+  value: string;
+  selectionStart: number;
+  selectionEnd: number;
+}
+
+function insertMarkdownSnippet(
+  markdown: string,
+  snippet: string,
+  selectionStart: number,
+  selectionEnd: number,
+  fallbackSelection = ""
+): MarkdownInsertion {
+  const boundedStart = Math.max(0, Math.min(selectionStart, markdown.length));
+  const boundedEnd = Math.max(boundedStart, Math.min(selectionEnd, markdown.length));
+  const selectedText = markdown.slice(boundedStart, boundedEnd).trim();
+  const insertedFocusText = selectedText || fallbackSelection;
+  const snippetText = snippet.includes("{{selection}}")
+    ? snippet.split("{{selection}}").join(insertedFocusText)
+    : snippet;
+  const before = markdown.slice(0, boundedStart).replace(/\s+$/g, "");
+  const after = markdown.slice(boundedEnd).replace(/^\s+/g, "");
+  const prefix = before ? `${before}\n\n` : "";
+  const suffix = after ? `\n\n${after}` : "\n";
+  const value = `${prefix}${snippetText}${suffix}`;
+  const focusIndex = insertedFocusText ? snippetText.indexOf(insertedFocusText) : -1;
+  const cursorStart = focusIndex >= 0 ? prefix.length + focusIndex : prefix.length + snippetText.length;
+  const cursorEnd = focusIndex >= 0 ? cursorStart + insertedFocusText.length : cursorStart;
+
+  return {
+    value,
+    selectionStart: cursorStart,
+    selectionEnd: cursorEnd
   };
 }
 

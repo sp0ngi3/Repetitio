@@ -406,8 +406,13 @@ function OverviewPage(props: OverviewPageProps) {
                   </div>
                   <div className="overview-row-actions">
                     <span className="confidence">{item.confidence ? `${item.confidence}/5` : "No confidence"}</span>
-                    <button className="secondary-button compact-button" type="button" onClick={() => props.onOpenItem(item)}>
-                      Open
+                    <button
+                      className="secondary-button compact-button"
+                      type="button"
+                      disabled={!canOpenLearningTarget(item)}
+                      onClick={() => props.onOpenItem(item)}
+                    >
+                      {getLearningTargetActionLabel(item, "Open")}
                     </button>
                   </div>
                 </li>
@@ -446,14 +451,14 @@ function OverviewPage(props: OverviewPageProps) {
                     <button
                       className="secondary-button compact-button"
                       type="button"
-                      disabled={!weakness.drillTarget}
+                      disabled={!weakness.drillTarget || !canOpenLearningTarget(weakness.drillTarget)}
                       onClick={() => {
-                        if (weakness.drillTarget) {
+                        if (weakness.drillTarget && canOpenLearningTarget(weakness.drillTarget)) {
                           props.onOpenItem(weakness.drillTarget);
                         }
                       }}
                     >
-                      Drill
+                      {weakness.drillTarget ? getLearningTargetActionLabel(weakness.drillTarget, "Drill") : "Drill"}
                     </button>
                   </div>
                 </li>
@@ -489,8 +494,13 @@ function OverviewPage(props: OverviewPageProps) {
                 </div>
                 <div className="overview-row-actions">
                   <span className="confidence">{item.confidence ? `${item.confidence}/5` : "No confidence"}</span>
-                  <button className="secondary-button compact-button" type="button" onClick={() => props.onOpenItem(item)}>
-                    {item.type === "Flashcard" && item.learningSessionId ? "Open session" : "Open"}
+                  <button
+                    className="secondary-button compact-button"
+                    type="button"
+                    disabled={!canOpenLearningTarget(item)}
+                    onClick={() => props.onOpenItem(item)}
+                  >
+                    {getLearningTargetActionLabel(item, "Open")}
                   </button>
                 </div>
               </li>
@@ -502,6 +512,18 @@ function OverviewPage(props: OverviewPageProps) {
       </section>
     </>
   );
+}
+
+function canOpenLearningTarget(target: LearningNavigationTarget) {
+  return target.type !== "Flashcard" || Boolean(target.learningSessionId);
+}
+
+function getLearningTargetActionLabel(target: LearningNavigationTarget, fallback: string) {
+  if (target.type !== "Flashcard") {
+    return fallback;
+  }
+
+  return target.learningSessionId ? `${fallback} session` : "No session";
 }
 
 /**

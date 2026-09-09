@@ -5,6 +5,7 @@ import {
   emptyAttemptScorecard,
   type AttemptScorecardValue
 } from "./AttemptScorecard";
+import { CodeEditor } from "./CodeEditor";
 import {
   createDsaProblem,
   createDsaSolution,
@@ -881,11 +882,10 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
               </label>
               <label>
                 Source code
-                <textarea
-                  className="code-input expanding-textarea"
+                <CodeEditor
+                  language={props.solutionForm.language || "C#"}
                   value={props.solutionForm.sourceCode}
-                  onChange={(event) => props.onSolutionChange("sourceCode", event.target.value)}
-                  placeholder="Paste your accepted solution."
+                  onChange={(value) => props.onSolutionChange("sourceCode", value)}
                 />
               </label>
               <div className="form-grid two-columns">

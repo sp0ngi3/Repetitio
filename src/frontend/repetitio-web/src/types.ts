@@ -335,6 +335,10 @@ export interface InterviewPlanItem {
   confidence?: number | null;
   /** Total recorded practice attempts. */
   totalAttempts: number;
+  /** Saved learning session to open when this plan item is a flashcard. */
+  learningSessionId?: string | null;
+  /** Saved learning session name to open when this plan item is a flashcard. */
+  learningSessionName?: string | null;
 }
 
 /**
@@ -373,6 +377,10 @@ export interface WeaknessDrillTarget {
   nextReviewAt?: string | null;
   /** Current confidence value from 1 to 5. */
   confidence?: number | null;
+  /** Saved learning session to open when this target is a flashcard. */
+  learningSessionId?: string | null;
+  /** Saved learning session name to open when this target is a flashcard. */
+  learningSessionName?: string | null;
 }
 
 /**

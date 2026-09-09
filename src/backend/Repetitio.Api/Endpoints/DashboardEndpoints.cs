@@ -50,13 +50,13 @@ public static class DashboardEndpoints
             .Where(item => openableLearningItemIds.Contains(item.Id))
             .ToArray();
 
+        var flashcardSessionTargets = await GetFlashcardSessionTargetsAsync(dbContext, openableLearningItems);
         var dueReviews = openableLearningItems
             .Where(item => item.NextReviewAt != null && item.NextReviewAt <= now)
             .OrderBy(item => item.NextReviewAt)
             .ThenBy(item => item.Title)
             .Take(10)
             .ToArray();
-        var flashcardSessionTargets = await GetFlashcardSessionTargetsAsync(dbContext, dueReviews);
 
         var recentPractice = await dbContext.PracticeSessions
             .AsNoTracking()
@@ -77,8 +77,8 @@ public static class DashboardEndpoints
                 flashcardSessionTargets.TryGetValue(item.Id, out var target);
                 return ApiMappings.ToDueReviewResponse(item, target?.Id, target?.Name);
             }).ToArray(),
-            InterviewPlan = CreateInterviewPlan(openableLearningItems, now),
-            WeaknessMap = CreateWeaknessMap(openableLearningItems, now),
+            InterviewPlan = CreateInterviewPlan(openableLearningItems, now, flashcardSessionTargets),
+            WeaknessMap = CreateWeaknessMap(openableLearningItems, now, flashcardSessionTargets),
             RecentPractice = recentPractice.Select(ApiMappings.ToResponse).ToArray()
         };
 
@@ -144,7 +144,8 @@ public static class DashboardEndpoints
     /// <returns>Prioritized daily interview plan items.</returns>
     private static IReadOnlyCollection<InterviewPlanItemResponse> CreateInterviewPlan(
         IEnumerable<LearningItem> items,
-        DateTime now)
+        DateTime now,
+        IReadOnlyDictionary<Guid, FlashcardLearningSessionTarget> flashcardSessionTargets)
     {
         return items
             .Select(item => new
@@ -158,17 +159,23 @@ public static class DashboardEndpoints
             .ThenBy(candidate => candidate.Item.LastPracticedAt ?? DateTime.MinValue)
             .ThenBy(candidate => candidate.Item.Title)
             .Take(5)
-            .Select(candidate => new InterviewPlanItemResponse
+            .Select(candidate =>
             {
-                Id = candidate.Item.Id,
-                Title = candidate.Item.Title,
-                Type = candidate.Item.Type,
-                Tags = candidate.Item.Tags.Select(itemTag => itemTag.Tag.Name).Order(StringComparer.Ordinal).ToArray(),
-                Reason = candidate.Reason,
-                LastPracticedAt = candidate.Item.LastPracticedAt,
-                NextReviewAt = candidate.Item.NextReviewAt,
-                Confidence = candidate.Item.Confidence,
-                TotalAttempts = candidate.Item.PracticeSessions.Count
+                flashcardSessionTargets.TryGetValue(candidate.Item.Id, out var target);
+                return new InterviewPlanItemResponse
+                {
+                    Id = candidate.Item.Id,
+                    Title = candidate.Item.Title,
+                    Type = candidate.Item.Type,
+                    Tags = candidate.Item.Tags.Select(itemTag => itemTag.Tag.Name).Order(StringComparer.Ordinal).ToArray(),
+                    Reason = candidate.Reason,
+                    LastPracticedAt = candidate.Item.LastPracticedAt,
+                    NextReviewAt = candidate.Item.NextReviewAt,
+                    Confidence = candidate.Item.Confidence,
+                    TotalAttempts = candidate.Item.PracticeSessions.Count,
+                    LearningSessionId = target?.Id,
+                    LearningSessionName = target?.Name
+                };
             })
             .ToArray();
     }
@@ -178,7 +185,10 @@ public static class DashboardEndpoints
     /// </summary>
     /// <param name="items">Learning items to summarize.</param>
     /// <returns>Tag-level weakness summaries.</returns>
-    private static IReadOnlyCollection<WeaknessTagResponse> CreateWeaknessMap(IEnumerable<LearningItem> items, DateTime now)
+    private static IReadOnlyCollection<WeaknessTagResponse> CreateWeaknessMap(
+        IEnumerable<LearningItem> items,
+        DateTime now,
+        IReadOnlyDictionary<Guid, FlashcardLearningSessionTarget> flashcardSessionTargets)
     {
         return items
             .SelectMany(item => item.Tags.Select(itemTag => new { Tag = itemTag.Tag.Name, Item = item }))
@@ -201,7 +211,7 @@ public static class DashboardEndpoints
                     AverageConfidence = confidenceValues.Length == 0 ? null : Math.Round(confidenceValues.Average(), 1),
                     FailedOrPartialAttempts = failedOrPartial,
                     LastPracticedAt = groupedItems.Max(item => item.LastPracticedAt),
-                    DrillTarget = CreateWeaknessDrillTarget(groupedItems, now),
+                    DrillTarget = CreateWeaknessDrillTarget(groupedItems, now, flashcardSessionTargets),
                     ImproveNextSamples = groupedItems
                         .SelectMany(item => item.PracticeSessions)
                         .OrderByDescending(session => session.CreatedAt)
@@ -245,7 +255,10 @@ public static class DashboardEndpoints
     /// <param name="items">Existing tagged learning items.</param>
     /// <param name="now">The current timestamp.</param>
     /// <returns>The drill target for this tag.</returns>
-    private static WeaknessDrillTargetResponse? CreateWeaknessDrillTarget(IEnumerable<LearningItem> items, DateTime now)
+    private static WeaknessDrillTargetResponse? CreateWeaknessDrillTarget(
+        IEnumerable<LearningItem> items,
+        DateTime now,
+        IReadOnlyDictionary<Guid, FlashcardLearningSessionTarget> flashcardSessionTargets)
     {
         var item = items
             .OrderByDescending(candidate => CalculatePlanScore(candidate, now))
@@ -253,16 +266,22 @@ public static class DashboardEndpoints
             .ThenBy(candidate => candidate.Title)
             .FirstOrDefault();
 
-        return item is null
-            ? null
-            : new WeaknessDrillTargetResponse
+        if (item is null)
+        {
+            return null;
+        }
+
+        flashcardSessionTargets.TryGetValue(item.Id, out var target);
+        return new WeaknessDrillTargetResponse
             {
                 Id = item.Id,
                 Title = item.Title,
                 Type = item.Type,
                 LastPracticedAt = item.LastPracticedAt,
                 NextReviewAt = item.NextReviewAt,
-                Confidence = item.Confidence
+                Confidence = item.Confidence,
+                LearningSessionId = target?.Id,
+                LearningSessionName = target?.Name
             };
     }
 

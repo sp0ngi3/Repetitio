@@ -42,7 +42,7 @@ public static class FlashcardEndpoints
         group.MapGet("/decks", GetDecksAsync).WithName("GetFlashcardDecks");
         group.MapGet("/decks/{id:guid}", GetDeckAsync).WithName("GetFlashcardDeck");
         group.MapPost("/decks", CreateDeckAsync).WithName("CreateFlashcardDeck");
-        group.MapPost("/decks/{id:guid}/missed-session", CreateMissedDeckSessionAsync).WithName("CreateMissedFlashcardDeckSession");
+        group.MapPost("/decks/{id:guid}/missed-session", GetMissedDeckSessionAsync).WithName("CreateMissedFlashcardDeckSession");
         group.MapPut("/decks/{id:guid}", UpdateDeckAsync).WithName("UpdateFlashcardDeck");
         group.MapDelete("/decks/{id:guid}", DeleteDeckAsync).WithName("DeleteFlashcardDeck");
         group.MapPost("/sessions/complete", CompleteSessionAsync).WithName("CompleteFlashcardSession");
@@ -443,12 +443,12 @@ public static class FlashcardEndpoints
     }
 
     /// <summary>
-    /// Creates a normal saved learning session from cards missed in a source deck.
+    /// Creates a temporary study view from cards missed in a source deck.
     /// </summary>
     /// <param name="dbContext">The database context.</param>
     /// <param name="id">The source deck identifier.</param>
-    /// <returns>The created missed-card learning session.</returns>
-    private static async Task<IResult> CreateMissedDeckSessionAsync(RepetitioDbContext dbContext, Guid id)
+    /// <returns>The source learning session response filtered to previously missed cards.</returns>
+    private static async Task<IResult> GetMissedDeckSessionAsync(RepetitioDbContext dbContext, Guid id)
     {
         var sourceDeck = await DeckQuery(dbContext)
             .AsNoTracking()
@@ -473,23 +473,12 @@ public static class FlashcardEndpoints
             return Results.BadRequest("This learning session has no previously missed flashcards.");
         }
 
-        var now = DateTime.UtcNow;
-        var deck = new FlashcardDeck
-        {
-            Id = Guid.NewGuid(),
-            Name = $"{sourceDeck.Name} - missed review {now:yyyy-MM-dd HH:mm}",
-            Description = $"Flashcards previously missed in {sourceDeck.Name}.",
-            DefaultSessionSize = Math.Min(sourceDeck.DefaultSessionSize, missedCardIds.Length),
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        AddDeckCards(deck, missedCardIds);
-        dbContext.FlashcardDecks.Add(deck);
-        await dbContext.SaveChangesAsync();
-
-        var created = await DeckQuery(dbContext).FirstAsync(savedDeck => savedDeck.Id == deck.Id);
-        return Results.Created($"/api/flashcards/decks/{deck.Id}", ToDeckResponse(created));
+        return Results.Ok(ToDeckResponse(
+            sourceDeck,
+            missedCardIds.ToHashSet(),
+            $"{sourceDeck.Name} - missed review",
+            $"Temporary review of flashcards previously missed in {sourceDeck.Name}.",
+            Math.Min(sourceDeck.DefaultSessionSize, missedCardIds.Length)));
     }
 
     /// <summary>
@@ -1006,14 +995,24 @@ public static class FlashcardEndpoints
     /// </summary>
     /// <param name="deck">The deck.</param>
     /// <returns>The deck response.</returns>
-    private static FlashcardDeckResponse ToDeckResponse(FlashcardDeck deck)
+    private static FlashcardDeckResponse ToDeckResponse(
+        FlashcardDeck deck,
+        IReadOnlySet<Guid>? onlyCardIds = null,
+        string? nameOverride = null,
+        string? descriptionOverride = null,
+        int? defaultSessionSizeOverride = null)
     {
+        var deckCards = deck.Cards
+            .Where(deckCard => onlyCardIds is null || onlyCardIds.Contains(deckCard.FlashcardLearningItemId))
+            .OrderBy(deckCard => deckCard.SortOrder)
+            .ToArray();
+
         return new FlashcardDeckResponse
         {
             Id = deck.Id,
-            Name = deck.Name,
-            Description = deck.Description,
-            DefaultSessionSize = deck.DefaultSessionSize,
+            Name = nameOverride ?? deck.Name,
+            Description = descriptionOverride ?? deck.Description,
+            DefaultSessionSize = defaultSessionSizeOverride ?? deck.DefaultSessionSize,
             TotalRuns = deck.TotalRuns,
             TotalReviews = deck.Reviews.Count,
             KnownReviews = deck.Reviews.Count(review => review.KnewAnswer),
@@ -1021,13 +1020,12 @@ public static class FlashcardEndpoints
             NextReviewAt = deck.NextReviewAt,
             CreatedAt = deck.CreatedAt,
             UpdatedAt = deck.UpdatedAt,
-            Tags = deck.Cards
+            Tags = deckCards
                 .SelectMany(deckCard => deckCard.Flashcard.LearningItem.Tags.Select(itemTag => itemTag.Tag.Name))
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
                 .ToArray(),
-            Cards = deck.Cards
-                .OrderBy(deckCard => deckCard.SortOrder)
+            Cards = deckCards
                 .Select(deckCard => ToResponse(deckCard.Flashcard))
                 .ToArray()
         };

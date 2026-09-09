@@ -595,12 +595,9 @@ beforeEach(() => {
   vi.mocked(createFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
   vi.mocked(createMissedFlashcardDeckSession).mockResolvedValue({
     ...flashcardDecks[0],
-    id: "deck-missed-1",
     name: "Interview flashcards - missed review",
-    cards: flashcards.slice(0, 1),
-    totalRuns: 0,
-    totalReviews: 0,
-    knownReviews: 0
+    description: "Temporary review of flashcards previously missed in Interview flashcards.",
+    cards: flashcards.slice(0, 1)
   });
   vi.mocked(updateFlashcardDeck).mockResolvedValue(flashcardDecks[0]);
   vi.mocked(deleteFlashcardDeck).mockResolvedValue();
@@ -716,6 +713,42 @@ describe("App", () => {
     expect(getFlashcardDeck).toHaveBeenCalledWith("deck-1");
     expect(await screen.findByRole("heading", { name: "CAP theorem" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Flip" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that Daily interview plan flashcards open their saved learning session.
+   */
+  it("opens a daily flashcard plan item through its learning session", async () => {
+    vi.mocked(getDashboard).mockResolvedValueOnce({
+      ...dashboard,
+      interviewPlan: [
+        {
+          id: "flashcard-1",
+          title: "CAP theorem",
+          type: "Flashcard",
+          tags: ["system-design"],
+          reason: "Never practiced",
+          lastPracticedAt: null,
+          nextReviewAt: null,
+          confidence: null,
+          totalAttempts: 0,
+          learningSessionId: "deck-1",
+          learningSessionName: "Interview flashcards"
+        }
+      ]
+    });
+    vi.mocked(getFlashcardDeck).mockResolvedValueOnce({
+      ...flashcardDecks[0],
+      cards: flashcards.slice(0, 1)
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("CAP theorem")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open session" }));
+
+    expect(getFlashcardDeck).toHaveBeenCalledWith("deck-1");
+    expect(await screen.findByRole("heading", { name: "CAP theorem" })).toBeInTheDocument();
   });
 
   /**
@@ -946,9 +979,9 @@ describe("App", () => {
   });
 
   /**
-   * Verifies that missed flashcards from a saved session become a normal learning session.
+   * Verifies that missed flashcards run as a temporary review of the source learning session.
    */
-  it("creates and starts a missed-card learning session", async () => {
+  it("starts a missed-card review without creating a new learning session", async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
@@ -964,7 +997,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Knew it" }));
 
     expect(completeFlashcardSession).toHaveBeenCalledWith({
-      deckId: "deck-missed-1",
+      deckId: "deck-1",
       reviews: [
         {
           flashcardId: "flashcard-1",

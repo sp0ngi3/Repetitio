@@ -144,6 +144,16 @@ public sealed record InterviewPlanItemResponse
     /// Gets the number of recorded attempts.
     /// </summary>
     public required int TotalAttempts { get; init; }
+
+    /// <summary>
+    /// Gets the saved flashcard learning session to open when this plan item is a flashcard.
+    /// </summary>
+    public Guid? LearningSessionId { get; init; }
+
+    /// <summary>
+    /// Gets the saved flashcard learning session name to open when this plan item is a flashcard.
+    /// </summary>
+    public string? LearningSessionName { get; init; }
 }
 
 /// <summary>
@@ -221,4 +231,14 @@ public sealed record WeaknessDrillTargetResponse
     /// Gets the current confidence value from 1 to 5.
     /// </summary>
     public int? Confidence { get; init; }
+
+    /// <summary>
+    /// Gets the saved flashcard learning session to open when this drill target is a flashcard.
+    /// </summary>
+    public Guid? LearningSessionId { get; init; }
+
+    /// <summary>
+    /// Gets the saved flashcard learning session name to open when this drill target is a flashcard.
+    /// </summary>
+    public string? LearningSessionName { get; init; }
 }

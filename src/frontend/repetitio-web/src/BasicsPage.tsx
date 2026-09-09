@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import type { FormEvent } from "react";
 import { createPracticeSession, executeBasicExercise } from "./api";
 import {
   AttemptScorecard,
@@ -7,6 +7,7 @@ import {
   emptyAttemptScorecard,
   type AttemptScorecardValue
 } from "./AttemptScorecard";
+import { CodeEditor } from "./CodeEditor";
 import { getPracticeAgeClass } from "./practiceAge";
 import { sortByLastPracticed, type LastPracticedSort } from "./practiceSort";
 import { createDefaultNextReviewDate, toNextReviewTimestamp, type ReviewSchedulePreset } from "./reviewSchedule";
@@ -26,11 +27,6 @@ const outcomes: PracticeOutcome[] = ["Completed", "Passed", "Partial", "Failed"]
  * Number of Basics exercises shown on one dashboard page.
  */
 const basicsPageSize = 10;
-
-/**
- * Number of spaces inserted by the code editor Tab key.
- */
-const codeEditorIndent = "    ";
 
 /**
  * Basics page view modes.
@@ -196,31 +192,6 @@ export function BasicsPage(props: BasicsPageProps) {
   }
 
   /**
-   * Inserts or removes indentation when Tab is pressed inside the code editor.
-   *
-   * @param event - Keyboard event raised by the code editor textarea.
-   */
-  function handleCodeEditorKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Tab") {
-      return;
-    }
-
-    event.preventDefault();
-
-    const textarea = event.currentTarget;
-    const edit = event.shiftKey
-      ? removeCodeEditorIndentation(textarea.value, textarea.selectionStart, textarea.selectionEnd)
-      : addCodeEditorIndentation(textarea.value, textarea.selectionStart, textarea.selectionEnd);
-
-    updateAttemptForm("codeDraft", edit.value);
-
-    requestAnimationFrame(() => {
-      textarea.selectionStart = edit.selectionStart;
-      textarea.selectionEnd = edit.selectionEnd;
-    });
-  }
-
-  /**
    * Records a Basics attempt for the selected exercise.
    *
    * @param event - The form submission event.
@@ -357,20 +328,18 @@ export function BasicsPage(props: BasicsPageProps) {
 
             <form className="attempt-form" onSubmit={handleAttemptSubmit}>
               <div className="editor-field">
-                <span className="editor-toolbar">
-                  <label htmlFor="basics-code-editor">Code</label>
-                  <button className="secondary-button compact-button" type="button" onClick={handleRunTests} disabled={isRunning}>
-                    {isRunning ? "Running..." : "Run tests"}
-                  </button>
-                </span>
-                <textarea
+                <label htmlFor="basics-code-editor">Code</label>
+                <CodeEditor
                   id="basics-code-editor"
-                  className="code-editor-textarea"
-                  spellCheck={false}
+                  language={selectedExercise.language}
                   value={attemptForm.codeDraft}
-                  onChange={(event) => updateAttemptForm("codeDraft", event.target.value)}
-                  onKeyDown={handleCodeEditorKeyDown}
+                  onChange={(value) => updateAttemptForm("codeDraft", value)}
                   placeholder="Write your solution here."
+                  toolbarEnd={
+                    <button className="secondary-button compact-button" type="button" onClick={handleRunTests} disabled={isRunning}>
+                      {isRunning ? "Running..." : "Run tests"}
+                    </button>
+                  }
                 />
               </div>
 
@@ -619,18 +588,6 @@ interface PaginationBarProps {
   pageSize: number;
   /** Updates the current page. */
   onPageChange: (page: number) => void;
-}
-
-/**
- * Represents an edited code textarea value and the selection that should be restored.
- */
-interface CodeEditorEdit {
-  /** Edited textarea value. */
-  value: string;
-  /** Next selection start. */
-  selectionStart: number;
-  /** Next selection end. */
-  selectionEnd: number;
 }
 
 /**
@@ -894,109 +851,6 @@ function filterBasicExercises(exercises: BasicExercise[], searchQuery: string, s
 function paginateBasicExercises(exercises: BasicExercise[], currentPage: number, pageSize: number) {
   const startIndex = (currentPage - 1) * pageSize;
   return exercises.slice(startIndex, startIndex + pageSize);
-}
-
-/**
- * Adds indentation to the current cursor or selected lines.
- *
- * @param value - Current editor value.
- * @param selectionStart - Current selection start.
- * @param selectionEnd - Current selection end.
- * @returns Edited code and selection.
- */
-function addCodeEditorIndentation(value: string, selectionStart: number, selectionEnd: number): CodeEditorEdit {
-  if (selectionStart === selectionEnd || !value.slice(selectionStart, selectionEnd).includes("\n")) {
-    return {
-      value: `${value.slice(0, selectionStart)}${codeEditorIndent}${value.slice(selectionEnd)}`,
-      selectionStart: selectionStart + codeEditorIndent.length,
-      selectionEnd: selectionStart + codeEditorIndent.length
-    };
-  }
-
-  const lineStart = findLineStart(value, selectionStart);
-  const lineEnd = findSelectedLineEnd(value, selectionStart, selectionEnd);
-  const block = value.slice(lineStart, lineEnd);
-  const lineCount = block.split("\n").length;
-  const indentedBlock = block
-    .split("\n")
-    .map((line) => `${codeEditorIndent}${line}`)
-    .join("\n");
-
-  return {
-    value: `${value.slice(0, lineStart)}${indentedBlock}${value.slice(lineEnd)}`,
-    selectionStart: selectionStart + codeEditorIndent.length,
-    selectionEnd: selectionEnd + lineCount * codeEditorIndent.length
-  };
-}
-
-/**
- * Removes one indentation level from the current line or selected lines.
- *
- * @param value - Current editor value.
- * @param selectionStart - Current selection start.
- * @param selectionEnd - Current selection end.
- * @returns Edited code and selection.
- */
-function removeCodeEditorIndentation(value: string, selectionStart: number, selectionEnd: number): CodeEditorEdit {
-  const lineStart = findLineStart(value, selectionStart);
-  const lineEnd = findSelectedLineEnd(value, selectionStart, selectionEnd);
-  const block = value.slice(lineStart, lineEnd);
-  let removedBeforeSelection = 0;
-  let removedInsideSelection = 0;
-  let offset = lineStart;
-
-  const outdentedBlock = block
-    .split("\n")
-    .map((line) => {
-      const removeCount = line.startsWith(codeEditorIndent) ? codeEditorIndent.length : line.startsWith("\t") ? 1 : 0;
-
-      if (removeCount > 0) {
-        if (offset < selectionStart) {
-          removedBeforeSelection += Math.min(removeCount, selectionStart - offset);
-        }
-
-        if (offset < selectionEnd) {
-          removedInsideSelection += removeCount;
-        }
-      }
-
-      offset += line.length + 1;
-      return line.slice(removeCount);
-    })
-    .join("\n");
-
-  return {
-    value: `${value.slice(0, lineStart)}${outdentedBlock}${value.slice(lineEnd)}`,
-    selectionStart: Math.max(lineStart, selectionStart - removedBeforeSelection),
-    selectionEnd: Math.max(lineStart, selectionEnd - removedInsideSelection)
-  };
-}
-
-/**
- * Finds the first character index of the line containing a selection.
- *
- * @param value - Current editor value.
- * @param selectionStart - Current selection start.
- * @returns Start index for the containing line.
- */
-function findLineStart(value: string, selectionStart: number) {
-  return value.lastIndexOf("\n", Math.max(0, selectionStart - 1)) + 1;
-}
-
-/**
- * Finds the end index of the selected line block.
- *
- * @param value - Current editor value.
- * @param selectionStart - Current selection start.
- * @param selectionEnd - Current selection end.
- * @returns End index for the selected line block.
- */
-function findSelectedLineEnd(value: string, selectionStart: number, selectionEnd: number) {
-  if (selectionStart === selectionEnd) {
-    return value.indexOf("\n", selectionEnd) === -1 ? value.length : value.indexOf("\n", selectionEnd);
-  }
-
-  return value[selectionEnd - 1] === "\n" ? selectionEnd - 1 : selectionEnd;
 }
 
 /**
