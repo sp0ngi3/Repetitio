@@ -712,7 +712,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
       <PageBackHeader eyebrow="DSA problem" title={props.problem.title} onBack={props.onBack} />
       {props.error ? <p className="error-banner">{props.error}</p> : null}
       <div className="coding-layout">
-        <ProblemEditorPanel form={props.problemForm} onChange={props.onProblemChange} showExternalUrlTools>
+        <ProblemEditorPanel form={props.problemForm} onChange={props.onProblemChange} showExternalUrlTools showTagsEditor>
           <div className="editor-actions">
             <button className="secondary-button" type="button" onClick={props.onSaveMetadata} disabled={props.isSaving}>
               Save metadata
@@ -971,6 +971,8 @@ interface ProblemEditorPanelProps {
   children?: ReactNode;
   /** Whether external URL controls should be shown inside the editor. */
   showExternalUrlTools?: boolean;
+  /** Whether tag controls should be shown inside the editor. */
+  showTagsEditor?: boolean;
   /** Updates one form field. */
   onChange: <K extends keyof DsaProblemForm>(key: K, value: DsaProblemForm[K]) => void;
 }
@@ -1006,6 +1008,17 @@ function ProblemEditorPanel(props: ProblemEditorPanelProps) {
           value={props.form.externalUrl}
           onChange={(value) => props.onChange("externalUrl", value)}
         />
+      ) : null}
+
+      {props.showTagsEditor ? (
+        <label>
+          Tags
+          <input
+            value={props.form.tagsText}
+            onChange={(event) => props.onChange("tagsText", event.target.value)}
+            placeholder="arrays, sliding-window"
+          />
+        </label>
       ) : null}
 
       <label>

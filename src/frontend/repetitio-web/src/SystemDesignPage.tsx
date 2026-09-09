@@ -689,7 +689,7 @@ function SystemDesignDetailPage(props: SystemDesignDetailPageProps) {
       <PageBackHeader eyebrow="System Design problem" title={props.problem.title} onBack={props.onBack} />
       {props.error ? <p className="error-banner">{props.error}</p> : null}
       <div className="system-design-layout">
-        <SystemDesignEditorPanel form={props.form} onChange={props.onChange} showExternalUrlTools>
+        <SystemDesignEditorPanel form={props.form} onChange={props.onChange} showExternalUrlTools showTagsEditor>
           <div className="editor-actions">
             <button className="secondary-button" type="button" onClick={props.onSave} disabled={props.isSaving}>
               Save design
@@ -873,6 +873,8 @@ interface SystemDesignEditorPanelProps {
   children?: ReactNode;
   /** Whether external URL controls should be shown inside the editor. */
   showExternalUrlTools?: boolean;
+  /** Whether tag controls should be shown inside the editor. */
+  showTagsEditor?: boolean;
   /** Updates one form field. */
   onChange: <K extends keyof SystemDesignProblemForm>(key: K, value: SystemDesignProblemForm[K]) => void;
 }
@@ -908,6 +910,17 @@ function SystemDesignEditorPanel(props: SystemDesignEditorPanelProps) {
           value={props.form.externalUrl}
           onChange={(value) => props.onChange("externalUrl", value)}
         />
+      ) : null}
+
+      {props.showTagsEditor ? (
+        <label>
+          Tags
+          <input
+            value={props.form.tagsText}
+            onChange={(event) => props.onChange("tagsText", event.target.value)}
+            placeholder="caching, queues, consistency"
+          />
+        </label>
       ) : null}
 
       <MarkdownEditor

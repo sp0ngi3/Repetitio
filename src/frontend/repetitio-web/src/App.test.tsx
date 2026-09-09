@@ -29,9 +29,11 @@ import {
   getSystemDesignProblems,
   importFlashcardsBatch,
   importBackup,
+  updateDsaProblem,
   updateFlashcard,
   updateFlashcardDeck,
   updateNotePage,
+  updateSystemDesignProblem,
   validateBackup
 } from "./api";
 import { createDefaultNextReviewDate } from "./reviewSchedule";
@@ -494,6 +496,19 @@ beforeEach(() => {
   vi.mocked(getLearningItems).mockResolvedValue(learningItems);
   vi.mocked(getDsaProblems).mockResolvedValue(dsaProblems);
   vi.mocked(getDsaProblemTemplate).mockResolvedValue(dsaTemplate);
+  vi.mocked(updateDsaProblem).mockImplementation(async (id, request) => ({
+    ...dsaProblems[0],
+    ...request,
+    id,
+    externalUrl: request.externalUrl || null,
+    source: request.source || null,
+    description: request.description || null,
+    problemStatement: request.problemStatement || null,
+    testCases: request.testCases || null,
+    assumptions: request.assumptions || null,
+    expectedTimeComplexity: request.expectedTimeComplexity || null,
+    expectedSpaceComplexity: request.expectedSpaceComplexity || null
+  }));
   vi.mocked(getFlashcard).mockResolvedValue(flashcards[0]);
   vi.mocked(getFlashcards).mockImplementation(async (filters = {}) => {
     const page = filters.page ?? 1;
@@ -539,6 +554,28 @@ beforeEach(() => {
   });
   vi.mocked(getSystemDesignProblems).mockResolvedValue(systemDesignProblems);
   vi.mocked(getSystemDesignProblemTemplate).mockResolvedValue(systemDesignTemplate);
+  vi.mocked(updateSystemDesignProblem).mockImplementation(async (id, request) => ({
+    ...systemDesignProblems[0],
+    ...request,
+    id,
+    externalUrl: request.externalUrl || null,
+    source: request.source || null,
+    description: request.description || null,
+    promptMarkdown: request.promptMarkdown || null,
+    functionalRequirementsMarkdown: request.functionalRequirementsMarkdown || null,
+    nonFunctionalRequirementsMarkdown: request.nonFunctionalRequirementsMarkdown || null,
+    constraintsMarkdown: request.constraintsMarkdown || null,
+    capacityEstimatesMarkdown: request.capacityEstimatesMarkdown || null,
+    apiDesignMarkdown: request.apiDesignMarkdown || null,
+    dataModelMarkdown: request.dataModelMarkdown || null,
+    architectureMarkdown: request.architectureMarkdown || null,
+    scalingStrategyMarkdown: request.scalingStrategyMarkdown || null,
+    tradeoffsMarkdown: request.tradeoffsMarkdown || null,
+    reflectionMarkdown: request.reflectionMarkdown || null,
+    whatHelped: request.whatHelped || null,
+    whatWasDifficult: request.whatWasDifficult || null,
+    improveNext: request.improveNext || null
+  }));
   vi.mocked(getNotePages).mockResolvedValue(notePages);
   vi.mocked(createNotePage).mockResolvedValue({
     id: "note-new",
@@ -817,6 +854,29 @@ describe("App", () => {
   });
 
   /**
+   * Verifies that System Design tags can be edited from the detail page.
+   */
+  it("edits System Design tags from the detail page", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "System Design" }));
+    fireEvent.click(await screen.findByText("Design a Rate Limiter"));
+
+    const tagsInput = await screen.findByLabelText("Tags");
+    fireEvent.change(tagsInput, { target: { value: "redis, consistency, queues" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save design" }));
+
+    await waitFor(() => {
+      expect(updateSystemDesignProblem).toHaveBeenLastCalledWith(
+        "system-1",
+        expect.objectContaining({
+          tags: ["redis", "consistency", "queues"]
+        })
+      );
+    });
+  });
+
+  /**
    * Verifies that the DSA page can be opened from navigation.
    */
   it("renders the dedicated DSA tracker page", async () => {
@@ -829,6 +889,29 @@ describe("App", () => {
     expect(screen.getByRole("combobox", { name: "Last practiced" })).toHaveValue("never-first");
     expect(screen.getByText("Due now")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add problem" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that DSA tags can be edited from the detail page.
+   */
+  it("edits DSA tags from the detail page", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "DSA" }));
+    fireEvent.click(await screen.findByText("Valid Parentheses"));
+
+    const tagsInput = await screen.findByLabelText("Tags");
+    fireEvent.change(tagsInput, { target: { value: "stack, strings, easy" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save metadata" }));
+
+    await waitFor(() => {
+      expect(updateDsaProblem).toHaveBeenLastCalledWith(
+        "dsa-1",
+        expect.objectContaining({
+          tags: ["stack", "strings", "easy"]
+        })
+      );
+    });
   });
 
   /**
