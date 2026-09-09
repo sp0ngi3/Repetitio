@@ -6,6 +6,7 @@ import {
   type AttemptScorecardValue
 } from "./AttemptScorecard";
 import { CodeEditor } from "./CodeEditor";
+import { confirmDelete } from "./confirmDelete";
 import {
   createDsaProblem,
   createDsaSolution,
@@ -503,6 +504,10 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
    */
   async function handleDeleteProblem() {
     if (!selectedProblem) {
+      return;
+    }
+
+    if (!confirmDelete(`DSA problem "${selectedProblem.title}"`)) {
       return;
     }
 

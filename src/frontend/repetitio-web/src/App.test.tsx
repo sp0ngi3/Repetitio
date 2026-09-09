@@ -8,6 +8,7 @@ import {
   createMissedFlashcardDeckSession,
   createNotePage,
   createPracticeSession,
+  deleteDsaProblem,
   deleteFlashcard,
   deleteFlashcardDeck,
   deleteNotePage,
@@ -488,6 +489,7 @@ const backupStatus = {
  */
 beforeEach(() => {
   localStorage.clear();
+  vi.stubGlobal("confirm", vi.fn(() => true));
   vi.mocked(getDashboard).mockResolvedValue(dashboard);
   vi.mocked(getBasicExercises).mockResolvedValue(basics);
   vi.mocked(getHealthStatus).mockResolvedValue({
@@ -934,6 +936,21 @@ describe("App", () => {
         })
       );
     });
+  });
+
+  /**
+   * Verifies that cancelling the delete confirmation keeps a DSA problem.
+   */
+  it("does not delete a DSA problem when confirmation is cancelled", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => false));
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "DSA" }));
+    fireEvent.click(await screen.findByText("Valid Parentheses"));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Are you sure you want to delete"));
+    expect(deleteDsaProblem).not.toHaveBeenCalled();
   });
 
   /**

@@ -5,6 +5,7 @@ import {
   emptyAttemptScorecard,
   type AttemptScorecardValue
 } from "./AttemptScorecard";
+import { confirmDelete } from "./confirmDelete";
 import {
   createPracticeSession,
   createSystemDesignProblem,
@@ -392,6 +393,10 @@ export function SystemDesignPage({
    */
   async function handleDeleteProblem() {
     if (!selectedProblem) {
+      return;
+    }
+
+    if (!confirmDelete(`System Design problem "${selectedProblem.title}"`)) {
       return;
     }
 

@@ -14,6 +14,7 @@ import {
   updateFlashcard,
   updateFlashcardDeck
 } from "./api";
+import { confirmDelete } from "./confirmDelete";
 import { getPracticeAgeClass } from "./practiceAge";
 import type {
   CompleteFlashcardReviewRequest,
@@ -637,6 +638,10 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
       return;
     }
 
+    if (!confirmDelete(`flashcard "${selectedCard.title}"`)) {
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
 
@@ -798,6 +803,14 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
    */
   async function handleDeleteDeck() {
     if (!selectedDeck) {
+      return;
+    }
+
+    const deleteDetail = deckForm.deleteCardsWithSession
+      ? "This will delete the learning session and every flashcard inside it."
+      : "This will delete only the learning session. The flashcards will stay in the database.";
+
+    if (!confirmDelete(`learning session "${selectedDeck.name}"`, deleteDetail)) {
       return;
     }
 

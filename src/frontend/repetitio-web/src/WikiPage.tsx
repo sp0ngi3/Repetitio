@@ -8,6 +8,7 @@ import {
   importWikiPages,
   updateWikiPage
 } from "./api";
+import { confirmDelete } from "./confirmDelete";
 import type {
   CreateWikiPageRequest,
   ImportWikiPageNodeRequest,
@@ -302,6 +303,12 @@ export function WikiPage() {
 
   async function handleDelete() {
     if (!editingPageId) {
+      return;
+    }
+
+    const targetTitle = (selectedPage?.title ?? form.title.trim()) || "this article";
+
+    if (!confirmDelete(`wiki article "${targetTitle}"`, "This will delete the article and its subtopics.")) {
       return;
     }
 

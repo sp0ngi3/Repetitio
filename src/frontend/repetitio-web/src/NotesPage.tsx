@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createNotePage, deleteNotePage, getNotePages, updateNotePage } from "./api";
+import { confirmDelete } from "./confirmDelete";
 import type { CreateNotePageRequest, NoteArea, NotePage as NotePageRecord, UpdateNotePageRequest } from "./types";
 
 /**
@@ -175,6 +176,10 @@ export function NotesPage(props: NotesPageProps) {
    */
   async function handleDelete() {
     if (!selectedNote) {
+      return;
+    }
+
+    if (!confirmDelete(`note "${selectedNote.title}"`)) {
       return;
     }
 
