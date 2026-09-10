@@ -58,6 +58,8 @@ Expected capabilities:
 - Create, edit, delete, and search pages.
 - Write markdown content.
 - Create headings, definitions, checklists, tables, and code blocks.
+- Embed local images and export a page with its subtopics through a print-to-PDF view.
+- Add optional article-only quiz questions and flashcards from JSON.
 - Use tags for discovery.
 - Link pages using a wiki-style syntax such as `[[Redis]]` or `[[Consistent Hashing]]`.
 - Show backlinks so the user can see where a concept is referenced.
@@ -76,6 +78,37 @@ KnowledgePage
 - CreatedAt
 - UpdatedAt
 ```
+
+Implemented article-only practice inserts:
+
+```text
+WikiQuizQuestion
+- Id
+- WikiPageId
+- Prompt
+- Explanation
+- SortOrder
+- CreatedAt
+- UpdatedAt
+
+WikiQuizOption
+- Id
+- WikiQuizQuestionId
+- Text
+- IsCorrect
+- SortOrder
+
+WikiFlashcard
+- Id
+- WikiPageId
+- Front
+- Back
+- SortOrder
+- CreatedAt
+- UpdatedAt
+```
+
+These wiki inserts are not part of review scheduling. They are quick self-check material that is exported and imported with the wiki page data.
 
 ## 4. Functional Drawing
 
@@ -262,6 +295,8 @@ Reason: the app is personal, local, and designed to be portable through backups.
 This expansion is successful when:
 
 - A user can create a wiki page and attach it to a DSA or System Design problem.
+- A user can export a wiki page and its subtopics as a PDF through the browser print flow.
+- A user can add JSON-backed quiz questions and lightweight flashcards to a wiki article.
 - A user can create a diagram and reopen it later for editing.
 - A user can add a local image to a wiki page by selecting a file or pasting a screenshot.
 - A user can export the whole app, including database records and wiki images.

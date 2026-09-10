@@ -29,6 +29,16 @@ public sealed record CreateWikiPageRequest
     /// Gets the editable markdown content.
     /// </summary>
     public string? ContentMarkdown { get; init; }
+
+    /// <summary>
+    /// Gets optional lightweight quiz questions attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiQuizQuestionRequest>? QuizQuestions { get; init; }
+
+    /// <summary>
+    /// Gets optional lightweight flashcards attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiFlashcardRequest>? Flashcards { get; init; }
 }
 
 /// <summary>
@@ -70,6 +80,16 @@ public sealed record UpdateWikiPageRequest
     /// Gets whether the page is archived.
     /// </summary>
     public bool IsArchived { get; init; }
+
+    /// <summary>
+    /// Gets optional lightweight quiz questions attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiQuizQuestionRequest>? QuizQuestions { get; init; }
+
+    /// <summary>
+    /// Gets optional lightweight flashcards attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiFlashcardRequest>? Flashcards { get; init; }
 }
 
 /// <summary>
@@ -98,9 +118,72 @@ public sealed record ImportWikiPageNodeRequest
     public string? ContentMarkdown { get; init; }
 
     /// <summary>
+    /// Gets optional lightweight quiz questions attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiQuizQuestionRequest>? QuizQuestions { get; init; }
+
+    /// <summary>
+    /// Gets optional lightweight flashcards attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiFlashcardRequest>? Flashcards { get; init; }
+
+    /// <summary>
     /// Gets nested child pages to import under this page.
     /// </summary>
     public IReadOnlyCollection<ImportWikiPageNodeRequest>? Children { get; init; }
+}
+
+/// <summary>
+/// Represents one lightweight wiki quiz question request.
+/// </summary>
+public sealed record WikiQuizQuestionRequest
+{
+    /// <summary>
+    /// Gets the quiz prompt.
+    /// </summary>
+    public required string Prompt { get; init; }
+
+    /// <summary>
+    /// Gets the answer options.
+    /// </summary>
+    public required IReadOnlyCollection<WikiQuizOptionRequest> Options { get; init; }
+
+    /// <summary>
+    /// Gets the optional explanation shown after answering.
+    /// </summary>
+    public string? Explanation { get; init; }
+}
+
+/// <summary>
+/// Represents one lightweight wiki quiz answer option request.
+/// </summary>
+public sealed record WikiQuizOptionRequest
+{
+    /// <summary>
+    /// Gets the answer option text.
+    /// </summary>
+    public required string Text { get; init; }
+
+    /// <summary>
+    /// Gets whether this option is correct.
+    /// </summary>
+    public bool IsCorrect { get; init; }
+}
+
+/// <summary>
+/// Represents one lightweight wiki flashcard request.
+/// </summary>
+public sealed record WikiFlashcardRequest
+{
+    /// <summary>
+    /// Gets the front side.
+    /// </summary>
+    public required string Front { get; init; }
+
+    /// <summary>
+    /// Gets the back side.
+    /// </summary>
+    public required string Back { get; init; }
 }
 
 /// <summary>
@@ -250,6 +333,99 @@ public sealed record WikiPageResponse
     /// Gets the date and time when the page was last updated.
     /// </summary>
     public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>
+    /// Gets lightweight quiz questions attached to the page.
+    /// </summary>
+    public required IReadOnlyCollection<WikiQuizQuestionResponse> QuizQuestions { get; init; }
+
+    /// <summary>
+    /// Gets lightweight flashcards attached to the page.
+    /// </summary>
+    public required IReadOnlyCollection<WikiFlashcardResponse> Flashcards { get; init; }
+}
+
+/// <summary>
+/// Represents one lightweight quiz question attached to a wiki page.
+/// </summary>
+public sealed record WikiQuizQuestionResponse
+{
+    /// <summary>
+    /// Gets the quiz question identifier.
+    /// </summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>
+    /// Gets the quiz prompt.
+    /// </summary>
+    public required string Prompt { get; init; }
+
+    /// <summary>
+    /// Gets the optional explanation shown after answering.
+    /// </summary>
+    public string? Explanation { get; init; }
+
+    /// <summary>
+    /// Gets the manual display order inside the page.
+    /// </summary>
+    public required int SortOrder { get; init; }
+
+    /// <summary>
+    /// Gets answer options.
+    /// </summary>
+    public required IReadOnlyCollection<WikiQuizOptionResponse> Options { get; init; }
+}
+
+/// <summary>
+/// Represents one lightweight quiz answer option attached to a wiki page.
+/// </summary>
+public sealed record WikiQuizOptionResponse
+{
+    /// <summary>
+    /// Gets the option identifier.
+    /// </summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>
+    /// Gets the answer option text.
+    /// </summary>
+    public required string Text { get; init; }
+
+    /// <summary>
+    /// Gets whether this option is correct.
+    /// </summary>
+    public required bool IsCorrect { get; init; }
+
+    /// <summary>
+    /// Gets the manual display order inside the question.
+    /// </summary>
+    public required int SortOrder { get; init; }
+}
+
+/// <summary>
+/// Represents one lightweight flashcard attached to a wiki page.
+/// </summary>
+public sealed record WikiFlashcardResponse
+{
+    /// <summary>
+    /// Gets the flashcard identifier.
+    /// </summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>
+    /// Gets the front side.
+    /// </summary>
+    public required string Front { get; init; }
+
+    /// <summary>
+    /// Gets the back side.
+    /// </summary>
+    public required string Back { get; init; }
+
+    /// <summary>
+    /// Gets the manual display order inside the page.
+    /// </summary>
+    public required int SortOrder { get; init; }
 }
 
 /// <summary>

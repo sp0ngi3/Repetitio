@@ -95,6 +95,21 @@ public sealed class RepetitioDbContext : DbContext
     public DbSet<WikiImage> WikiImages => Set<WikiImage>();
 
     /// <summary>
+    /// Gets the wiki quiz questions table.
+    /// </summary>
+    public DbSet<WikiQuizQuestion> WikiQuizQuestions => Set<WikiQuizQuestion>();
+
+    /// <summary>
+    /// Gets the wiki quiz options table.
+    /// </summary>
+    public DbSet<WikiQuizOption> WikiQuizOptions => Set<WikiQuizOption>();
+
+    /// <summary>
+    /// Gets the wiki flashcards table.
+    /// </summary>
+    public DbSet<WikiFlashcard> WikiFlashcards => Set<WikiFlashcard>();
+
+    /// <summary>
     /// Configures the database model.
     /// </summary>
     /// <param name="modelBuilder">The model builder.</param>
@@ -346,6 +361,52 @@ public sealed class RepetitioDbContext : DbContext
             entity.HasIndex(image => image.ContentType);
             entity.HasIndex(image => image.SizeBytes);
             entity.HasIndex(image => image.CreatedAt);
+        });
+
+        modelBuilder.Entity<WikiQuizQuestion>(entity =>
+        {
+            entity.HasKey(question => question.Id);
+            entity.Property(question => question.Prompt).HasMaxLength(4000).IsRequired();
+            entity.Property(question => question.Explanation).HasMaxLength(4000);
+            entity.Property(question => question.SortOrder).IsRequired();
+            entity.Property(question => question.CreatedAt).IsRequired();
+            entity.Property(question => question.UpdatedAt).IsRequired();
+            entity.HasIndex(question => question.WikiPageId);
+            entity.HasIndex(question => new { question.WikiPageId, question.SortOrder });
+            entity.HasOne(question => question.WikiPage)
+                .WithMany(page => page.QuizQuestions)
+                .HasForeignKey(question => question.WikiPageId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WikiQuizOption>(entity =>
+        {
+            entity.HasKey(option => option.Id);
+            entity.Property(option => option.Text).HasMaxLength(2000).IsRequired();
+            entity.Property(option => option.IsCorrect).IsRequired();
+            entity.Property(option => option.SortOrder).IsRequired();
+            entity.HasIndex(option => option.WikiQuizQuestionId);
+            entity.HasIndex(option => new { option.WikiQuizQuestionId, option.SortOrder });
+            entity.HasOne(option => option.WikiQuizQuestion)
+                .WithMany(question => question.Options)
+                .HasForeignKey(option => option.WikiQuizQuestionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WikiFlashcard>(entity =>
+        {
+            entity.HasKey(flashcard => flashcard.Id);
+            entity.Property(flashcard => flashcard.Front).HasMaxLength(4000).IsRequired();
+            entity.Property(flashcard => flashcard.Back).HasMaxLength(8000).IsRequired();
+            entity.Property(flashcard => flashcard.SortOrder).IsRequired();
+            entity.Property(flashcard => flashcard.CreatedAt).IsRequired();
+            entity.Property(flashcard => flashcard.UpdatedAt).IsRequired();
+            entity.HasIndex(flashcard => flashcard.WikiPageId);
+            entity.HasIndex(flashcard => new { flashcard.WikiPageId, flashcard.SortOrder });
+            entity.HasOne(flashcard => flashcard.WikiPage)
+                .WithMany(page => page.Flashcards)
+                .HasForeignKey(flashcard => flashcard.WikiPageId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

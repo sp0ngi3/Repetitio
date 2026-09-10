@@ -30,7 +30,10 @@ public sealed class BackupArchiveValidator
         "FlashcardReviews",
         "NotePages",
         "WikiPages",
-        "WikiImages"
+        "WikiImages",
+        "WikiQuizQuestions",
+        "WikiQuizOptions",
+        "WikiFlashcards"
     ];
 
     /// <summary>

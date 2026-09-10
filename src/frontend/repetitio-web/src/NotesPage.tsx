@@ -14,6 +14,16 @@ const noteAreas: NoteArea[] = ["Dsa", "SystemDesign", "Other"];
 const companionSaveDebounceMs = 500;
 
 /**
+ * Number of note pages rendered in the sidebar at once.
+ */
+const notesPageSize = 12;
+
+/**
+ * Target maximum size for one split note page.
+ */
+const noteSplitTargetLength = 12000;
+
+/**
  * Editable note form state.
  */
 interface NoteForm {
@@ -53,6 +63,7 @@ export function NotesPage(props: NotesPageProps) {
   const [activeArea, setActiveArea] = useState<NoteArea>("Dsa");
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState<NoteForm>(emptyNoteForm);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,6 +85,13 @@ export function NotesPage(props: NotesPageProps) {
       return matchesArea && matchesSearch;
     });
   }, [activeArea, notes, search]);
+  const totalPages = Math.max(1, Math.ceil(visibleNotes.length / notesPageSize));
+  const normalizedPage = Math.min(page, totalPages);
+  const pagedNotes = visibleNotes.slice((normalizedPage - 1) * notesPageSize, normalizedPage * notesPageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeArea, search]);
 
   /**
    * Loads all note pages.
@@ -198,6 +216,53 @@ export function NotesPage(props: NotesPageProps) {
     }
   }
 
+  /**
+   * Splits a long note into several note pages in the same notebook area.
+   */
+  async function handleSplitPage() {
+    const title = form.title.trim();
+
+    if (!title) {
+      setError("Title is required before splitting a note.");
+      return;
+    }
+
+    const chunks = splitNoteIntoPages(form.contentMarkdown);
+
+    if (chunks.length <= 1) {
+      setError("This note is short enough to stay as one page.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const firstPage = selectedNote
+        ? await updateNotePage(selectedNote.id, {
+          ...toUpdateNotePageRequest({ ...form, contentMarkdown: chunks[0] }, selectedNote)
+        })
+        : await createNotePage(toCreateNotePageRequest({ ...form, contentMarkdown: chunks[0] }));
+
+      for (let index = 1; index < chunks.length; index++) {
+        await createNotePage({
+          area: form.area,
+          title: `${title} (${index + 1})`,
+          contentMarkdown: chunks[index]
+        });
+      }
+
+      await props.onChanged?.();
+      setSelectedNoteId(firstPage.id);
+      setActiveArea(firstPage.area);
+      await loadNotes(firstPage.id, firstPage.area);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to split note.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <section className="notes-page" aria-labelledby="notes-title">
       <div className="section-heading">
@@ -234,11 +299,16 @@ export function NotesPage(props: NotesPageProps) {
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="title or note text..." />
           </label>
 
+          <div className="notes-sidebar-summary">
+            <strong>{visibleNotes.length}</strong>
+            <span>{formatNoteArea(activeArea)} pages</span>
+          </div>
+
           {isLoading ? (
             <p className="empty-state">Loading notes...</p>
           ) : visibleNotes.length ? (
             <ul className="problem-list">
-              {visibleNotes.map((note) => (
+              {pagedNotes.map((note) => (
                 <li key={note.id}>
                   <button
                     aria-label={note.title}
@@ -257,6 +327,34 @@ export function NotesPage(props: NotesPageProps) {
           ) : (
             <p className="empty-state">No note pages match this search.</p>
           )}
+
+          {visibleNotes.length > notesPageSize ? (
+            <nav className="pagination-bar notes-pagination" aria-label="Notes pagination">
+              <span>
+                Page {normalizedPage} / {totalPages}
+              </span>
+              <div className="pagination-controls">
+                <button
+                  aria-label="Previous notes page"
+                  className="pagination-button"
+                  disabled={normalizedPage <= 1}
+                  type="button"
+                  onClick={() => setPage(Math.max(1, normalizedPage - 1))}
+                >
+                  Prev
+                </button>
+                <button
+                  aria-label="Next notes page"
+                  className="pagination-button"
+                  disabled={normalizedPage >= totalPages}
+                  type="button"
+                  onClick={() => setPage(Math.min(totalPages, normalizedPage + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
+          ) : null}
         </aside>
 
         <form className="panel notes-editor" onSubmit={handleSubmit}>
@@ -291,6 +389,14 @@ export function NotesPage(props: NotesPageProps) {
           <div className="editor-actions">
             <button className="primary-button compact-button" type="submit" disabled={isSaving}>
               {isSaving ? "Saving..." : "Save page"}
+            </button>
+            <button
+              className="secondary-button compact-button"
+              type="button"
+              disabled={isSaving || form.contentMarkdown.length <= noteSplitTargetLength}
+              onClick={handleSplitPage}
+            >
+              Split page
             </button>
             {selectedNote ? (
               <button className="danger-button" type="button" onClick={handleDelete} disabled={isSaving}>
@@ -534,6 +640,87 @@ function toUpdateNotePageRequest(form: NoteForm, note: NotePageRecord): UpdateNo
  */
 function hasDraftChanged(draft: NoteForm, note: NotePageRecord) {
   return draft.area !== note.area || draft.title !== note.title || draft.contentMarkdown !== note.contentMarkdown;
+}
+
+/**
+ * Splits a long note into page-sized markdown chunks.
+ *
+ * @param markdown - The markdown document.
+ * @returns Split markdown chunks.
+ */
+function splitNoteIntoPages(markdown: string) {
+  const normalized = markdown.trim();
+
+  if (normalized.length <= noteSplitTargetLength) {
+    return [normalized];
+  }
+
+  const sections = normalized
+    .split(/\n(?=#{1,2}\s+)/g)
+    .map((section) => section.trim())
+    .filter(Boolean);
+  const sourceSections = sections.length > 1 ? sections : splitByLength(normalized);
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const section of sourceSections) {
+    if (section.length > noteSplitTargetLength) {
+      if (current) {
+        chunks.push(current.trim());
+        current = "";
+      }
+
+      chunks.push(...splitByLength(section));
+      continue;
+    }
+
+    const candidate = current ? `${current}\n\n${section}` : section;
+
+    if (candidate.length > noteSplitTargetLength && current) {
+      chunks.push(current.trim());
+      current = section;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current) {
+    chunks.push(current.trim());
+  }
+
+  return chunks;
+}
+
+/**
+ * Splits text into bounded chunks when markdown headings are not enough.
+ *
+ * @param text - The text to split.
+ * @returns Bounded chunks.
+ */
+function splitByLength(text: string) {
+  const chunks: string[] = [];
+  let remaining = text.trim();
+
+  while (remaining.length > noteSplitTargetLength) {
+    let splitAt = remaining.lastIndexOf("\n\n", noteSplitTargetLength);
+
+    if (splitAt < noteSplitTargetLength * 0.5) {
+      splitAt = remaining.lastIndexOf("\n", noteSplitTargetLength);
+    }
+
+    if (splitAt < noteSplitTargetLength * 0.5) {
+      splitAt = noteSplitTargetLength;
+    }
+
+    chunks.push(remaining.slice(0, splitAt).trim());
+    remaining = remaining.slice(splitAt).trim();
+  }
+
+  if (remaining) {
+    chunks.push(remaining);
+  }
+
+  return chunks;
 }
 
 /**

@@ -684,6 +684,33 @@ textarea {
   gap: 10px;
 }
 
+.notes-pagination {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.notes-sidebar-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #e1e6eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fbfcfe;
+}
+
+.notes-sidebar-summary strong {
+  color: #24313a;
+  font-size: 1.4rem;
+}
+
+.notes-sidebar-summary span {
+  color: #65717b;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
 .record-header {
   padding: 0 0 10px;
   color: #65717b;
@@ -3675,6 +3702,310 @@ textarea {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
+.wiki-practice-inserts {
+  display: grid;
+  gap: 18px;
+  border: 1px solid #c8ccd1;
+  border-left: 4px solid #36c;
+  margin-top: 34px;
+  padding: 18px;
+  background:
+    linear-gradient(180deg, rgba(51, 102, 204, 0.06), rgba(255, 255, 255, 0) 120px),
+    #ffffff;
+}
+
+.wiki-practice-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #eaecf0;
+  padding-bottom: 16px;
+}
+
+.wiki-practice-header h2 {
+  border-bottom: 0;
+  margin: 0;
+  color: #202122;
+  font-size: 1.55rem;
+}
+
+.wiki-practice-header p {
+  max-width: 680px;
+  margin: 6px 0 0;
+  color: #54595d;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.wiki-practice-kicker,
+.wiki-check-section-heading span {
+  color: #36c;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.wiki-practice-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.wiki-practice-stats span {
+  display: grid;
+  min-width: 86px;
+  border: 1px solid #c8ccd1;
+  padding: 8px 10px;
+  background: #f8f9fa;
+}
+
+.wiki-practice-stats strong {
+  color: #202122;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+}
+
+.wiki-practice-stats small {
+  color: #54595d;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.wiki-check-section {
+  display: grid;
+  gap: 10px;
+}
+
+.wiki-check-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wiki-check-section-heading strong {
+  color: #54595d;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.wiki-quiz-stack,
+.wiki-flashcard-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.wiki-quiz-card,
+.wiki-mini-flashcard {
+  break-inside: avoid;
+  border: 1px solid #c8ccd1;
+  background: #f8f9fa;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+}
+
+.wiki-quiz-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.wiki-quiz-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wiki-quiz-card-heading > span,
+.wiki-quiz-card-heading small,
+.wiki-mini-flashcard > span,
+.wiki-mini-flashcard small {
+  display: block;
+  color: #54595d;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.wiki-quiz-card-heading small {
+  border: 1px solid #c8ccd1;
+  padding: 4px 8px;
+  background: #ffffff;
+}
+
+.wiki-quiz-card-heading small.correct {
+  border-color: #2f8f5b;
+  color: #1c7a5a;
+  background: #edf8f2;
+}
+
+.wiki-quiz-card-heading small.incorrect {
+  border-color: #d17772;
+  color: #9a3412;
+  background: #fff1f1;
+}
+
+.wiki-quiz-card h3 {
+  border-bottom: 0;
+  margin: 0;
+  color: #202122;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.wiki-quiz-options {
+  display: grid;
+  gap: 8px;
+}
+
+.wiki-quiz-options button,
+.wiki-mini-flashcard {
+  width: 100%;
+  border-radius: 0;
+  text-align: left;
+  color: #202122;
+}
+
+.wiki-quiz-options button {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #c8ccd1;
+  padding: 10px 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.wiki-quiz-options button:hover {
+  border-color: #36c;
+  background: #f6f8ff;
+  box-shadow: 0 0 0 3px rgba(51, 102, 204, 0.1);
+}
+
+.wiki-quiz-options button strong {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c8ccd1;
+  color: #36c;
+  background: #f8f9fa;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+}
+
+.wiki-quiz-options button span {
+  align-self: center;
+  line-height: 1.45;
+}
+
+.wiki-quiz-options button.selected {
+  border-color: #36c;
+  background: #f1f5ff;
+}
+
+.wiki-quiz-options button.correct {
+  border-color: #2f8f5b;
+  background: #edf8f2;
+}
+
+.wiki-quiz-options button.correct strong {
+  border-color: #2f8f5b;
+  color: #ffffff;
+  background: #2f8f5b;
+}
+
+.wiki-quiz-options button.incorrect {
+  border-color: #d17772;
+  background: #fff1f1;
+}
+
+.wiki-quiz-options button.incorrect strong {
+  border-color: #b94a48;
+  color: #ffffff;
+  background: #b94a48;
+}
+
+.wiki-quiz-feedback {
+  display: grid;
+  gap: 4px;
+  border: 1px solid;
+  margin: 0;
+  padding: 10px 12px;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.92rem;
+}
+
+.wiki-quiz-feedback strong {
+  font-size: 0.9rem;
+}
+
+.wiki-quiz-feedback p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.wiki-quiz-feedback.correct {
+  border-color: #8fc8a8;
+  color: #1c7a5a;
+  background: #f3fbf6;
+}
+
+.wiki-quiz-feedback.incorrect {
+  border-color: #efb1a7;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.wiki-flashcard-stack {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.wiki-mini-flashcard {
+  display: grid;
+  gap: 10px;
+  min-height: 108px;
+  padding: 14px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.wiki-mini-flashcard:hover {
+  border-color: #36c;
+  background: #f6f8ff;
+  box-shadow: 0 0 0 3px rgba(51, 102, 204, 0.1);
+}
+
+.wiki-mini-flashcard strong {
+  color: #202122;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.02rem;
+  line-height: 1.45;
+}
+
+.wiki-mini-flashcard small {
+  align-self: end;
+  color: #72777d;
+  font-size: 0.72rem;
+}
+
+.wiki-mini-flashcard.revealed {
+  background: #eef6ff;
+}
+
 .official-wiki-content ul,
 .official-wiki-content ol {
   margin: 8px 0 16px;
@@ -3924,6 +4255,48 @@ textarea {
   background: #f8f9fa;
 }
 
+.wiki-practice-editor {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #a2a9b1;
+  padding: 14px;
+  background: #f8f9fa;
+}
+
+.wiki-practice-editor header {
+  border-bottom: 1px solid #c8ccd1;
+  padding-bottom: 8px;
+}
+
+.wiki-practice-editor header span {
+  color: #54595d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.wiki-practice-editor h2 {
+  margin: 2px 0 0;
+  color: #000000;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+}
+
+.wiki-practice-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.wiki-insert-json-textarea {
+  min-height: 230px;
+  resize: vertical;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
 .wiki-image-action {
   min-height: 38px;
 }
@@ -4060,6 +4433,7 @@ textarea {
 [data-theme="dark"] .wiki-search-strip,
 [data-theme="dark"] .wiki-edit-metadata,
 [data-theme="dark"] .wiki-markdown-toolbar,
+[data-theme="dark"] .wiki-practice-editor,
 [data-theme="dark"] .wiki-editor-preview,
 [data-theme="dark"] .wiki-import-reference {
   border-color: #2f3b45;
@@ -4088,6 +4462,11 @@ textarea {
 [data-theme="dark"] .wiki-article-titlebar,
 [data-theme="dark"] .wiki-infobox > strong,
 [data-theme="dark"] .wiki-infobox div,
+[data-theme="dark"] .wiki-practice-inserts,
+[data-theme="dark"] .wiki-practice-header,
+[data-theme="dark"] .wiki-practice-editor header,
+[data-theme="dark"] .wiki-quiz-card,
+[data-theme="dark"] .wiki-mini-flashcard,
 [data-theme="dark"] .wiki-search-results li,
 [data-theme="dark"] .wiki-preview-heading,
 [data-theme="dark"] .official-wiki-content h2,
@@ -4109,6 +4488,38 @@ textarea {
 
 [data-theme="dark"] .wiki-preview-heading strong {
   color: #f3f7fb;
+}
+
+[data-theme="dark"] .notes-sidebar-summary {
+  border-color: #2f3b45;
+  background: #121a22;
+}
+
+[data-theme="dark"] .notes-sidebar-summary strong,
+[data-theme="dark"] .wiki-practice-editor h2,
+[data-theme="dark"] .wiki-practice-header h2,
+[data-theme="dark"] .wiki-quiz-card h3,
+[data-theme="dark"] .wiki-mini-flashcard,
+[data-theme="dark"] .wiki-quiz-options button {
+  color: #f3f7fb;
+}
+
+[data-theme="dark"] .notes-sidebar-summary span,
+[data-theme="dark"] .wiki-practice-editor header span,
+[data-theme="dark"] .wiki-practice-header p,
+[data-theme="dark"] .wiki-practice-stats small,
+[data-theme="dark"] .wiki-check-section-heading strong,
+[data-theme="dark"] .wiki-quiz-card-heading > span,
+[data-theme="dark"] .wiki-quiz-card-heading small,
+[data-theme="dark"] .wiki-mini-flashcard > span,
+[data-theme="dark"] .wiki-mini-flashcard small {
+  color: #9ba8b4;
+}
+
+[data-theme="dark"] .wiki-practice-kicker,
+[data-theme="dark"] .wiki-check-section-heading span,
+[data-theme="dark"] .wiki-quiz-options button strong {
+  color: #8fc3ff;
 }
 
 [data-theme="dark"] .wiki-page-tabs button.active,
@@ -4148,6 +4559,90 @@ textarea {
   background: #111820;
 }
 
+[data-theme="dark"] .wiki-quiz-card,
+[data-theme="dark"] .wiki-mini-flashcard,
+[data-theme="dark"] .wiki-quiz-options button {
+  border-color: #334451;
+  background: #111820;
+}
+
+[data-theme="dark"] .wiki-practice-inserts {
+  border-left-color: #8fc3ff;
+  background:
+    linear-gradient(180deg, rgba(143, 195, 255, 0.1), rgba(15, 21, 27, 0) 130px),
+    #0f151b;
+}
+
+[data-theme="dark"] .wiki-practice-stats span,
+[data-theme="dark"] .wiki-quiz-card-heading small,
+[data-theme="dark"] .wiki-quiz-options button strong {
+  border-color: #334451;
+  background: #162331;
+}
+
+[data-theme="dark"] .wiki-practice-stats strong,
+[data-theme="dark"] .wiki-mini-flashcard strong {
+  color: #f3f7fb;
+}
+
+[data-theme="dark"] .wiki-quiz-options button:hover,
+[data-theme="dark"] .wiki-mini-flashcard:hover,
+[data-theme="dark"] .wiki-quiz-options button.selected {
+  border-color: #8fc3ff;
+  background: #13263a;
+  box-shadow: 0 0 0 3px rgba(143, 195, 255, 0.12);
+}
+
+[data-theme="dark"] .wiki-quiz-card-heading small.correct {
+  border-color: #3ea96e;
+  color: #a7f3cf;
+  background: #0d2a20;
+}
+
+[data-theme="dark"] .wiki-quiz-card-heading small.incorrect {
+  border-color: #b94a48;
+  color: #ffd6d1;
+  background: #311519;
+}
+
+[data-theme="dark"] .wiki-quiz-options button.correct {
+  border-color: #3ea96e;
+  background: #0d2a20;
+}
+
+[data-theme="dark"] .wiki-quiz-options button.correct strong {
+  border-color: #3ea96e;
+  color: #07120d;
+  background: #a7f3cf;
+}
+
+[data-theme="dark"] .wiki-quiz-options button.incorrect {
+  border-color: #b94a48;
+  background: #311519;
+}
+
+[data-theme="dark"] .wiki-quiz-options button.incorrect strong {
+  border-color: #b94a48;
+  color: #170506;
+  background: #ffd6d1;
+}
+
+[data-theme="dark"] .wiki-quiz-feedback.correct {
+  border-color: #286144;
+  color: #a7f3cf;
+  background: #0d2a20;
+}
+
+[data-theme="dark"] .wiki-quiz-feedback.incorrect {
+  border-color: #7f3d38;
+  color: #ffd6d1;
+  background: #311519;
+}
+
+[data-theme="dark"] .wiki-mini-flashcard.revealed {
+  background: #12304c;
+}
+
 [data-theme="dark"] .wiki-table-wrap th,
 [data-theme="dark"] .wiki-table-wrap td {
   border-color: #334451;
@@ -4167,6 +4662,7 @@ textarea {
   .wiki-reading-layout,
   .wiki-article-body-grid,
   .wiki-editor-workspace,
+  .wiki-practice-editor-grid,
   .wiki-import-layout {
     grid-template-columns: 1fr;
   }
@@ -4191,6 +4687,15 @@ textarea {
   .wiki-search-strip,
   .wiki-edit-metadata {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .wiki-practice-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wiki-practice-stats {
+    justify-content: flex-start;
   }
 }
 
@@ -4223,6 +4728,29 @@ textarea {
 
   .wiki-search-strip,
   .wiki-edit-metadata {
+    grid-template-columns: 1fr;
+  }
+
+  .wiki-practice-inserts {
+    padding: 14px;
+  }
+
+  .wiki-practice-stats {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .wiki-quiz-options button {
+    grid-template-columns: 30px 1fr;
+    padding: 10px;
+  }
+
+  .wiki-quiz-options button strong {
+    width: 26px;
+    height: 26px;
+  }
+
+  .wiki-flashcard-stack {
     grid-template-columns: 1fr;
   }
 }

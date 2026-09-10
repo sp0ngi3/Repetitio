@@ -26,6 +26,16 @@ public sealed class WikiPage
     public ICollection<WikiPage> Children { get; } = [];
 
     /// <summary>
+    /// Gets the lightweight quiz questions attached to the page.
+    /// </summary>
+    public ICollection<WikiQuizQuestion> QuizQuestions { get; } = [];
+
+    /// <summary>
+    /// Gets the lightweight flashcards attached to the page.
+    /// </summary>
+    public ICollection<WikiFlashcard> Flashcards { get; } = [];
+
+    /// <summary>
     /// Gets or sets the page title.
     /// </summary>
     public string Title { get; set; } = string.Empty;

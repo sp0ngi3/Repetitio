@@ -1115,6 +1115,54 @@ export interface WikiPage {
   createdAt: string;
   /** Last update date and time. */
   updatedAt: string;
+  /** Lightweight quiz questions attached to the page. */
+  quizQuestions: WikiQuizQuestion[];
+  /** Lightweight flashcards attached to the page. */
+  flashcards: WikiFlashcard[];
+}
+
+/**
+ * Represents one lightweight wiki quiz question.
+ */
+export interface WikiQuizQuestion {
+  /** Unique quiz question identifier. */
+  id: string;
+  /** Quiz prompt. */
+  prompt: string;
+  /** Optional explanation shown after answering. */
+  explanation?: string | null;
+  /** Manual display order inside the page. */
+  sortOrder: number;
+  /** Answer options. */
+  options: WikiQuizOption[];
+}
+
+/**
+ * Represents one lightweight wiki quiz option.
+ */
+export interface WikiQuizOption {
+  /** Unique answer option identifier. */
+  id: string;
+  /** Answer option text. */
+  text: string;
+  /** Whether this option is correct. */
+  isCorrect: boolean;
+  /** Manual display order inside the question. */
+  sortOrder: number;
+}
+
+/**
+ * Represents one lightweight wiki flashcard.
+ */
+export interface WikiFlashcard {
+  /** Unique flashcard identifier. */
+  id: string;
+  /** Front side. */
+  front: string;
+  /** Back side. */
+  back: string;
+  /** Manual display order inside the page. */
+  sortOrder: number;
 }
 
 /**
@@ -1173,6 +1221,10 @@ export interface CreateWikiPageRequest {
   summary?: string;
   /** Editable markdown content. */
   contentMarkdown?: string;
+  /** Lightweight quiz questions attached to the page. */
+  quizQuestions?: WikiQuizQuestionRequest[];
+  /** Lightweight flashcards attached to the page. */
+  flashcards?: WikiFlashcardRequest[];
 }
 
 /**
@@ -1197,8 +1249,44 @@ export interface ImportWikiPageNodeRequest {
   summary?: string;
   /** Editable markdown content. */
   contentMarkdown?: string;
+  /** Lightweight quiz questions attached to the page. */
+  quizQuestions?: WikiQuizQuestionRequest[];
+  /** Lightweight flashcards attached to the page. */
+  flashcards?: WikiFlashcardRequest[];
   /** Nested child pages. */
   children?: ImportWikiPageNodeRequest[];
+}
+
+/**
+ * Represents one lightweight wiki quiz question request.
+ */
+export interface WikiQuizQuestionRequest {
+  /** Quiz prompt. */
+  prompt: string;
+  /** Optional explanation shown after answering. */
+  explanation?: string;
+  /** Answer options. */
+  options: WikiQuizOptionRequest[];
+}
+
+/**
+ * Represents one lightweight wiki quiz answer option request.
+ */
+export interface WikiQuizOptionRequest {
+  /** Answer option text. */
+  text: string;
+  /** Whether this option is correct. */
+  isCorrect: boolean;
+}
+
+/**
+ * Represents one lightweight wiki flashcard request.
+ */
+export interface WikiFlashcardRequest {
+  /** Front side. */
+  front: string;
+  /** Back side. */
+  back: string;
 }
 
 /**

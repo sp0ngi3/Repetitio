@@ -175,6 +175,11 @@ const dsaBatchImportSample = JSON.stringify(
 );
 
 /**
+ * Number of DSA problems shown on one dashboard page.
+ */
+const dsaDashboardPageSize = 10;
+
+/**
  * Props accepted by the DSA page.
  */
 interface DsaPageProps {
@@ -615,10 +620,19 @@ interface DsaDashboardProps {
  * @returns The DSA dashboard.
  */
 function DsaDashboard(props: DsaDashboardProps) {
+  const [page, setPage] = useState(1);
   const sortedProblems = useMemo(
     () => sortByLastPracticed(props.problems, props.filters.lastPracticedSort),
     [props.filters.lastPracticedSort, props.problems]
   );
+  const totalPages = Math.max(1, Math.ceil(sortedProblems.length / dsaDashboardPageSize));
+  const normalizedPage = Math.min(page, totalPages);
+  const startIndex = (normalizedPage - 1) * dsaDashboardPageSize;
+  const visibleProblems = sortedProblems.slice(startIndex, startIndex + dsaDashboardPageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [props.filters.difficulty, props.filters.lastPracticedSort, props.filters.search, props.filters.status]);
 
   return (
     <>
@@ -700,38 +714,48 @@ function DsaDashboard(props: DsaDashboardProps) {
         {props.isLoading ? (
           <p className="empty-state">Loading DSA problems...</p>
         ) : props.problems.length ? (
-          <div className="record-table dsa-table">
-            <div className="record-header">
-              <span>Problem</span>
-              <span>Tags</span>
-              <span>Last practiced</span>
-              <span>Next review</span>
-              <span>Status</span>
-              <span>Solved</span>
-            </div>
-            {sortedProblems.map((problem) => {
-              const lastPracticedClass = getPracticeAgeClass(problem.lastPracticedAt);
-              const nextReviewClass = getReviewDueClass(problem.nextReviewAt, problem.lastPracticedAt);
+          <>
+            <div className="record-table dsa-table">
+              <div className="record-header">
+                <span>Problem</span>
+                <span>Tags</span>
+                <span>Last practiced</span>
+                <span>Next review</span>
+                <span>Status</span>
+                <span>Solved</span>
+              </div>
+              {visibleProblems.map((problem) => {
+                const lastPracticedClass = getPracticeAgeClass(problem.lastPracticedAt);
+                const nextReviewClass = getReviewDueClass(problem.nextReviewAt, problem.lastPracticedAt);
 
-              return (
-                <button className="record-row" type="button" key={problem.id} onClick={() => props.onOpen(problem)}>
-                  <span>
-                    <strong>{problem.title}</strong>
-                    <small>
-                      {problem.source || "Personal"} · {problem.difficulty}
-                    </small>
-                  </span>
-                  <span className="tag-row compact">
-                    {problem.tags.length ? problem.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
-                  </span>
-                  <span className={`date-chip ${lastPracticedClass}`}>{formatLastPracticed(problem.lastPracticedAt)}</span>
-                  <span className={`date-chip ${nextReviewClass}`}>{formatNextReview(problem)}</span>
-                  <span>{formatStatus(problem.status)}</span>
-                  <span>{problem.successfulAttempts}/{Math.max(problem.totalAttempts, problem.successfulAttempts)}</span>
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <button className="record-row" type="button" key={problem.id} onClick={() => props.onOpen(problem)}>
+                    <span>
+                      <strong>{problem.title}</strong>
+                      <small>
+                        {problem.source || "Personal"} · {problem.difficulty}
+                      </small>
+                    </span>
+                    <span className="tag-row compact">
+                      {problem.tags.length ? problem.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>No tags</span>}
+                    </span>
+                    <span className={`date-chip ${lastPracticedClass}`}>{formatLastPracticed(problem.lastPracticedAt)}</span>
+                    <span className={`date-chip ${nextReviewClass}`}>{formatNextReview(problem)}</span>
+                    <span>{formatStatus(problem.status)}</span>
+                    <span>{problem.successfulAttempts}/{Math.max(problem.totalAttempts, problem.successfulAttempts)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <PaginationBar
+              label="DSA pagination"
+              page={normalizedPage}
+              pageSize={dsaDashboardPageSize}
+              totalCount={sortedProblems.length}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </>
         ) : (
           <p className="empty-state">No DSA problems yet.</p>
         )}
@@ -826,6 +850,47 @@ function DsaBatchImportPage(props: DsaBatchImportPageProps) {
         </form>
       </main>
     </>
+  );
+}
+
+function PaginationBar(props: {
+  label: string;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  const start = props.totalCount === 0 ? 0 : (props.page - 1) * props.pageSize + 1;
+  const end = Math.min(props.totalCount, props.page * props.pageSize);
+
+  return (
+    <nav className="pagination-bar" aria-label={props.label}>
+      <span>
+        Showing {start}-{end} of {props.totalCount}
+      </span>
+      <div className="pagination-controls">
+        <button
+          aria-label="Previous page"
+          className="pagination-button"
+          disabled={props.page <= 1}
+          type="button"
+          onClick={() => props.onPageChange(Math.max(1, props.page - 1))}
+        >
+          Prev
+        </button>
+        <span>Page {props.page} / {props.totalPages}</span>
+        <button
+          aria-label="Next page"
+          className="pagination-button"
+          disabled={props.page >= props.totalPages}
+          type="button"
+          onClick={() => props.onPageChange(Math.min(props.totalPages, props.page + 1))}
+        >
+          Next
+        </button>
+      </div>
+    </nav>
   );
 }
 

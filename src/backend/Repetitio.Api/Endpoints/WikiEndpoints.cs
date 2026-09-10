@@ -146,7 +146,9 @@ public static class WikiEndpoints
     /// <returns>The wiki page response when found.</returns>
     private static async Task<IResult> GetWikiPageAsync(RepetitioDbContext dbContext, Guid id)
     {
-        var wikiPage = await dbContext.WikiPages.AsNoTracking().FirstOrDefaultAsync(page => page.Id == id);
+        var wikiPage = await WikiPageDetailsQuery(dbContext)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(page => page.Id == id);
 
         if (wikiPage is null)
         {
@@ -250,6 +252,13 @@ public static class WikiEndpoints
             return Results.BadRequest("Title is required.");
         }
 
+        var practiceInsertError = ValidateWikiPracticeInserts(request.QuizQuestions, request.Flashcards);
+
+        if (practiceInsertError is not null)
+        {
+            return Results.BadRequest(practiceInsertError);
+        }
+
         var parent = request.ParentId is null
             ? null
             : await dbContext.WikiPages.FirstOrDefaultAsync(page => page.Id == request.ParentId);
@@ -276,6 +285,7 @@ public static class WikiEndpoints
             UpdatedAt = now
         };
 
+        ApplyWikiPracticeInserts(wikiPage, request.QuizQuestions, request.Flashcards, now);
         dbContext.WikiPages.Add(wikiPage);
         await dbContext.SaveChangesAsync();
 
@@ -362,6 +372,13 @@ public static class WikiEndpoints
             return Results.BadRequest("Title is required.");
         }
 
+        var practiceInsertError = ValidateWikiPracticeInserts(request.QuizQuestions, request.Flashcards);
+
+        if (practiceInsertError is not null)
+        {
+            return Results.BadRequest(practiceInsertError);
+        }
+
         var wikiPage = await dbContext.WikiPages.FirstOrDefaultAsync(page => page.Id == id);
 
         if (wikiPage is null)
@@ -395,6 +412,8 @@ public static class WikiEndpoints
         var newDepth = parent is null ? 0 : parent.Depth + 1;
         var now = DateTime.UtcNow;
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
         wikiPage.ParentId = request.ParentId;
         wikiPage.Title = request.Title.Trim();
         wikiPage.Slug = slug;
@@ -405,6 +424,7 @@ public static class WikiEndpoints
         wikiPage.ContentMarkdown = TrimContent(request.ContentMarkdown);
         wikiPage.IsArchived = request.IsArchived;
         wikiPage.UpdatedAt = now;
+        await ReplaceWikiPracticeInsertsAsync(dbContext, wikiPage, request.QuizQuestions, request.Flashcards, now);
 
         if (!string.Equals(oldPath, newPath, StringComparison.Ordinal) || oldDepth != newDepth)
         {
@@ -412,6 +432,7 @@ public static class WikiEndpoints
         }
 
         await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         var childCount = await dbContext.WikiPages.CountAsync(page => page.ParentId == id);
         return Results.Ok(ToResponse(wikiPage, childCount));
@@ -558,6 +579,7 @@ public static class WikiEndpoints
             };
 
             dbContext.WikiPages.Add(page);
+            ApplyWikiPracticeInserts(page, node.QuizQuestions, node.Flashcards, createdAt);
             createdPages.Add(page);
 
             if (collectAsRoot)
@@ -788,6 +810,19 @@ public static class WikiEndpoints
     }
 
     /// <summary>
+    /// Creates the wiki page query with lightweight practice inserts.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <returns>The wiki page details query.</returns>
+    private static IQueryable<WikiPage> WikiPageDetailsQuery(RepetitioDbContext dbContext)
+    {
+        return dbContext.WikiPages
+            .Include(page => page.QuizQuestions)
+            .ThenInclude(question => question.Options)
+            .Include(page => page.Flashcards);
+    }
+
+    /// <summary>
     /// Gets the next display order value for a sibling group.
     /// </summary>
     /// <param name="dbContext">The database context.</param>
@@ -871,7 +906,57 @@ public static class WikiEndpoints
             IsArchived = wikiPage.IsArchived,
             ChildCount = childCount,
             CreatedAt = wikiPage.CreatedAt,
-            UpdatedAt = wikiPage.UpdatedAt
+            UpdatedAt = wikiPage.UpdatedAt,
+            QuizQuestions = wikiPage.QuizQuestions
+                .OrderBy(question => question.SortOrder)
+                .Select(ToQuizQuestionResponse)
+                .ToArray(),
+            Flashcards = wikiPage.Flashcards
+                .OrderBy(flashcard => flashcard.SortOrder)
+                .Select(ToFlashcardResponse)
+                .ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Converts a wiki quiz question into an API response.
+    /// </summary>
+    /// <param name="question">The quiz question.</param>
+    /// <returns>The quiz question response.</returns>
+    private static WikiQuizQuestionResponse ToQuizQuestionResponse(WikiQuizQuestion question)
+    {
+        return new WikiQuizQuestionResponse
+        {
+            Id = question.Id,
+            Prompt = question.Prompt,
+            Explanation = question.Explanation,
+            SortOrder = question.SortOrder,
+            Options = question.Options
+                .OrderBy(option => option.SortOrder)
+                .Select(option => new WikiQuizOptionResponse
+                {
+                    Id = option.Id,
+                    Text = option.Text,
+                    IsCorrect = option.IsCorrect,
+                    SortOrder = option.SortOrder
+                })
+                .ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Converts a wiki flashcard into an API response.
+    /// </summary>
+    /// <param name="flashcard">The wiki flashcard.</param>
+    /// <returns>The wiki flashcard response.</returns>
+    private static WikiFlashcardResponse ToFlashcardResponse(WikiFlashcard flashcard)
+    {
+        return new WikiFlashcardResponse
+        {
+            Id = flashcard.Id,
+            Front = flashcard.Front,
+            Back = flashcard.Back,
+            SortOrder = flashcard.SortOrder
         };
     }
 
@@ -1064,6 +1149,175 @@ public static class WikiEndpoints
     }
 
     /// <summary>
+    /// Replaces lightweight quiz questions and flashcards for an existing wiki page.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="wikiPage">The wiki page being updated.</param>
+    /// <param name="quizQuestions">The requested quiz questions.</param>
+    /// <param name="flashcards">The requested lightweight flashcards.</param>
+    /// <param name="timestamp">The update timestamp.</param>
+    private static async Task ReplaceWikiPracticeInsertsAsync(
+        RepetitioDbContext dbContext,
+        WikiPage wikiPage,
+        IReadOnlyCollection<WikiQuizQuestionRequest>? quizQuestions,
+        IReadOnlyCollection<WikiFlashcardRequest>? flashcards,
+        DateTime timestamp)
+    {
+        var existingQuestionIds = await dbContext.WikiQuizQuestions
+            .Where(question => question.WikiPageId == wikiPage.Id)
+            .Select(question => question.Id)
+            .ToArrayAsync();
+
+        if (existingQuestionIds.Length > 0)
+        {
+            await dbContext.WikiQuizOptions
+                .Where(option => existingQuestionIds.Contains(option.WikiQuizQuestionId))
+                .ExecuteDeleteAsync();
+
+            await dbContext.WikiQuizQuestions
+                .Where(question => question.WikiPageId == wikiPage.Id)
+                .ExecuteDeleteAsync();
+        }
+
+        await dbContext.WikiFlashcards
+            .Where(flashcard => flashcard.WikiPageId == wikiPage.Id)
+            .ExecuteDeleteAsync();
+
+        wikiPage.QuizQuestions.Clear();
+        wikiPage.Flashcards.Clear();
+        ApplyWikiPracticeInserts(wikiPage, quizQuestions, flashcards, timestamp);
+        dbContext.WikiQuizQuestions.AddRange(wikiPage.QuizQuestions);
+        dbContext.WikiFlashcards.AddRange(wikiPage.Flashcards);
+    }
+
+    /// <summary>
+    /// Adds lightweight quiz questions and flashcards to a wiki page.
+    /// </summary>
+    /// <param name="wikiPage">The wiki page receiving inserts.</param>
+    /// <param name="quizQuestions">The requested quiz questions.</param>
+    /// <param name="flashcards">The requested lightweight flashcards.</param>
+    /// <param name="timestamp">The creation timestamp.</param>
+    private static void ApplyWikiPracticeInserts(
+        WikiPage wikiPage,
+        IReadOnlyCollection<WikiQuizQuestionRequest>? quizQuestions,
+        IReadOnlyCollection<WikiFlashcardRequest>? flashcards,
+        DateTime timestamp)
+    {
+        var questionOrder = 0;
+
+        foreach (var questionRequest in quizQuestions ?? [])
+        {
+            var question = new WikiQuizQuestion
+            {
+                Id = Guid.NewGuid(),
+                WikiPageId = wikiPage.Id,
+                Prompt = questionRequest.Prompt.Trim(),
+                Explanation = TrimOptional(questionRequest.Explanation),
+                SortOrder = questionOrder++,
+                CreatedAt = timestamp,
+                UpdatedAt = timestamp
+            };
+            var optionOrder = 0;
+
+            foreach (var optionRequest in questionRequest.Options)
+            {
+                question.Options.Add(new WikiQuizOption
+                {
+                    Id = Guid.NewGuid(),
+                    WikiQuizQuestionId = question.Id,
+                    Text = optionRequest.Text.Trim(),
+                    IsCorrect = optionRequest.IsCorrect,
+                    SortOrder = optionOrder++
+                });
+            }
+
+            wikiPage.QuizQuestions.Add(question);
+        }
+
+        var flashcardOrder = 0;
+
+        foreach (var flashcardRequest in flashcards ?? [])
+        {
+            wikiPage.Flashcards.Add(new WikiFlashcard
+            {
+                Id = Guid.NewGuid(),
+                WikiPageId = wikiPage.Id,
+                Front = flashcardRequest.Front.Trim(),
+                Back = flashcardRequest.Back.Trim(),
+                SortOrder = flashcardOrder++,
+                CreatedAt = timestamp,
+                UpdatedAt = timestamp
+            });
+        }
+    }
+
+    /// <summary>
+    /// Validates lightweight wiki quiz and flashcard inserts.
+    /// </summary>
+    /// <param name="quizQuestions">The requested quiz questions.</param>
+    /// <param name="flashcards">The requested lightweight flashcards.</param>
+    /// <param name="path">The validation path.</param>
+    /// <returns>A validation message when invalid; otherwise, null.</returns>
+    private static string? ValidateWikiPracticeInserts(
+        IReadOnlyCollection<WikiQuizQuestionRequest>? quizQuestions,
+        IReadOnlyCollection<WikiFlashcardRequest>? flashcards,
+        string path = "page")
+    {
+        var questionIndex = 0;
+
+        foreach (var question in quizQuestions ?? [])
+        {
+            if (!EndpointValidation.HasText(question.Prompt))
+            {
+                return $"{path}.quizQuestions[{questionIndex}].prompt is required.";
+            }
+
+            if (question.Options.Count is < 2 or > 8)
+            {
+                return $"{path}.quizQuestions[{questionIndex}].options must contain 2 to 8 answers.";
+            }
+
+            if (!question.Options.Any(option => option.IsCorrect))
+            {
+                return $"{path}.quizQuestions[{questionIndex}] must contain at least one correct answer.";
+            }
+
+            var optionIndex = 0;
+
+            foreach (var option in question.Options)
+            {
+                if (!EndpointValidation.HasText(option.Text))
+                {
+                    return $"{path}.quizQuestions[{questionIndex}].options[{optionIndex}].text is required.";
+                }
+
+                optionIndex++;
+            }
+
+            questionIndex++;
+        }
+
+        var flashcardIndex = 0;
+
+        foreach (var flashcard in flashcards ?? [])
+        {
+            if (!EndpointValidation.HasText(flashcard.Front))
+            {
+                return $"{path}.flashcards[{flashcardIndex}].front is required.";
+            }
+
+            if (!EndpointValidation.HasText(flashcard.Back))
+            {
+                return $"{path}.flashcards[{flashcardIndex}].back is required.";
+            }
+
+            flashcardIndex++;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Counts import nodes recursively.
     /// </summary>
     /// <param name="nodes">The import nodes.</param>
@@ -1095,6 +1349,13 @@ public static class WikiEndpoints
             if (!EndpointValidation.HasText(node.Title))
             {
                 return $"{path}[{index}].title is required.";
+            }
+
+            var insertError = ValidateWikiPracticeInserts(node.QuizQuestions, node.Flashcards, $"{path}[{index}]");
+
+            if (insertError is not null)
+            {
+                return insertError;
             }
 
             var childError = ValidateImportNodes(node.Children ?? [], $"{path}[{index}].children");

@@ -237,7 +237,27 @@ const wikiPages: WikiPageRecord[] = [
     isArchived: false,
     childCount: 0,
     createdAt: "2026-09-08T12:00:00Z",
-    updatedAt: "2026-09-08T12:00:00Z"
+    updatedAt: "2026-09-08T12:00:00Z",
+    quizQuestions: [
+      {
+        id: "wiki-quiz-1",
+        prompt: "What is an algorithm?",
+        explanation: "It is a finite, well-defined procedure.",
+        sortOrder: 0,
+        options: [
+          { id: "wiki-option-1", text: "A finite procedure.", isCorrect: true, sortOrder: 0 },
+          { id: "wiki-option-2", text: "Only a database table.", isCorrect: false, sortOrder: 1 }
+        ]
+      }
+    ],
+    flashcards: [
+      {
+        id: "wiki-flashcard-1",
+        front: "Algorithm",
+        back: "Finite procedure for solving a class of problems.",
+        sortOrder: 0
+      }
+    ]
   }
 ];
 
@@ -948,6 +968,64 @@ describe("App", () => {
   });
 
   /**
+   * Verifies that wiki quiz and flashcard JSON inserts are saved with the page.
+   */
+  it("saves wiki quiz and flashcard inserts from JSON", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Wiki" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit source" }));
+    fireEvent.change(await screen.findByLabelText("Quiz JSON"), {
+      target: {
+        value: JSON.stringify([
+          {
+            prompt: "Pick the invariant.",
+            options: [
+              { text: "The answer stays inside the search interval.", isCorrect: true },
+              { text: "The array mutates every iteration.", isCorrect: false }
+            ],
+            explanation: "Binary search keeps narrowing a valid interval."
+          }
+        ])
+      }
+    });
+    fireEvent.change(screen.getByLabelText("Flashcards JSON"), {
+      target: {
+        value: JSON.stringify([
+          {
+            front: "Binary search invariant",
+            back: "The target boundary remains in the active range."
+          }
+        ])
+      }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save article" }));
+
+    await waitFor(() => {
+      expect(updateWikiPage).toHaveBeenCalledWith(
+        "wiki-1",
+        expect.objectContaining({
+          quizQuestions: [
+            expect.objectContaining({
+              prompt: "Pick the invariant.",
+              options: [
+                { text: "The answer stays inside the search interval.", isCorrect: true },
+                { text: "The array mutates every iteration.", isCorrect: false }
+              ]
+            })
+          ],
+          flashcards: [
+            {
+              front: "Binary search invariant",
+              back: "The target boundary remains in the active range."
+            }
+          ]
+        })
+      );
+    });
+  });
+
+  /**
    * Verifies that System Design has its own dashboard.
    */
   it("renders the dedicated System Design dashboard", async () => {
@@ -1035,6 +1113,30 @@ describe("App", () => {
     expect(screen.getByRole("combobox", { name: "Last practiced" })).toHaveValue("never-first");
     expect(screen.getByText("Due now")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add problem" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that the DSA dashboard paginates long problem lists.
+   */
+  it("paginates DSA dashboard problems", async () => {
+    vi.mocked(getDsaProblems).mockResolvedValueOnce(
+      Array.from({ length: 12 }, (_, index) => ({
+        ...dsaProblems[0],
+        id: `dsa-generated-${index + 1}`,
+        title: `Generated DSA ${index + 1}`,
+        practiceSessions: []
+      }))
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "DSA" }));
+
+    expect(await screen.findByText("Showing 1-10 of 12")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Generated DSA 11/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+
+    expect(screen.getByRole("button", { name: /Generated DSA 11/i })).toBeInTheDocument();
   });
 
   /**
@@ -1274,6 +1376,27 @@ describe("App", () => {
       title: "Two pointers",
       contentMarkdown: "Fast and slow pointer reminders."
     });
+  });
+
+  /**
+   * Verifies that a long note can be split into smaller note pages.
+   */
+  it("splits a long note into multiple pages", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Notes" }));
+
+    const longNote = `## Part one\n\n${"A".repeat(13000)}\n\n## Part two\n\n${"B".repeat(1000)}`;
+    fireEvent.change(await screen.findByLabelText("Page"), { target: { value: longNote } });
+    fireEvent.click(screen.getByRole("button", { name: "Split page" }));
+
+    await waitFor(() => expect(createNotePage).toHaveBeenCalled());
+    expect(updateNotePage).toHaveBeenCalledWith(
+      "note-dsa",
+      expect.objectContaining({
+        contentMarkdown: expect.stringContaining("Part one")
+      })
+    );
   });
 
   /**

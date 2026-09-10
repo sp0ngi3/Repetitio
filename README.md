@@ -19,6 +19,8 @@ Flashcards are stored in the same SQLite database as the rest of the system, so 
 
 The planned next expansion is a local-first knowledge/artifact system: a private Repositorium or wiki, editable functional drawings, and local image storage. The intent is to make Repetitio more than a practice tracker: it should become a personal interview preparation knowledge base where notes, diagrams, images, problems, basics exercises, flashcards, and saved learning sessions can all be connected.
 
+The Wiki now supports local image embeds, downloadable print-to-PDF article exports for a page and its subtopics, and optional lightweight quiz/flashcard inserts that live with the article but do not affect review scheduling.
+
 ## Product Goals
 
 Repetitio should help answer questions like:
@@ -32,6 +34,7 @@ Repetitio should help answer questions like:
 - How confident am I with this topic?
 - When did I last implement this algorithm from memory?
 - Which notes, diagrams, and images explain this topic best?
+- Can I quiz myself inside a wiki article without changing my review queue?
 - Which learning materials are connected to this problem or session?
 
 The application is intentionally local, single-user, and lightweight. The MVP does not require authentication, cloud infrastructure, distributed systems, or multi-user features.
@@ -40,7 +43,7 @@ The application is intentionally local, single-user, and lightweight. The MVP do
 
 Repetitio is expected to grow toward a shared artifact model instead of separate one-off features. The planned modules are:
 
-- Repositorium / Wiki: personal markdown pages with headings, definitions, tags, wiki-style links, and backlinks.
+- Repositorium / Wiki: personal markdown pages with headings, definitions, local images, PDF export, lightweight quiz inserts, flashcard inserts, tags, wiki-style links, and backlinks.
 - Functional Drawing: editable diagrams similar in spirit to Excalidraw or draw.io, stored as structured JSON so they remain editable.
 - Local Image Storage: wiki images are stored locally in SQLite with SHA-256 deduplication, so screenshots, sketches, and reference images stay portable.
 - Artifact Links: a shared linking layer that can attach wiki pages, drawings, and images to DSA problems, System Design problems, Basics exercises, Flashcards, saved learning sessions, and other knowledge pages.
