@@ -1,11 +1,13 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, ClipboardEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   createWikiPage,
   deleteWikiPage,
+  getWikiImageUrl,
   getWikiPage,
   getWikiPages,
   getWikiTree,
   importWikiPages,
+  uploadWikiImage,
   updateWikiPage
 } from "./api";
 import { confirmDelete } from "./confirmDelete";
@@ -758,15 +760,26 @@ function WikiEditor(props: {
   onCancel: () => void;
 }) {
   const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [imageUploadStatus, setImageUploadStatus] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const preview = useMemo(() => renderMarkdown(props.form.contentMarkdown), [props.form.contentMarkdown]);
 
   function insertSnippet(snippet: string, fallbackSelection = "") {
     const textarea = sourceTextareaRef.current;
+    insertSnippetAt(snippet, textarea?.selectionStart, textarea?.selectionEnd, fallbackSelection);
+  }
+
+  function insertSnippetAt(
+    snippet: string,
+    selectionStart = props.form.contentMarkdown.length,
+    selectionEnd = props.form.contentMarkdown.length,
+    fallbackSelection = ""
+  ) {
     const insertion = insertMarkdownSnippet(
       props.form.contentMarkdown,
       snippet,
-      textarea?.selectionStart ?? props.form.contentMarkdown.length,
-      textarea?.selectionEnd ?? props.form.contentMarkdown.length,
+      selectionStart,
+      selectionEnd,
       fallbackSelection
     );
 
@@ -776,6 +789,49 @@ function WikiEditor(props: {
       sourceTextareaRef.current?.focus();
       sourceTextareaRef.current?.setSelectionRange(insertion.selectionStart, insertion.selectionEnd);
     });
+  }
+
+  async function insertImageFile(file: File, selectionStart?: number, selectionEnd?: number) {
+    if (!file.type.startsWith("image/")) {
+      setImageUploadStatus("Choose an image file.");
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setImageUploadStatus(null);
+
+    try {
+      const image = await uploadWikiImage(file);
+      insertSnippetAt(image.markdownSnippet, selectionStart, selectionEnd);
+      setImageUploadStatus(`Added ${image.fileName}.`);
+    } catch (requestError) {
+      setImageUploadStatus(requestError instanceof Error ? requestError.message : "Unable to upload image.");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }
+
+  function handleImageFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0] ?? null;
+    event.currentTarget.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const textarea = sourceTextareaRef.current;
+    void insertImageFile(file, textarea?.selectionStart, textarea?.selectionEnd);
+  }
+
+  function handleSourcePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const imageFile = findClipboardImage(event);
+
+    if (!imageFile) {
+      return;
+    }
+
+    event.preventDefault();
+    void insertImageFile(imageFile, event.currentTarget.selectionStart, event.currentTarget.selectionEnd);
   }
 
   return (
@@ -865,12 +921,24 @@ function WikiEditor(props: {
                 <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("| Topic | Notes |\n| --- | --- |\n|  |  |")}>
                   Table
                 </button>
+                <label className="secondary-button compact-button file-action-button wiki-image-action" title="Add image">
+                  {isUploadingImage ? "Uploading..." : "Image"}
+                  <input
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    disabled={isUploadingImage}
+                    type="file"
+                    onChange={handleImageFileChange}
+                  />
+                </label>
               </div>
+              {imageUploadStatus ? <p className="wiki-image-upload-status" aria-live="polite">{imageUploadStatus}</p> : null}
               <textarea
+                aria-label="Article source"
                 ref={sourceTextareaRef}
                 className="wiki-source-textarea"
                 value={props.form.contentMarkdown}
                 onChange={(event) => props.onUpdate("contentMarkdown", event.target.value)}
+                onPaste={handleSourcePaste}
                 placeholder="Use headings, bullet points, comparison tables, code snippets and links."
               />
             </section>
@@ -1147,6 +1215,18 @@ function insertMarkdownSnippet(
     selectionStart: cursorStart,
     selectionEnd: cursorEnd
   };
+}
+
+function findClipboardImage(event: ClipboardEvent<HTMLTextAreaElement>) {
+  const items = Array.from(event.clipboardData.items ?? []);
+
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      return item.getAsFile();
+    }
+  }
+
+  return Array.from(event.clipboardData.files ?? []).find((file) => file.type.startsWith("image/")) ?? null;
 }
 
 function parseWikiBatchImport(contents: string): ImportWikiPageNodeRequest[] {
@@ -1658,7 +1738,7 @@ function splitTableRow(row: string) {
 
 function formatInline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|!\[[^\]]*]\([^)]+\)|\[[^\]]+\]\([^)]+\))/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -1673,6 +1753,16 @@ function formatInline(text: string): ReactNode[] {
       nodes.push(<code key={`${match.index}-code`}>{token.slice(1, -1)}</code>);
     } else if (token.startsWith("**")) {
       nodes.push(<strong key={`${match.index}-strong`}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith("![")) {
+      const imageMatch = token.match(/^!\[([^\]]*)]\(([^)]+)\)$/);
+      const alt = imageMatch?.[1] ?? "";
+      const src = resolveWikiImageSource(imageMatch?.[2] ?? "");
+
+      if (src) {
+        nodes.push(<img alt={alt} className="wiki-content-image" key={`${match.index}-image`} src={src} />);
+      } else {
+        nodes.push(token);
+      }
     } else {
       const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       const href = linkMatch?.[2] ?? "";
@@ -1691,6 +1781,17 @@ function formatInline(text: string): ReactNode[] {
   }
 
   return nodes;
+}
+
+function resolveWikiImageSource(source: string) {
+  const trimmedSource = source.trim();
+  const localImageMatch = trimmedSource.match(/^wiki-image:([0-9a-fA-F-]{36})$/);
+
+  if (localImageMatch) {
+    return getWikiImageUrl(localImageMatch[1]);
+  }
+
+  return trimmedSource;
 }
 
 function createHeadingId(text: string, index: number) {

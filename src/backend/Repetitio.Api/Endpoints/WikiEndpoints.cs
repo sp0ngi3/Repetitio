@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace Repetitio.Api.Endpoints;
 /// </summary>
 public static class WikiEndpoints
 {
+    private const long MaxWikiImageBytes = 10 * 1024 * 1024;
     private const int MaxBatchImportPageCount = 500;
     private const int MaximumSortOrder = 100000;
     private const string UpdatedNewestSort = "updated-newest";
@@ -32,9 +34,11 @@ public static class WikiEndpoints
 
         group.MapGet("/", GetWikiPagesAsync).WithName("GetWikiPages");
         group.MapGet("/tree", GetWikiTreeAsync).WithName("GetWikiTree");
+        group.MapGet("/images/{id:guid}", GetWikiImageAsync).WithName("GetWikiImage");
         group.MapGet("/{id:guid}", GetWikiPageAsync).WithName("GetWikiPage");
         group.MapPost("/", CreateWikiPageAsync).WithName("CreateWikiPage");
         group.MapPost("/batch", ImportWikiPagesAsync).WithName("ImportWikiPages");
+        group.MapPost("/images", UploadWikiImageAsync).DisableAntiforgery().WithName("UploadWikiImage");
         group.MapPut("/{id:guid}", UpdateWikiPageAsync).WithName("UpdateWikiPage");
         group.MapDelete("/{id:guid}", DeleteWikiPageAsync).WithName("DeleteWikiPage");
 
@@ -152,6 +156,85 @@ public static class WikiEndpoints
         var childCount = await dbContext.WikiPages.CountAsync(page => page.ParentId == id);
 
         return Results.Ok(ToResponse(wikiPage, childCount));
+    }
+
+    /// <summary>
+    /// Returns one locally stored wiki image.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="id">The image identifier.</param>
+    /// <returns>The image bytes when found.</returns>
+    private static async Task<IResult> GetWikiImageAsync(RepetitioDbContext dbContext, Guid id)
+    {
+        var image = await dbContext.WikiImages.AsNoTracking().FirstOrDefaultAsync(wikiImage => wikiImage.Id == id);
+
+        if (image is null)
+        {
+            return Results.NotFound();
+        }
+
+        return Results.File(image.Data, image.ContentType, image.FileName, enableRangeProcessing: true);
+    }
+
+    /// <summary>
+    /// Uploads a locally stored wiki image and returns markdown for embedding it.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="file">The uploaded image file.</param>
+    /// <returns>The stored image metadata and markdown snippet.</returns>
+    private static async Task<IResult> UploadWikiImageAsync(RepetitioDbContext dbContext, IFormFile file)
+    {
+        if (file.Length <= 0)
+        {
+            return Results.BadRequest("Image file is required.");
+        }
+
+        if (file.Length > MaxWikiImageBytes)
+        {
+            return Results.BadRequest("Wiki images can be at most 10 MB.");
+        }
+
+        var contentType = NormalizeImageContentType(file.ContentType, file.FileName);
+
+        if (contentType is null)
+        {
+            return Results.BadRequest("Supported wiki image types are PNG, JPEG, WEBP, and GIF.");
+        }
+
+        await using var imageStream = file.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await imageStream.CopyToAsync(memoryStream);
+        var bytes = memoryStream.ToArray();
+
+        if (!ImageSignatureMatches(contentType, bytes))
+        {
+            return Results.BadRequest("Image content does not match a supported image format.");
+        }
+
+        var sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        var existingImage = await dbContext.WikiImages.FirstOrDefaultAsync(image => image.Sha256 == sha256);
+
+        if (existingImage is not null)
+        {
+            return Results.Ok(ToImageResponse(existingImage));
+        }
+
+        var now = DateTime.UtcNow;
+        var image = new WikiImage
+        {
+            Id = Guid.NewGuid(),
+            FileName = SanitizeImageFileName(file.FileName, contentType),
+            ContentType = contentType,
+            Sha256 = sha256,
+            SizeBytes = bytes.LongLength,
+            Data = bytes,
+            CreatedAt = now
+        };
+
+        dbContext.WikiImages.Add(image);
+        await dbContext.SaveChangesAsync();
+
+        return Results.Created($"/api/wiki/images/{image.Id}", ToImageResponse(image));
     }
 
     /// <summary>
@@ -809,6 +892,155 @@ public static class WikiEndpoints
             SortOrder = wikiPage.SortOrder,
             UpdatedAt = wikiPage.UpdatedAt
         };
+    }
+
+    /// <summary>
+    /// Converts a stored wiki image into an API response.
+    /// </summary>
+    /// <param name="image">The stored image.</param>
+    /// <returns>The image metadata response.</returns>
+    private static WikiImageResponse ToImageResponse(WikiImage image)
+    {
+        var altText = Path.GetFileNameWithoutExtension(image.FileName);
+
+        if (!EndpointValidation.HasText(altText))
+        {
+            altText = "wiki image";
+        }
+
+        return new WikiImageResponse
+        {
+            Id = image.Id,
+            FileName = image.FileName,
+            ContentType = image.ContentType,
+            SizeBytes = image.SizeBytes,
+            Sha256 = image.Sha256,
+            Url = $"/api/wiki/images/{image.Id}",
+            MarkdownSnippet = $"![{EscapeMarkdownImageAltText(altText)}](wiki-image:{image.Id})",
+            CreatedAt = image.CreatedAt
+        };
+    }
+
+    /// <summary>
+    /// Resolves and validates an image content type.
+    /// </summary>
+    /// <param name="contentType">The browser-provided content type.</param>
+    /// <param name="fileName">The uploaded file name.</param>
+    /// <returns>The normalized supported content type; otherwise, <see langword="null"/>.</returns>
+    private static string? NormalizeImageContentType(string? contentType, string fileName)
+    {
+        var normalized = contentType?.Trim().ToLowerInvariant();
+
+        if (IsSupportedImageContentType(normalized))
+        {
+            return normalized;
+        }
+
+        return Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Determines whether a content type can be stored as a wiki image.
+    /// </summary>
+    /// <param name="contentType">The normalized content type.</param>
+    /// <returns><see langword="true"/> when the content type is supported.</returns>
+    private static bool IsSupportedImageContentType(string? contentType)
+    {
+        return contentType is "image/png" or "image/jpeg" or "image/webp" or "image/gif";
+    }
+
+    /// <summary>
+    /// Verifies that the uploaded bytes match the claimed image format.
+    /// </summary>
+    /// <param name="contentType">The normalized content type.</param>
+    /// <param name="bytes">The uploaded bytes.</param>
+    /// <returns><see langword="true"/> when the byte signature is supported.</returns>
+    private static bool ImageSignatureMatches(string contentType, byte[] bytes)
+    {
+        return contentType switch
+        {
+            "image/png" => bytes is [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, ..],
+            "image/jpeg" => bytes is [0xFF, 0xD8, ..],
+            "image/gif" => bytes.Length >= 6
+                && bytes[0] == 0x47
+                && bytes[1] == 0x49
+                && bytes[2] == 0x46
+                && bytes[3] == 0x38
+                && (bytes[4] == 0x37 || bytes[4] == 0x39)
+                && bytes[5] == 0x61,
+            "image/webp" => bytes.Length >= 12
+                && bytes[0] == 0x52
+                && bytes[1] == 0x49
+                && bytes[2] == 0x46
+                && bytes[3] == 0x46
+                && bytes[8] == 0x57
+                && bytes[9] == 0x45
+                && bytes[10] == 0x42
+                && bytes[11] == 0x50,
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// Sanitizes the uploaded file name and adds a useful extension when needed.
+    /// </summary>
+    /// <param name="fileName">The uploaded file name.</param>
+    /// <param name="contentType">The normalized content type.</param>
+    /// <returns>A safe display file name.</returns>
+    private static string SanitizeImageFileName(string fileName, string contentType)
+    {
+        var name = Path.GetFileName(fileName).Trim();
+
+        if (!EndpointValidation.HasText(name))
+        {
+            name = $"wiki-image{GetImageExtension(contentType)}";
+        }
+
+        var sanitized = new string(name.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '-' : character).ToArray());
+
+        if (!Path.HasExtension(sanitized))
+        {
+            sanitized += GetImageExtension(contentType);
+        }
+
+        return sanitized.Length > 260 ? sanitized[..260] : sanitized;
+    }
+
+    /// <summary>
+    /// Gets the standard file extension for an image content type.
+    /// </summary>
+    /// <param name="contentType">The normalized content type.</param>
+    /// <returns>The file extension.</returns>
+    private static string GetImageExtension(string contentType)
+    {
+        return contentType switch
+        {
+            "image/jpeg" => ".jpg",
+            "image/webp" => ".webp",
+            "image/gif" => ".gif",
+            _ => ".png"
+        };
+    }
+
+    /// <summary>
+    /// Escapes text before using it as markdown image alt text.
+    /// </summary>
+    /// <param name="value">The raw alt text.</param>
+    /// <returns>The escaped alt text.</returns>
+    private static string EscapeMarkdownImageAltText(string value)
+    {
+        return value.Replace("[", string.Empty, StringComparison.Ordinal)
+            .Replace("]", string.Empty, StringComparison.Ordinal)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Trim();
     }
 
     /// <summary>

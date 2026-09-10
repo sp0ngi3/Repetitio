@@ -136,6 +136,52 @@ public sealed record ImportWikiPagesResponse
 }
 
 /// <summary>
+/// Represents one locally stored wiki image returned by the API.
+/// </summary>
+public sealed record WikiImageResponse
+{
+    /// <summary>
+    /// Gets the image identifier.
+    /// </summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>
+    /// Gets the sanitized original file name.
+    /// </summary>
+    public required string FileName { get; init; }
+
+    /// <summary>
+    /// Gets the image media type.
+    /// </summary>
+    public required string ContentType { get; init; }
+
+    /// <summary>
+    /// Gets the image size in bytes.
+    /// </summary>
+    public required long SizeBytes { get; init; }
+
+    /// <summary>
+    /// Gets the SHA-256 digest used for deduplication.
+    /// </summary>
+    public required string Sha256 { get; init; }
+
+    /// <summary>
+    /// Gets the API URL that returns the image bytes.
+    /// </summary>
+    public required string Url { get; init; }
+
+    /// <summary>
+    /// Gets a portable markdown snippet for embedding the image.
+    /// </summary>
+    public required string MarkdownSnippet { get; init; }
+
+    /// <summary>
+    /// Gets the date and time when the image was created.
+    /// </summary>
+    public required DateTime CreatedAt { get; init; }
+}
+
+/// <summary>
 /// Represents one wiki page returned by the API.
 /// </summary>
 public sealed record WikiPageResponse

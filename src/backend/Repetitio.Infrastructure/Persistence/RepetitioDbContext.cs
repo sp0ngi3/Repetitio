@@ -90,6 +90,11 @@ public sealed class RepetitioDbContext : DbContext
     public DbSet<WikiPage> WikiPages => Set<WikiPage>();
 
     /// <summary>
+    /// Gets the wiki images table.
+    /// </summary>
+    public DbSet<WikiImage> WikiImages => Set<WikiImage>();
+
+    /// <summary>
     /// Configures the database model.
     /// </summary>
     /// <param name="modelBuilder">The model builder.</param>
@@ -326,6 +331,21 @@ public sealed class RepetitioDbContext : DbContext
                 .WithMany(wikiPage => wikiPage.Children)
                 .HasForeignKey(wikiPage => wikiPage.ParentId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WikiImage>(entity =>
+        {
+            entity.HasKey(image => image.Id);
+            entity.Property(image => image.FileName).HasMaxLength(260).IsRequired();
+            entity.Property(image => image.ContentType).HasMaxLength(120).IsRequired();
+            entity.Property(image => image.Sha256).HasMaxLength(64).IsRequired();
+            entity.Property(image => image.SizeBytes).IsRequired();
+            entity.Property(image => image.Data).IsRequired();
+            entity.Property(image => image.CreatedAt).IsRequired();
+            entity.HasIndex(image => image.Sha256).IsUnique();
+            entity.HasIndex(image => image.ContentType);
+            entity.HasIndex(image => image.SizeBytes);
+            entity.HasIndex(image => image.CreatedAt);
         });
     }
 }

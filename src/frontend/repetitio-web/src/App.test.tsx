@@ -5,12 +5,14 @@ import {
   completeFlashcardSession,
   createFlashcard,
   createFlashcardDeck,
+  createWikiPage,
   createMissedFlashcardDeckSession,
   createNotePage,
   createPracticeSession,
   deleteDsaProblem,
   deleteFlashcard,
   deleteFlashcardDeck,
+  deleteWikiPage,
   deleteNotePage,
   exportBackup,
   executeBasicExercise,
@@ -26,16 +28,23 @@ import {
   getHealthStatus,
   getLearningItems,
   getNotePages,
+  getWikiImageUrl,
+  getWikiPage,
+  getWikiPages,
+  getWikiTree,
   getSystemDesignProblemTemplate,
   getSystemDesignProblems,
   importDsaProblems,
   importFlashcardsBatch,
+  importWikiPages,
   importBackup,
   updateDsaProblem,
   updateFlashcard,
   updateFlashcardDeck,
+  updateWikiPage,
   updateNotePage,
   updateSystemDesignProblem,
+  uploadWikiImage,
   validateBackup
 } from "./api";
 import { createDefaultNextReviewDate } from "./reviewSchedule";
@@ -50,7 +59,10 @@ import type {
   LearningItem,
   NotePage,
   SystemDesignProblem,
-  SystemDesignProblemTemplate
+  SystemDesignProblemTemplate,
+  WikiImage,
+  WikiPage as WikiPageRecord,
+  WikiTreeNode
 } from "./types";
 
 vi.mock("./api", () => ({
@@ -64,11 +76,13 @@ vi.mock("./api", () => ({
   createLearningItem: vi.fn(),
   createPracticeSession: vi.fn(),
   createSystemDesignProblem: vi.fn(),
+  createWikiPage: vi.fn(),
   deleteFlashcard: vi.fn(),
   deleteFlashcardDeck: vi.fn(),
   deleteNotePage: vi.fn(),
   deleteDsaProblem: vi.fn(),
   deleteSystemDesignProblem: vi.fn(),
+  deleteWikiPage: vi.fn(),
   exportBackup: vi.fn(),
   executeBasicExercise: vi.fn(),
   getBackupStatus: vi.fn(),
@@ -83,15 +97,22 @@ vi.mock("./api", () => ({
   getHealthStatus: vi.fn(),
   getLearningItems: vi.fn(),
   getNotePages: vi.fn(),
+  getWikiImageUrl: vi.fn((id: string) => `http://localhost:5182/api/wiki/images/${id}`),
+  getWikiPage: vi.fn(),
+  getWikiPages: vi.fn(),
+  getWikiTree: vi.fn(),
   getSystemDesignProblemTemplate: vi.fn(),
   getSystemDesignProblems: vi.fn(),
   importDsaProblems: vi.fn(),
   importFlashcardsBatch: vi.fn(),
+  importWikiPages: vi.fn(),
   updateDsaProblem: vi.fn(),
   updateFlashcard: vi.fn(),
   updateFlashcardDeck: vi.fn(),
   updateNotePage: vi.fn(),
   updateSystemDesignProblem: vi.fn(),
+  updateWikiPage: vi.fn(),
+  uploadWikiImage: vi.fn(),
   importBackup: vi.fn(),
   validateBackup: vi.fn()
 }));
@@ -198,6 +219,56 @@ const learningItems: LearningItem[] = [
     totalAttempts: 0
   }
 ];
+
+/**
+ * Mocked wiki page response used by component tests.
+ */
+const wikiPages: WikiPageRecord[] = [
+  {
+    id: "wiki-1",
+    parentId: null,
+    title: "Algorithm",
+    slug: "algorithm",
+    path: "algorithm",
+    depth: 0,
+    sortOrder: 0,
+    summary: "A precise procedure for solving a class of problems.",
+    contentMarkdown: "## Definition\n\nAn algorithm has finite steps.",
+    isArchived: false,
+    childCount: 0,
+    createdAt: "2026-09-08T12:00:00Z",
+    updatedAt: "2026-09-08T12:00:00Z"
+  }
+];
+
+/**
+ * Mocked wiki tree response used by component tests.
+ */
+const wikiTreeNodes: WikiTreeNode[] = [
+  {
+    id: "wiki-1",
+    parentId: null,
+    title: "Algorithm",
+    path: "algorithm",
+    depth: 0,
+    sortOrder: 0,
+    updatedAt: "2026-09-08T12:00:00Z"
+  }
+];
+
+/**
+ * Mocked local wiki image upload response used by component tests.
+ */
+const wikiImage: WikiImage = {
+  id: "11111111-1111-1111-1111-111111111111",
+  fileName: "diagram.png",
+  contentType: "image/png",
+  sizeBytes: 7,
+  sha256: "abc123",
+  url: "/api/wiki/images/11111111-1111-1111-1111-111111111111",
+  markdownSnippet: "![diagram](wiki-image:11111111-1111-1111-1111-111111111111)",
+  createdAt: "2026-09-09T12:00:00Z"
+};
 
 /**
  * Mocked flashcard response used by component tests.
@@ -620,6 +691,22 @@ beforeEach(() => {
     updatedAt: "2026-08-30T13:00:00Z"
   }));
   vi.mocked(deleteNotePage).mockResolvedValue();
+  vi.mocked(getWikiTree).mockResolvedValue(wikiTreeNodes);
+  vi.mocked(getWikiPages).mockResolvedValue({
+    items: wikiPages,
+    totalCount: wikiPages.length,
+    page: 1,
+    pageSize: 15
+  });
+  vi.mocked(getWikiPage).mockResolvedValue(wikiPages[0]);
+  vi.mocked(createWikiPage).mockResolvedValue(wikiPages[0]);
+  vi.mocked(updateWikiPage).mockResolvedValue(wikiPages[0]);
+  vi.mocked(deleteWikiPage).mockResolvedValue();
+  vi.mocked(importWikiPages).mockResolvedValue({
+    importedCount: 1,
+    rootPages: wikiPages
+  });
+  vi.mocked(uploadWikiImage).mockResolvedValue(wikiImage);
   vi.mocked(getBackupStatus).mockResolvedValue(backupStatus);
   vi.mocked(exportBackup).mockResolvedValue({
     blob: new Blob(["backup"], { type: "application/zip" }),
@@ -823,6 +910,41 @@ describe("App", () => {
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(localStorage.getItem("repetitio-theme")).toBe("dark");
     expect(screen.getByRole("button", { name: "Switch to light mode" })).toBeInTheDocument();
+  });
+
+  /**
+   * Verifies that pasted screenshots are uploaded into local wiki storage and embedded in markdown.
+   */
+  it("uploads pasted wiki screenshots into the article source", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Wiki" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit source" }));
+
+    const editor = await screen.findByLabelText("Article source") as HTMLTextAreaElement;
+    const imageFile = new File(["diagram"], "diagram.png", { type: "image/png" });
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+
+    fireEvent.paste(editor, {
+      clipboardData: {
+        files: [imageFile],
+        items: [
+          {
+            kind: "file",
+            type: "image/png",
+            getAsFile: () => imageFile
+          }
+        ]
+      }
+    });
+
+    await waitFor(() => expect(uploadWikiImage).toHaveBeenCalledWith(imageFile));
+    expect(editor.value).toContain("![diagram](wiki-image:11111111-1111-1111-1111-111111111111)");
+    expect(getWikiImageUrl).toHaveBeenCalledWith("11111111-1111-1111-1111-111111111111");
+    expect(await screen.findByAltText("diagram")).toHaveAttribute(
+      "src",
+      "http://localhost:5182/api/wiki/images/11111111-1111-1111-1111-111111111111"
+    );
   });
 
   /**

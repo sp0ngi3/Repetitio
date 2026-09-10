@@ -1118,6 +1118,28 @@ export interface WikiPage {
 }
 
 /**
+ * Represents one locally stored wiki image.
+ */
+export interface WikiImage {
+  /** Unique image identifier. */
+  id: string;
+  /** Sanitized original file name. */
+  fileName: string;
+  /** Image media type. */
+  contentType: string;
+  /** Image size in bytes. */
+  sizeBytes: number;
+  /** SHA-256 digest used for deduplication. */
+  sha256: string;
+  /** API URL that returns the image bytes. */
+  url: string;
+  /** Portable markdown snippet for embedding the image. */
+  markdownSnippet: string;
+  /** Creation date and time. */
+  createdAt: string;
+}
+
+/**
  * Represents one wiki page in the navigation tree.
  */
 export interface WikiTreeNode {

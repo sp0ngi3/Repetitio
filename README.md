@@ -42,12 +42,12 @@ Repetitio is expected to grow toward a shared artifact model instead of separate
 
 - Repositorium / Wiki: personal markdown pages with headings, definitions, tags, wiki-style links, and backlinks.
 - Functional Drawing: editable diagrams similar in spirit to Excalidraw or draw.io, stored as structured JSON so they remain editable.
-- Local Image Storage: locally stored images with metadata in SQLite, so screenshots, sketches, and reference images can be reused across the app.
+- Local Image Storage: wiki images are stored locally in SQLite with SHA-256 deduplication, so screenshots, sketches, and reference images stay portable.
 - Artifact Links: a shared linking layer that can attach wiki pages, drawings, and images to DSA problems, System Design problems, Basics exercises, Flashcards, saved learning sessions, and other knowledge pages.
 
 This is not meant to replace practice sessions. It should support them. A System Design attempt could link to a drawing, a DSA problem could link to an explanation page, a Basics exercise could link to a visual memory aid, and a flashcard deck could link to the source material it was created from.
 
-All of these artifacts must remain local-first and portable. They should be included in export, import, validation, and backup flows. Database records should capture structure and relationships, while large binary image files should be stored locally on disk and referenced by metadata in the database.
+All of these artifacts must remain local-first and portable. They should be included in export, import, validation, and backup flows. Wiki image blobs currently live inside SQLite so the existing backup archive contains images without a separate media folder.
 
 See [docs/knowledge-artifacts.md](docs/knowledge-artifacts.md) for the proposed plan and decisions.
 
@@ -103,9 +103,7 @@ Open Settings in the frontend to export or import data.
 - Validate Backup checks the manifest, SQLite integrity, required tables, and schema version without changing data.
 - Import Data validates the uploaded backup, writes a pre-import backup to `backups/`, and restores the validated SQLite database.
 
-The backup archive contains `manifest.json` and `repetitio.db`.
-
-Future artifact-aware backups should also include local media files, drawing previews if generated, and a manifest section that verifies those files. Import should restore both the SQLite records and the local files, while handling missing or obsolete links safely.
+The backup archive contains `manifest.json` and `repetitio.db`. Because wiki images are stored in the `WikiImages` table, exported backups already include them. Future drawing previews or external media folders may add manifest-level file checks, while import should continue handling obsolete or missing artifact links safely.
 
 ## Testing
 

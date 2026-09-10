@@ -136,6 +136,7 @@ public sealed class BackupArchiveValidatorTests
             "CREATE TABLE FlashcardReviews (Id TEXT NOT NULL PRIMARY KEY);",
             "CREATE TABLE NotePages (Id TEXT NOT NULL PRIMARY KEY);",
             "CREATE TABLE WikiPages (Id TEXT NOT NULL PRIMARY KEY);",
+            "CREATE TABLE WikiImages (Id TEXT NOT NULL PRIMARY KEY);",
             $"INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('{schemaVersion}', '10.0.11');"
         };
 

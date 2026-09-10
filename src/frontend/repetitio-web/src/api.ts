@@ -45,6 +45,7 @@ import type {
   UpdateSystemDesignProblemRequest,
   CreateWikiPageRequest,
   UpdateWikiPageRequest,
+  WikiImage,
   WikiPage,
   WikiTreeNode
 } from "./types";
@@ -634,6 +635,39 @@ export function getWikiTree(includeArchived = false): Promise<WikiTreeNode[]> {
  */
 export function getWikiPage(id: string): Promise<WikiPage> {
   return requestJson<WikiPage>(`/api/wiki/${id}`);
+}
+
+/**
+ * Builds the local API URL for a stored wiki image.
+ *
+ * @param id - Wiki image identifier.
+ * @returns Absolute image URL.
+ */
+export function getWikiImageUrl(id: string): string {
+  return `${apiBaseUrl}/api/wiki/images/${id}`;
+}
+
+/**
+ * Uploads an image into local wiki storage.
+ *
+ * @param file - Image file selected or pasted by the user.
+ * @returns Stored image metadata and markdown snippet.
+ */
+export async function uploadWikiImage(file: File): Promise<WikiImage> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${apiBaseUrl}/api/wiki/images`, {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<WikiImage>;
 }
 
 /**

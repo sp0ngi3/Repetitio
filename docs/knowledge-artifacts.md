@@ -110,38 +110,28 @@ Important decision: the editable diagram source should live in the database as J
 
 Images should be stored locally, not in the cloud.
 
-Recommended approach:
+Implemented Wiki-first approach:
 
-- Store image metadata in SQLite.
-- Store the binary image file on disk under a controlled local folder.
-- Include image files in export/import backups.
-- Use content hashes to detect duplicates when possible.
+- Store wiki image metadata and binary bytes in SQLite.
+- Use SHA-256 hashes to deduplicate repeated screenshots.
+- Reference images from markdown with portable `wiki-image:{id}` links.
+- Include images automatically in export/import backups because the backup already contains `repetitio.db`.
+- Validate basic image signatures before storing PNG, JPEG, WEBP, or GIF files.
 
 Possible model:
 
 ```text
-MediaAsset
+WikiImage
 - Id
 - FileName
 - ContentType
 - SizeBytes
 - Sha256
-- StoragePath
-- Width
-- Height
+- Data
 - CreatedAt
 ```
 
-Recommended local layout:
-
-```text
-data/
-  assets/
-    images/
-      asset-id-or-sha256.png
-```
-
-Reason: SQLite should keep relationships and metadata, while the filesystem stores larger binary files. This keeps the database lighter and makes backup validation more explicit.
+Reason: the app is local and personal, and most current images are expected to be screenshots. Keeping Wiki images in SQLite makes them harder to orphan, keeps import/export simple, and means deduplication happens by content hash instead of file path. If image volume becomes very large later, a future migration can move binary storage behind a shared `MediaAsset` abstraction while preserving the same markdown references.
 
 ## 6. Artifact Links
 
@@ -198,38 +188,31 @@ backup.zip
 - repetitio.db
 ```
 
-Future artifact-aware backups should include:
+Current artifact-aware backups include:
 
 ```text
 backup.zip
 - manifest.json
 - repetitio.db
-- assets/
-  - images/
-    - ...
-- drawings/
-  - previews/
-    - ...
 ```
 
 Export requirements:
 
 - Include all database records.
-- Include all media files referenced by `MediaAsset`.
+- Include all wiki image blobs stored in `WikiImages`.
 - Include generated drawing previews if they exist.
-- Add file hashes and expected paths to the manifest.
-- Validate that referenced local files exist before finalizing export.
+- Validate required artifact tables before import.
+- Add file hashes and expected paths to the manifest if future media moves outside SQLite.
 
 Import requirements:
 
 - Validate `manifest.json`.
 - Validate SQLite integrity.
 - Validate schema compatibility.
-- Validate included media file hashes.
 - Create a pre-import backup.
 - Restore database records.
-- Restore local media files.
-- Re-map local storage paths if needed.
+- Restore wiki image blobs with the database.
+- Validate included media file hashes and re-map paths if future media moves outside SQLite.
 - Handle obsolete or missing artifact links safely.
 
 If a link points to a target that no longer exists, import should not fail the whole backup by default. The safer behavior is to preserve the artifact and either skip the broken link or mark it as orphaned for later cleanup.
@@ -238,7 +221,7 @@ If a link points to a target that no longer exists, import should not fail the w
 
 The safest implementation order is:
 
-1. Add `MediaAsset` storage and backup support.
+1. Add Wiki image storage and backup validation.
 2. Add `KnowledgePage` wiki CRUD and search.
 3. Add `ArtifactLink` and a shared linked-materials panel.
 4. Attach wiki pages and images to DSA, System Design, Basics, Flashcards, and saved learning sessions.
@@ -256,11 +239,11 @@ Decision: store the editable diagram source as JSON in the database.
 
 Reason: the user must be able to reopen and edit diagrams later. Images alone are not enough.
 
-### Store images on disk, metadata in SQLite
+### Store wiki images in SQLite
 
-Decision: store local image files on disk and only keep metadata in the database.
+Decision: store Wiki image metadata and binary bytes in SQLite.
 
-Reason: this keeps SQLite smaller, makes export validation explicit, and avoids cloud dependencies.
+Reason: this keeps screenshots local, deduplicated, and automatically included in the existing export/import archive. It also avoids broken local file paths while the artifact system is still growing.
 
 ### Use one shared linking model
 
@@ -280,7 +263,7 @@ This expansion is successful when:
 
 - A user can create a wiki page and attach it to a DSA or System Design problem.
 - A user can create a diagram and reopen it later for editing.
-- A user can add a local image and reuse it in multiple places.
-- A user can export the whole app, including database records and local files.
+- A user can add a local image to a wiki page by selecting a file or pasting a screenshot.
+- A user can export the whole app, including database records and wiki images.
 - A user can import the backup and recover the same notes, images, diagrams, and links.
 - Broken links do not silently send the user to empty screens.
