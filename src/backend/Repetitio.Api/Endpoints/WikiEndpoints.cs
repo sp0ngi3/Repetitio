@@ -65,7 +65,10 @@ public static class WikiEndpoints
         int page = 1,
         int pageSize = 20)
     {
-        var query = dbContext.WikiPages.AsNoTracking().AsQueryable();
+        var query = dbContext.WikiPages
+            .AsNoTracking()
+            .Include(wikiPage => wikiPage.Sources)
+            .AsQueryable();
 
         if (!includeArchived)
         {
@@ -92,7 +95,13 @@ public static class WikiEndpoints
                     wikiPage.Title.Contains(normalizedSearch)
                     || wikiPage.Path.Contains(normalizedSearch)
                     || (wikiPage.Summary != null && wikiPage.Summary.Contains(normalizedSearch))
-                    || wikiPage.ContentMarkdown.Contains(normalizedSearch));
+                    || wikiPage.ContentMarkdown.Contains(normalizedSearch)
+                    || wikiPage.Sources.Any(source =>
+                        source.Title.Contains(normalizedSearch)
+                        || (source.Type != null && source.Type.Contains(normalizedSearch))
+                        || (source.Author != null && source.Author.Contains(normalizedSearch))
+                        || (source.Locator != null && source.Locator.Contains(normalizedSearch))
+                        || (source.Notes != null && source.Notes.Contains(normalizedSearch))));
             }
         }
 
@@ -252,6 +261,13 @@ public static class WikiEndpoints
             return Results.BadRequest("Title is required.");
         }
 
+        var sourceError = ValidateWikiSources(request.Sources);
+
+        if (sourceError is not null)
+        {
+            return Results.BadRequest(sourceError);
+        }
+
         var practiceInsertError = ValidateWikiPracticeInserts(request.QuizQuestions, request.Flashcards);
 
         if (practiceInsertError is not null)
@@ -285,6 +301,7 @@ public static class WikiEndpoints
             UpdatedAt = now
         };
 
+        ApplyWikiSources(wikiPage, request.Sources, now);
         ApplyWikiPracticeInserts(wikiPage, request.QuizQuestions, request.Flashcards, now);
         dbContext.WikiPages.Add(wikiPage);
         await dbContext.SaveChangesAsync();
@@ -372,6 +389,13 @@ public static class WikiEndpoints
             return Results.BadRequest("Title is required.");
         }
 
+        var sourceError = ValidateWikiSources(request.Sources);
+
+        if (sourceError is not null)
+        {
+            return Results.BadRequest(sourceError);
+        }
+
         var practiceInsertError = ValidateWikiPracticeInserts(request.QuizQuestions, request.Flashcards);
 
         if (practiceInsertError is not null)
@@ -424,6 +448,7 @@ public static class WikiEndpoints
         wikiPage.ContentMarkdown = TrimContent(request.ContentMarkdown);
         wikiPage.IsArchived = request.IsArchived;
         wikiPage.UpdatedAt = now;
+        await ReplaceWikiSourcesAsync(dbContext, wikiPage, request.Sources, now);
         await ReplaceWikiPracticeInsertsAsync(dbContext, wikiPage, request.QuizQuestions, request.Flashcards, now);
 
         if (!string.Equals(oldPath, newPath, StringComparison.Ordinal) || oldDepth != newDepth)
@@ -473,58 +498,71 @@ public static class WikiEndpoints
     {
         var ftsQuery = BuildFtsQuery(search);
 
-        if (ftsQuery.Length == 0)
-        {
-            return [];
-        }
-
         var ids = new List<Guid>();
         var connection = dbContext.Database.GetDbConnection();
         var shouldClose = connection.State != System.Data.ConnectionState.Open;
 
-        if (shouldClose)
+        if (ftsQuery.Length > 0 && shouldClose)
         {
             await connection.OpenAsync();
         }
 
-        try
+        if (ftsQuery.Length > 0)
         {
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT WikiPageId
-                FROM WikiPageSearch
-                WHERE WikiPageSearch MATCH $search
-                ORDER BY bm25(WikiPageSearch)
-                LIMIT 500;
-                """;
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "$search";
-            parameter.Value = ftsQuery;
-            command.Parameters.Add(parameter);
-
-            await using var reader = await command.ExecuteReaderAsync();
-
-            while (await reader.ReadAsync())
+            try
             {
-                if (Guid.TryParse(reader.GetString(0), out var id))
+                await using var command = connection.CreateCommand();
+                command.CommandText = """
+                    SELECT WikiPageId
+                    FROM WikiPageSearch
+                    WHERE WikiPageSearch MATCH $search
+                    ORDER BY bm25(WikiPageSearch)
+                    LIMIT 500;
+                    """;
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = "$search";
+                parameter.Value = ftsQuery;
+                command.Parameters.Add(parameter);
+
+                await using var reader = await command.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
                 {
-                    ids.Add(id);
+                    if (Guid.TryParse(reader.GetString(0), out var id))
+                    {
+                        ids.Add(id);
+                    }
+                }
+            }
+            catch (SqliteException)
+            {
+                // Fall back to ordinary source search below when the optional FTS index is unavailable.
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    await connection.CloseAsync();
                 }
             }
         }
-        catch (SqliteException)
-        {
-            return [];
-        }
-        finally
-        {
-            if (shouldClose)
-            {
-                await connection.CloseAsync();
-            }
-        }
 
-        return ids;
+        var normalizedSearch = search.Trim();
+        var sourceIds = await dbContext.WikiSources
+            .AsNoTracking()
+            .Where(source =>
+                source.Title.Contains(normalizedSearch)
+                || (source.Type != null && source.Type.Contains(normalizedSearch))
+                || (source.Author != null && source.Author.Contains(normalizedSearch))
+                || (source.Locator != null && source.Locator.Contains(normalizedSearch))
+                || (source.Notes != null && source.Notes.Contains(normalizedSearch)))
+            .Select(source => source.WikiPageId)
+            .Take(500)
+            .ToArrayAsync();
+
+        ids.AddRange(sourceIds);
+
+        return ids.Distinct().ToArray();
     }
 
     /// <summary>
@@ -579,6 +617,7 @@ public static class WikiEndpoints
             };
 
             dbContext.WikiPages.Add(page);
+            ApplyWikiSources(page, node.Sources, createdAt);
             ApplyWikiPracticeInserts(page, node.QuizQuestions, node.Flashcards, createdAt);
             createdPages.Add(page);
 
@@ -817,6 +856,7 @@ public static class WikiEndpoints
     private static IQueryable<WikiPage> WikiPageDetailsQuery(RepetitioDbContext dbContext)
     {
         return dbContext.WikiPages
+            .Include(page => page.Sources)
             .Include(page => page.QuizQuestions)
             .ThenInclude(question => question.Options)
             .Include(page => page.Flashcards);
@@ -907,6 +947,10 @@ public static class WikiEndpoints
             ChildCount = childCount,
             CreatedAt = wikiPage.CreatedAt,
             UpdatedAt = wikiPage.UpdatedAt,
+            Sources = wikiPage.Sources
+                .OrderBy(source => source.SortOrder)
+                .Select(ToSourceResponse)
+                .ToArray(),
             QuizQuestions = wikiPage.QuizQuestions
                 .OrderBy(question => question.SortOrder)
                 .Select(ToQuizQuestionResponse)
@@ -915,6 +959,26 @@ public static class WikiEndpoints
                 .OrderBy(flashcard => flashcard.SortOrder)
                 .Select(ToFlashcardResponse)
                 .ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Converts a wiki source into an API response.
+    /// </summary>
+    /// <param name="source">The wiki source.</param>
+    /// <returns>The wiki source response.</returns>
+    private static WikiSourceResponse ToSourceResponse(WikiSource source)
+    {
+        return new WikiSourceResponse
+        {
+            Id = source.Id,
+            Title = source.Title,
+            Type = source.Type,
+            Author = source.Author,
+            Url = source.Url,
+            Locator = source.Locator,
+            Notes = source.Notes,
+            SortOrder = source.SortOrder
         };
     }
 
@@ -1149,6 +1213,60 @@ public static class WikiEndpoints
     }
 
     /// <summary>
+    /// Replaces loose wiki sources for an existing wiki page.
+    /// </summary>
+    /// <param name="dbContext">The database context.</param>
+    /// <param name="wikiPage">The wiki page being updated.</param>
+    /// <param name="sources">The requested sources.</param>
+    /// <param name="timestamp">The update timestamp.</param>
+    private static async Task ReplaceWikiSourcesAsync(
+        RepetitioDbContext dbContext,
+        WikiPage wikiPage,
+        IReadOnlyCollection<WikiSourceRequest>? sources,
+        DateTime timestamp)
+    {
+        await dbContext.WikiSources
+            .Where(source => source.WikiPageId == wikiPage.Id)
+            .ExecuteDeleteAsync();
+
+        wikiPage.Sources.Clear();
+        ApplyWikiSources(wikiPage, sources, timestamp);
+        dbContext.WikiSources.AddRange(wikiPage.Sources);
+    }
+
+    /// <summary>
+    /// Adds loose sources to a wiki page.
+    /// </summary>
+    /// <param name="wikiPage">The wiki page receiving sources.</param>
+    /// <param name="sources">The requested sources.</param>
+    /// <param name="timestamp">The creation timestamp.</param>
+    private static void ApplyWikiSources(
+        WikiPage wikiPage,
+        IReadOnlyCollection<WikiSourceRequest>? sources,
+        DateTime timestamp)
+    {
+        var sourceOrder = 0;
+
+        foreach (var sourceRequest in sources ?? [])
+        {
+            wikiPage.Sources.Add(new WikiSource
+            {
+                Id = Guid.NewGuid(),
+                WikiPageId = wikiPage.Id,
+                Title = sourceRequest.Title.Trim(),
+                Type = TrimOptional(sourceRequest.Type),
+                Author = TrimOptional(sourceRequest.Author),
+                Url = TrimOptional(sourceRequest.Url),
+                Locator = TrimOptional(sourceRequest.Locator),
+                Notes = TrimOptional(sourceRequest.Notes),
+                SortOrder = sourceOrder++,
+                CreatedAt = timestamp,
+                UpdatedAt = timestamp
+            });
+        }
+    }
+
+    /// <summary>
     /// Replaces lightweight quiz questions and flashcards for an existing wiki page.
     /// </summary>
     /// <param name="dbContext">The database context.</param>
@@ -1318,6 +1436,36 @@ public static class WikiEndpoints
     }
 
     /// <summary>
+    /// Validates loose wiki sources.
+    /// </summary>
+    /// <param name="sources">The requested sources.</param>
+    /// <param name="path">The validation path.</param>
+    /// <returns>A validation message when invalid; otherwise, null.</returns>
+    private static string? ValidateWikiSources(IReadOnlyCollection<WikiSourceRequest>? sources, string path = "page")
+    {
+        var sourceIndex = 0;
+
+        foreach (var source in sources ?? [])
+        {
+            if (!EndpointValidation.HasText(source.Title))
+            {
+                return $"{path}.sources[{sourceIndex}].title is required.";
+            }
+
+            if (source.Url is not null
+                && EndpointValidation.HasText(source.Url)
+                && !Uri.TryCreate(source.Url.Trim(), UriKind.Absolute, out _))
+            {
+                return $"{path}.sources[{sourceIndex}].url must be an absolute URL.";
+            }
+
+            sourceIndex++;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Counts import nodes recursively.
     /// </summary>
     /// <param name="nodes">The import nodes.</param>
@@ -1349,6 +1497,13 @@ public static class WikiEndpoints
             if (!EndpointValidation.HasText(node.Title))
             {
                 return $"{path}[{index}].title is required.";
+            }
+
+            var sourceError = ValidateWikiSources(node.Sources, $"{path}[{index}]");
+
+            if (sourceError is not null)
+            {
+                return sourceError;
             }
 
             var insertError = ValidateWikiPracticeInserts(node.QuizQuestions, node.Flashcards, $"{path}[{index}]");

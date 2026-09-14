@@ -17,6 +17,7 @@ import type {
   WikiPage as WikiPageRecord,
   WikiFlashcardRequest,
   WikiQuizQuestionRequest,
+  WikiSourceRequest,
   WikiTreeNode
 } from "./types";
 
@@ -29,6 +30,7 @@ interface WikiForm {
   slug: string;
   summary: string;
   contentMarkdown: string;
+  sourcesJson: string;
   quizJson: string;
   flashcardsJson: string;
   sortOrder: number;
@@ -59,11 +61,33 @@ const emptyWikiForm: WikiForm = {
   slug: "",
   summary: "",
   contentMarkdown: "## Definition\n\n\n## Key points\n\n- \n\n## Comparison\n\n| Topic | Notes |\n| --- | --- |\n|  |  |\n",
+  sourcesJson: "[]",
   quizJson: "[]",
   flashcardsJson: "[]",
   sortOrder: 0,
   isArchived: false
 };
+
+const sampleWikiSourcesJson = JSON.stringify(
+  [
+    {
+      title: "Designing Data-Intensive Applications",
+      type: "Book",
+      author: "Martin Kleppmann",
+      locator: "Chapter 5 - Replication",
+      notes: "Use as the main explanation source for replication tradeoffs."
+    },
+    {
+      title: "System Design Interview",
+      type: "Book",
+      author: "Alex Xu",
+      locator: "Load balancer section",
+      notes: "Good interview-style framing and diagrams."
+    }
+  ],
+  null,
+  2
+);
 
 const sampleWikiQuizJson = JSON.stringify(
   [
@@ -167,6 +191,15 @@ const sampleImport = JSON.stringify(
           {
             label: "Personal interview notes",
             url: "https://example.com/notes"
+          }
+        ],
+        sources: [
+          {
+            title: "Designing Data-Intensive Applications",
+            type: "Book",
+            author: "Martin Kleppmann",
+            locator: "Chapter 1",
+            notes: "Used for reliability, scalability, and maintainability framing."
           }
         ],
         externalLinks: [
@@ -616,6 +649,8 @@ function WikiArticle(props: {
   onDownloadPdf: () => void;
   onOpenChild: (id: string) => void;
 }) {
+  const hasKnowledgeChecks = Boolean(props.page && (props.page.quizQuestions.length > 0 || props.page.flashcards.length > 0));
+
   if (props.isLoading) {
     return <main className="wiki-document"><p className="empty-state">Loading article...</p></main>;
   }
@@ -641,6 +676,11 @@ function WikiArticle(props: {
             <h1>{props.page.title}</h1>
           </div>
           <div className="wiki-article-actions">
+            {hasKnowledgeChecks ? (
+              <a className="secondary-button compact-button wiki-study-link" href="#wiki-knowledge-checks">
+                Study checks
+              </a>
+            ) : null}
             <button className="secondary-button compact-button" type="button" onClick={props.onCreateChild}>
               Add subtopic
             </button>
@@ -673,6 +713,7 @@ function WikiArticle(props: {
             {shouldRenderSummaryLead(props.page) ? <p className="wiki-lead">{props.page.summary}</p> : null}
             {props.renderedMarkdown.nodes.length ? props.renderedMarkdown.nodes : <p className="empty-state">This article is empty.</p>}
 
+            <WikiSourceList sources={props.page.sources} />
             <WikiPracticeInserts page={props.page} />
 
             {props.childNodes.length ? (
@@ -705,6 +746,14 @@ function WikiArticle(props: {
                 <dd>{props.page.childCount}</dd>
               </div>
               <div>
+                <dt>Sources</dt>
+                <dd>{props.page.sources.length}</dd>
+              </div>
+              <div>
+                <dt>Checks</dt>
+                <dd>{props.page.quizQuestions.length + props.page.flashcards.length}</dd>
+              </div>
+              <div>
                 <dt>Status</dt>
                 <dd>{props.page.isArchived ? "Archived" : "Active"}</dd>
               </div>
@@ -713,6 +762,55 @@ function WikiArticle(props: {
         </div>
       </article>
     </main>
+  );
+}
+
+function WikiSourceList(props: { sources: WikiPageRecord["sources"] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!props.sources.length) {
+    return null;
+  }
+
+  const visibleSources = isExpanded ? props.sources : props.sources.slice(0, 3);
+
+  return (
+    <section className="wiki-source-list" aria-label="Article sources">
+      <div className="wiki-source-list-heading">
+        <div>
+          <span>Sources</span>
+          <h2>Where this comes from</h2>
+        </div>
+        {props.sources.length > 3 ? (
+          <button className="secondary-button compact-button" type="button" onClick={() => setIsExpanded((current) => !current)}>
+            {isExpanded ? "Show less" : `Show all ${props.sources.length}`}
+          </button>
+        ) : null}
+      </div>
+      <div className="wiki-source-list-grid">
+        {visibleSources.map((source) => (
+          <article className="wiki-source-card" key={source.id}>
+            <span>{source.type || "Source"}</span>
+            <h3>{source.url ? <a href={source.url} rel="noreferrer" target="_blank">{source.title}</a> : source.title}</h3>
+            <dl>
+              {source.author ? (
+                <div>
+                  <dt>Author</dt>
+                  <dd>{source.author}</dd>
+                </div>
+              ) : null}
+              {source.locator ? (
+                <div>
+                  <dt>Locator</dt>
+                  <dd>{source.locator}</dd>
+                </div>
+              ) : null}
+            </dl>
+            {source.notes ? <p>{source.notes}</p> : null}
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -786,6 +884,16 @@ function WikiExplore(props: {
               >
                 <strong>{wikiPage.title}</strong>
                 <span>{wikiPage.summary || wikiPage.contentMarkdown.slice(0, 180) || "No summary yet."}</span>
+                {wikiPage.sources.length ? (
+                  <div className="wiki-result-sources" aria-label="Sources">
+                    {wikiPage.sources.slice(0, 3).map((source) => (
+                      <span key={source.id}>
+                        {source.title}{source.locator ? ` · ${source.locator}` : ""}
+                      </span>
+                    ))}
+                    {wikiPage.sources.length > 3 ? <span>+{wikiPage.sources.length - 3} more</span> : null}
+                  </div>
+                ) : null}
                 <small>
                   {wikiPage.path} · {wikiPage.childCount} subtopics · updated {formatDateTime(wikiPage.updatedAt)}
                 </small>
@@ -823,8 +931,10 @@ function WikiExplore(props: {
 }
 
 function WikiPracticeInserts(props: { page: WikiPageRecord }) {
+  const [mode, setMode] = useState<"menu" | "quiz" | "flashcards">("menu");
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
-  const [revealedFlashcards, setRevealedFlashcards] = useState<Set<string>>(new Set());
+  const [isFlashcardRevealed, setIsFlashcardRevealed] = useState(false);
+  const [flashcardIndex, setFlashcardIndex] = useState(0);
   const hasQuiz = props.page.quizQuestions.length > 0;
   const hasFlashcards = props.page.flashcards.length > 0;
   const answeredQuizCount = props.page.quizQuestions.filter((question) => selectedOptions[question.id]).length;
@@ -832,14 +942,28 @@ function WikiPracticeInserts(props: { page: WikiPageRecord }) {
     const selectedOptionId = selectedOptions[question.id];
     return question.options.some((option) => option.id === selectedOptionId && option.isCorrect);
   }).length;
-  const revealedFlashcardCount = revealedFlashcards.size;
+  const activeFlashcard = props.page.flashcards[flashcardIndex] ?? null;
 
   if (!hasQuiz && !hasFlashcards) {
     return null;
   }
 
+  function openFlashcards(index: number) {
+    setFlashcardIndex(Math.max(0, Math.min(props.page.flashcards.length - 1, index)));
+    setIsFlashcardRevealed(false);
+    setMode("flashcards");
+  }
+
+  function moveFlashcard(delta: number) {
+    setFlashcardIndex((current) => {
+      const next = Math.max(0, Math.min(props.page.flashcards.length - 1, current + delta));
+      return next;
+    });
+    setIsFlashcardRevealed(false);
+  }
+
   return (
-    <section className="wiki-practice-inserts" aria-label="Knowledge checks">
+    <section className="wiki-practice-inserts" id="wiki-knowledge-checks" aria-label="Knowledge checks">
       <header className="wiki-practice-header">
         <div>
           <span className="wiki-practice-kicker">Study insert</span>
@@ -861,14 +985,50 @@ function WikiPracticeInserts(props: { page: WikiPageRecord }) {
           ) : null}
           {hasFlashcards ? (
             <span>
-              <strong>{revealedFlashcardCount}/{props.page.flashcards.length}</strong>
-              <small>cards flipped</small>
+              <strong>{props.page.flashcards.length}</strong>
+              <small>flashcards</small>
             </span>
           ) : null}
         </div>
       </header>
+
+      <div className="wiki-study-tabs" role="tablist" aria-label="Knowledge check modes">
+        <button className={mode === "menu" ? "active" : ""} type="button" onClick={() => setMode("menu")}>
+          Menu
+        </button>
+        {hasQuiz ? (
+          <button className={mode === "quiz" ? "active" : ""} type="button" onClick={() => setMode("quiz")}>
+            Quiz
+          </button>
+        ) : null}
+        {hasFlashcards ? (
+          <button className={mode === "flashcards" ? "active" : ""} type="button" onClick={() => openFlashcards(flashcardIndex)}>
+            Flashcards
+          </button>
+        ) : null}
+      </div>
+
+      {mode === "menu" ? (
+        <div className="wiki-study-menu">
+          {hasQuiz ? (
+            <button className="wiki-study-mode-card" type="button" onClick={() => setMode("quiz")}>
+              <span>Quiz mode</span>
+              <strong>{props.page.quizQuestions.length} questions</strong>
+              <small>Answer multiple-choice checks with instant feedback.</small>
+            </button>
+          ) : null}
+          {hasFlashcards ? (
+            <button className="wiki-study-mode-card" type="button" onClick={() => openFlashcards(0)}>
+              <span>Flashcard mode</span>
+              <strong>{props.page.flashcards.length} cards</strong>
+              <small>Review one card at a time without scrolling through the whole article.</small>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {hasQuiz ? (
-        <div className="wiki-check-section">
+        <div className={mode === "quiz" ? "wiki-check-section" : "wiki-check-section hidden"}>
           <div className="wiki-check-section-heading">
             <span>Quiz</span>
             <strong>{props.page.quizQuestions.length} questions</strong>
@@ -927,36 +1087,51 @@ function WikiPracticeInserts(props: { page: WikiPageRecord }) {
         </div>
       ) : null}
 
-      {hasFlashcards ? (
+      {hasFlashcards && activeFlashcard ? (
         <div className="wiki-check-section">
-          <div className="wiki-check-section-heading">
+          <div className={mode === "flashcards" ? "wiki-check-section-heading" : "wiki-check-section-heading hidden"}>
             <span>Flashcards</span>
-            <strong>{props.page.flashcards.length} cards</strong>
+            <strong>
+              Card {flashcardIndex + 1} / {props.page.flashcards.length}
+            </strong>
           </div>
-          <div className="wiki-flashcard-stack">
-          {props.page.flashcards.map((flashcard) => {
-            const isRevealed = revealedFlashcards.has(flashcard.id);
-
-            return (
+          {mode === "flashcards" ? (
+            <div className="wiki-flashcard-player">
               <button
-                className={isRevealed ? "wiki-mini-flashcard revealed" : "wiki-mini-flashcard"}
-                key={flashcard.id}
+                className={isFlashcardRevealed ? "wiki-study-flashcard revealed" : "wiki-study-flashcard"}
                 type="button"
-                onClick={() =>
-                  setRevealedFlashcards((current) => {
-                    const next = new Set(current);
-                    next.has(flashcard.id) ? next.delete(flashcard.id) : next.add(flashcard.id);
-                    return next;
-                  })
-                }
+                onClick={() => setIsFlashcardRevealed((current) => !current)}
               >
-                <span>{isRevealed ? "Answer" : "Prompt"}</span>
-                <strong>{isRevealed ? flashcard.back : flashcard.front}</strong>
-                <small>{isRevealed ? "Click to hide answer" : "Click to reveal answer"}</small>
+                <span>{isFlashcardRevealed ? "Answer" : "Prompt"}</span>
+                <strong>{isFlashcardRevealed ? activeFlashcard.back : activeFlashcard.front}</strong>
+                <small>{isFlashcardRevealed ? "Click to hide answer" : "Click to reveal answer"}</small>
               </button>
-            );
-          })}
-          </div>
+              <div className="wiki-flashcard-player-actions">
+                <button className="secondary-button compact-button" type="button" disabled={flashcardIndex === 0} onClick={() => moveFlashcard(-1)}>
+                  Previous
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => setIsFlashcardRevealed((current) => !current)}>
+                  {isFlashcardRevealed ? "Hide answer" : "Reveal answer"}
+                </button>
+                <button className="secondary-button compact-button" type="button" disabled={flashcardIndex >= props.page.flashcards.length - 1} onClick={() => moveFlashcard(1)}>
+                  Next
+                </button>
+              </div>
+              <div className="wiki-flashcard-strip" aria-label="Flashcard picker">
+                {props.page.flashcards.map((flashcard, index) => (
+                  <button
+                    className={index === flashcardIndex ? "active" : ""}
+                    key={flashcard.id}
+                    type="button"
+                    onClick={() => openFlashcards(index)}
+                    title={flashcard.front}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -1170,6 +1345,36 @@ function WikiEditor(props: {
             </aside>
           </div>
         </label>
+
+        <section className="wiki-practice-editor wiki-sources-editor" aria-label="Article sources">
+          <header>
+            <div>
+              <span>Loose sources</span>
+              <h2>Books, articles, courses, notes</h2>
+            </div>
+          </header>
+          <div className="wiki-practice-editor-grid">
+            <label>
+              Sources JSON
+              <textarea
+                className="wiki-insert-json-textarea"
+                value={props.form.sourcesJson}
+                onChange={(event) => props.onUpdate("sourcesJson", event.target.value)}
+                placeholder={sampleWikiSourcesJson}
+              />
+              <button className="secondary-button compact-button" type="button" onClick={() => props.onUpdate("sourcesJson", sampleWikiSourcesJson)}>
+                Use source sample
+              </button>
+            </label>
+            <div className="wiki-editor-help-card">
+              <span>Why sources are separate</span>
+              <p>
+                A topic can appear in many books or articles. Keep sources here so search can find pages by book,
+                author, chapter, or loose notes without cluttering the article body.
+              </p>
+            </div>
+          </div>
+        </section>
 
         <section className="wiki-practice-editor" aria-label="Knowledge checks">
           <header>
@@ -1441,6 +1646,7 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
       <h1>${escapeHtml(page.title)}</h1>
       ${page.summary ? `<p class="lead">${escapeHtml(page.summary)}</p>` : ""}
       ${renderMarkdownToHtml(page.contentMarkdown)}
+      ${renderWikiSourcesToHtml(page)}
       ${renderWikiPracticeInsertsToHtml(page)}
     </article>
   `).join("\n");
@@ -1466,6 +1672,10 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
     code { font-family: Consolas, monospace; font-size: 10pt; }
     blockquote { margin: 12px 0; border-left: 4px solid #a2a9b1; padding: 8px 12px; background: #f8f9fa; }
     .checks { margin-top: 24px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
+    .sources { margin-top: 20px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
+    .source-card { break-inside: avoid; border: 1px solid #a2a9b1; margin: 8px 0; padding: 8px 10px; font-family: Arial, sans-serif; font-size: 10pt; }
+    .source-card strong { display: block; margin-bottom: 4px; }
+    .source-card p { margin: 4px 0 0; }
     .check-card { break-inside: avoid; border: 1px solid #a2a9b1; margin: 10px 0; padding: 10px 12px; }
     .check-card strong { display: block; margin-bottom: 6px; }
     .correct { font-weight: 700; }
@@ -1609,6 +1819,24 @@ function renderWikiPracticeInsertsToHtml(page: WikiPageRecord) {
   return `<section class="checks"><h2>Knowledge checks</h2>${quizHtml}${flashcardHtml}</section>`;
 }
 
+function renderWikiSourcesToHtml(page: WikiPageRecord) {
+  if (!page.sources.length) {
+    return "";
+  }
+
+  const sourcesHtml = page.sources.map((source) => {
+    const details = [
+      source.type,
+      source.author,
+      source.locator
+    ].filter(Boolean).map((value) => escapeHtml(value ?? "")).join(" · ");
+
+    return `<div class="source-card"><strong>${escapeHtml(source.title)}</strong>${details ? `<span>${details}</span>` : ""}${source.url ? `<p>${escapeHtml(source.url)}</p>` : ""}${source.notes ? `<p>${escapeHtml(source.notes)}</p>` : ""}</div>`;
+  }).join("");
+
+  return `<section class="sources"><h2>Sources</h2>${sourcesHtml}</section>`;
+}
+
 function formatInlineHtml(text: string) {
   return escapeHtml(text)
     .replace(/!\[([^\]]*)]\(([^)]+)\)/g, (_, alt: string, source: string) => {
@@ -1636,6 +1864,7 @@ function createWikiForm(page: WikiPageRecord): WikiForm {
     slug: page.slug,
     summary: page.summary ?? "",
     contentMarkdown: page.contentMarkdown,
+    sourcesJson: JSON.stringify(toWikiSourceRequests(page.sources), null, 2),
     quizJson: JSON.stringify(toWikiQuizQuestionRequests(page.quizQuestions), null, 2),
     flashcardsJson: JSON.stringify(toWikiFlashcardRequests(page.flashcards), null, 2),
     sortOrder: page.sortOrder,
@@ -1650,9 +1879,21 @@ function toCreateWikiPageRequest(form: WikiForm): CreateWikiPageRequest {
     slug: form.slug.trim() || undefined,
     summary: form.summary.trim() || undefined,
     contentMarkdown: form.contentMarkdown,
+    sources: parseWikiSourcesJson(form.sourcesJson),
     quizQuestions: parseWikiQuizJson(form.quizJson),
     flashcards: parseWikiFlashcardJson(form.flashcardsJson)
   };
+}
+
+function toWikiSourceRequests(sources: WikiPageRecord["sources"]): WikiSourceRequest[] {
+  return sources.map((source) => ({
+    title: source.title,
+    type: source.type ?? undefined,
+    author: source.author ?? undefined,
+    url: source.url ?? undefined,
+    locator: source.locator ?? undefined,
+    notes: source.notes ?? undefined
+  }));
 }
 
 function toWikiQuizQuestionRequests(questions: WikiPageRecord["quizQuestions"]): WikiQuizQuestionRequest[] {
@@ -1761,10 +2002,41 @@ function normalizeImportedWikiPage(value: unknown, path: string): ImportWikiPage
     slug: readOptionalWikiString(value.slug) || undefined,
     summary: readOptionalWikiString(value.summary) || leadParagraphs[0] || undefined,
     contentMarkdown,
+    sources: readWikiSources(value.sources ?? value.references, `${path}.sources`),
     quizQuestions: readWikiQuizQuestions(value.quizQuestions ?? value.quiz, `${path}.quizQuestions`),
     flashcards: readWikiFlashcards(value.flashcards, `${path}.flashcards`),
     children
   };
+}
+
+function parseWikiSourcesJson(contents: string): WikiSourceRequest[] {
+  const trimmed = contents.trim();
+
+  if (!trimmed) {
+    return [];
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    throw new Error("Sources JSON must be valid JSON.");
+  }
+
+  const rawSources = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed) && Array.isArray(parsed.sources)
+      ? parsed.sources
+      : isRecord(parsed) && Array.isArray(parsed.references)
+        ? parsed.references
+        : null;
+
+  if (!rawSources) {
+    throw new Error("Sources JSON must be an array or an object with sources/references.");
+  }
+
+  return readWikiSources(rawSources, "sources");
 }
 
 function parseWikiQuizJson(contents: string): WikiQuizQuestionRequest[] {
@@ -1823,6 +2095,34 @@ function parseWikiFlashcardJson(contents: string): WikiFlashcardRequest[] {
   }
 
   return readWikiFlashcards(rawFlashcards, "flashcards");
+}
+
+function readWikiSources(value: unknown, path: string): WikiSourceRequest[] {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`${path} must be an array.`);
+  }
+
+  return value.map((source, index) => {
+    if (!isRecord(source)) {
+      throw new Error(`${path}[${index}] must be a JSON object.`);
+    }
+
+    return {
+      title: readRequiredWikiString(source, "title", `${path}[${index}]`),
+      type: readOptionalWikiString(source.type) || readOptionalWikiString(source.kind) || undefined,
+      author: readOptionalWikiString(source.author) || readOptionalWikiString(source.authors) || undefined,
+      url: readOptionalWikiString(source.url) || undefined,
+      locator: readOptionalWikiString(source.locator)
+        || readOptionalWikiString(source.location)
+        || readOptionalWikiString(source.chapter)
+        || undefined,
+      notes: readOptionalWikiString(source.notes) || readOptionalWikiString(source.note) || undefined
+    };
+  });
 }
 
 function readWikiQuizQuestions(value: unknown, path: string): WikiQuizQuestionRequest[] {

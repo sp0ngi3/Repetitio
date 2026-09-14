@@ -31,6 +31,7 @@ public sealed class BackupArchiveValidator
         "NotePages",
         "WikiPages",
         "WikiImages",
+        "WikiSources",
         "WikiQuizQuestions",
         "WikiQuizOptions",
         "WikiFlashcards"

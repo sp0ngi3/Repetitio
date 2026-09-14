@@ -3714,6 +3714,130 @@ textarea {
     #ffffff;
 }
 
+.wiki-source-list {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #c8ccd1;
+  margin: 24px 0;
+  padding: 14px;
+  background: #f8f9fa;
+}
+
+.wiki-source-list-heading,
+.wiki-study-tabs,
+.wiki-flashcard-player-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wiki-source-list-heading h2 {
+  border-bottom: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-source-list-heading span,
+.wiki-source-card > span,
+.wiki-study-mode-card span,
+.wiki-study-flashcard > span,
+.wiki-study-flashcard small,
+.wiki-editor-help-card span {
+  display: block;
+  color: #54595d;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.wiki-source-list-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.wiki-source-card {
+  border: 1px solid #c8ccd1;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.wiki-source-card h3 {
+  border-bottom: 0;
+  margin: 4px 0 8px;
+  padding: 0;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.wiki-source-card dl {
+  display: grid;
+  gap: 5px;
+  margin: 0 0 8px;
+}
+
+.wiki-source-card dl div {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  gap: 8px;
+}
+
+.wiki-source-card dt,
+.wiki-source-card dd {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.84rem;
+}
+
+.wiki-source-card dt {
+  color: #72777d;
+  font-weight: 800;
+}
+
+.wiki-source-card p {
+  margin: 0;
+  color: #54595d;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.wiki-editor-help-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid #c8ccd1;
+  padding: 14px;
+  color: #54595d;
+  background: #f8f9fa;
+}
+
+.wiki-editor-help-card p {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.wiki-result-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.wiki-result-sources span {
+  border: 1px solid #c8ccd1;
+  padding: 3px 7px;
+  color: #54595d;
+  background: #f8f9fa;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
 .wiki-practice-header {
   display: flex;
   justify-content: space-between;
@@ -3781,6 +3905,69 @@ textarea {
 .wiki-check-section {
   display: grid;
   gap: 10px;
+}
+
+.wiki-check-section.hidden {
+  display: none;
+}
+
+.wiki-study-tabs {
+  justify-content: flex-start;
+  border-bottom: 1px solid #eaecf0;
+  padding-bottom: 12px;
+}
+
+.wiki-study-tabs button {
+  border: 1px solid #c8ccd1;
+  padding: 7px 12px;
+  color: #36c;
+  background: #ffffff;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wiki-study-tabs button.active {
+  border-color: #36c;
+  color: #ffffff;
+  background: #36c;
+}
+
+.wiki-study-menu {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.wiki-study-mode-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #c8ccd1;
+  padding: 16px;
+  text-align: left;
+  color: #202122;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.wiki-study-mode-card:hover {
+  border-color: #36c;
+  background: #f6f8ff;
+  box-shadow: 0 0 0 3px rgba(51, 102, 204, 0.1);
+}
+
+.wiki-study-mode-card strong {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.15rem;
+}
+
+.wiki-study-mode-card small {
+  color: #54595d;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .wiki-check-section-heading {
@@ -4004,6 +4191,74 @@ textarea {
 
 .wiki-mini-flashcard.revealed {
   background: #eef6ff;
+}
+
+.wiki-flashcard-player {
+  display: grid;
+  gap: 12px;
+}
+
+.wiki-study-flashcard {
+  display: grid;
+  gap: 14px;
+  min-height: 240px;
+  border: 1px solid #c8ccd1;
+  padding: 22px;
+  text-align: left;
+  color: #202122;
+  background:
+    linear-gradient(180deg, rgba(51, 102, 204, 0.06), rgba(255, 255, 255, 0) 150px),
+    #ffffff;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+}
+
+.wiki-study-flashcard strong {
+  align-self: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.45rem;
+  line-height: 1.45;
+}
+
+.wiki-study-flashcard.revealed {
+  border-color: #2f8f5b;
+  background:
+    linear-gradient(180deg, rgba(47, 143, 91, 0.08), rgba(255, 255, 255, 0) 150px),
+    #f8fffb;
+}
+
+.wiki-flashcard-player-actions {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.wiki-flashcard-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 120px;
+  overflow: auto;
+  border: 1px solid #eaecf0;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.wiki-flashcard-strip button {
+  width: 34px;
+  height: 30px;
+  border: 1px solid #c8ccd1;
+  color: #36c;
+  background: #f8f9fa;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.wiki-flashcard-strip button.active {
+  border-color: #36c;
+  color: #ffffff;
+  background: #36c;
 }
 
 .official-wiki-content ul,
@@ -4430,11 +4685,14 @@ textarea {
 [data-theme="dark"] .wiki-left-rail,
 [data-theme="dark"] .wiki-page-contents,
 [data-theme="dark"] .wiki-infobox,
+[data-theme="dark"] .wiki-source-list,
+[data-theme="dark"] .wiki-source-card,
 [data-theme="dark"] .wiki-search-strip,
 [data-theme="dark"] .wiki-edit-metadata,
 [data-theme="dark"] .wiki-markdown-toolbar,
 [data-theme="dark"] .wiki-practice-editor,
 [data-theme="dark"] .wiki-editor-preview,
+[data-theme="dark"] .wiki-editor-help-card,
 [data-theme="dark"] .wiki-import-reference {
   border-color: #2f3b45;
   color: #e8edf2;
@@ -4446,6 +4704,7 @@ textarea {
 [data-theme="dark"] .wiki-page-contents a,
 [data-theme="dark"] .text-button,
 [data-theme="dark"] .wiki-search-results strong,
+[data-theme="dark"] .wiki-source-card h3,
 [data-theme="dark"] .official-wiki-content a {
   color: #8fc3ff;
 }
@@ -4454,7 +4713,9 @@ textarea {
 [data-theme="dark"] .wiki-search-results span,
 [data-theme="dark"] .wiki-search-results button,
 [data-theme="dark"] .wiki-infobox dd,
-[data-theme="dark"] .wiki-infobox dt {
+[data-theme="dark"] .wiki-infobox dt,
+[data-theme="dark"] .wiki-study-mode-card,
+[data-theme="dark"] .wiki-study-flashcard {
   color: #e8edf2;
 }
 
@@ -4462,6 +4723,13 @@ textarea {
 [data-theme="dark"] .wiki-article-titlebar,
 [data-theme="dark"] .wiki-infobox > strong,
 [data-theme="dark"] .wiki-infobox div,
+[data-theme="dark"] .wiki-source-list,
+[data-theme="dark"] .wiki-source-card,
+[data-theme="dark"] .wiki-study-tabs,
+[data-theme="dark"] .wiki-study-mode-card,
+[data-theme="dark"] .wiki-study-flashcard,
+[data-theme="dark"] .wiki-flashcard-strip,
+[data-theme="dark"] .wiki-editor-help-card,
 [data-theme="dark"] .wiki-practice-inserts,
 [data-theme="dark"] .wiki-practice-header,
 [data-theme="dark"] .wiki-practice-editor header,
@@ -4482,7 +4750,17 @@ textarea {
 [data-theme="dark"] .wiki-field-hint,
 [data-theme="dark"] .wiki-image-upload-status,
 [data-theme="dark"] .wiki-preview-heading span,
-[data-theme="dark"] .wiki-search-results small {
+[data-theme="dark"] .wiki-search-results small,
+[data-theme="dark"] .wiki-source-list-heading span,
+[data-theme="dark"] .wiki-source-card > span,
+[data-theme="dark"] .wiki-source-card dt,
+[data-theme="dark"] .wiki-source-card p,
+[data-theme="dark"] .wiki-editor-help-card,
+[data-theme="dark"] .wiki-editor-help-card span,
+[data-theme="dark"] .wiki-study-mode-card span,
+[data-theme="dark"] .wiki-study-mode-card small,
+[data-theme="dark"] .wiki-study-flashcard > span,
+[data-theme="dark"] .wiki-study-flashcard small {
   color: #9ba8b4;
 }
 
@@ -4553,10 +4831,46 @@ textarea {
 
 [data-theme="dark"] .wiki-search-results button.active,
 [data-theme="dark"] .wiki-search-results button:hover,
-[data-theme="dark"] .wiki-related-pages button {
+[data-theme="dark"] .wiki-related-pages button,
+[data-theme="dark"] .wiki-result-sources span {
   border-color: #334451;
   color: #8fc3ff;
   background: #111820;
+}
+
+[data-theme="dark"] .wiki-study-tabs button,
+[data-theme="dark"] .wiki-flashcard-strip button {
+  border-color: #334451;
+  color: #8fc3ff;
+  background: #111820;
+}
+
+[data-theme="dark"] .wiki-study-tabs button.active,
+[data-theme="dark"] .wiki-flashcard-strip button.active {
+  border-color: #8fc3ff;
+  color: #07111c;
+  background: #8fc3ff;
+}
+
+[data-theme="dark"] .wiki-study-mode-card,
+[data-theme="dark"] .wiki-study-flashcard,
+[data-theme="dark"] .wiki-flashcard-strip {
+  border-color: #334451;
+  background: #111820;
+}
+
+[data-theme="dark"] .wiki-study-mode-card:hover,
+[data-theme="dark"] .wiki-study-flashcard:hover {
+  border-color: #8fc3ff;
+  background: #13263a;
+  box-shadow: 0 0 0 3px rgba(143, 195, 255, 0.12);
+}
+
+[data-theme="dark"] .wiki-study-flashcard.revealed {
+  border-color: #3ea96e;
+  background:
+    linear-gradient(180deg, rgba(62, 169, 110, 0.12), rgba(17, 24, 32, 0) 150px),
+    #10231b;
 }
 
 [data-theme="dark"] .wiki-quiz-card,

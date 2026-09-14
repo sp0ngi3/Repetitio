@@ -95,6 +95,11 @@ public sealed class RepetitioDbContext : DbContext
     public DbSet<WikiImage> WikiImages => Set<WikiImage>();
 
     /// <summary>
+    /// Gets the wiki sources table.
+    /// </summary>
+    public DbSet<WikiSource> WikiSources => Set<WikiSource>();
+
+    /// <summary>
     /// Gets the wiki quiz questions table.
     /// </summary>
     public DbSet<WikiQuizQuestion> WikiQuizQuestions => Set<WikiQuizQuestion>();
@@ -361,6 +366,29 @@ public sealed class RepetitioDbContext : DbContext
             entity.HasIndex(image => image.ContentType);
             entity.HasIndex(image => image.SizeBytes);
             entity.HasIndex(image => image.CreatedAt);
+        });
+
+        modelBuilder.Entity<WikiSource>(entity =>
+        {
+            entity.HasKey(source => source.Id);
+            entity.Property(source => source.Title).HasMaxLength(500).IsRequired();
+            entity.Property(source => source.Type).HasMaxLength(80);
+            entity.Property(source => source.Author).HasMaxLength(240);
+            entity.Property(source => source.Url).HasMaxLength(1000);
+            entity.Property(source => source.Locator).HasMaxLength(240);
+            entity.Property(source => source.Notes).HasMaxLength(2000);
+            entity.Property(source => source.SortOrder).IsRequired();
+            entity.Property(source => source.CreatedAt).IsRequired();
+            entity.Property(source => source.UpdatedAt).IsRequired();
+            entity.HasIndex(source => source.WikiPageId);
+            entity.HasIndex(source => source.Title);
+            entity.HasIndex(source => source.Type);
+            entity.HasIndex(source => source.Author);
+            entity.HasIndex(source => new { source.WikiPageId, source.SortOrder });
+            entity.HasOne(source => source.WikiPage)
+                .WithMany(page => page.Sources)
+                .HasForeignKey(source => source.WikiPageId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<WikiQuizQuestion>(entity =>

@@ -31,6 +31,11 @@ public sealed record CreateWikiPageRequest
     public string? ContentMarkdown { get; init; }
 
     /// <summary>
+    /// Gets loose sources attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiSourceRequest>? Sources { get; init; }
+
+    /// <summary>
     /// Gets optional lightweight quiz questions attached to the page.
     /// </summary>
     public IReadOnlyCollection<WikiQuizQuestionRequest>? QuizQuestions { get; init; }
@@ -70,6 +75,11 @@ public sealed record UpdateWikiPageRequest
     /// Gets the editable markdown content.
     /// </summary>
     public string? ContentMarkdown { get; init; }
+
+    /// <summary>
+    /// Gets loose sources attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiSourceRequest>? Sources { get; init; }
 
     /// <summary>
     /// Gets the manual display order inside the parent page.
@@ -118,6 +128,11 @@ public sealed record ImportWikiPageNodeRequest
     public string? ContentMarkdown { get; init; }
 
     /// <summary>
+    /// Gets loose sources attached to the page.
+    /// </summary>
+    public IReadOnlyCollection<WikiSourceRequest>? Sources { get; init; }
+
+    /// <summary>
     /// Gets optional lightweight quiz questions attached to the page.
     /// </summary>
     public IReadOnlyCollection<WikiQuizQuestionRequest>? QuizQuestions { get; init; }
@@ -131,6 +146,42 @@ public sealed record ImportWikiPageNodeRequest
     /// Gets nested child pages to import under this page.
     /// </summary>
     public IReadOnlyCollection<ImportWikiPageNodeRequest>? Children { get; init; }
+}
+
+/// <summary>
+/// Represents one loose wiki source request.
+/// </summary>
+public sealed record WikiSourceRequest
+{
+    /// <summary>
+    /// Gets the source title.
+    /// </summary>
+    public required string Title { get; init; }
+
+    /// <summary>
+    /// Gets the source type, such as book, article, course, paper, video, or notes.
+    /// </summary>
+    public string? Type { get; init; }
+
+    /// <summary>
+    /// Gets the optional author or publisher.
+    /// </summary>
+    public string? Author { get; init; }
+
+    /// <summary>
+    /// Gets the optional URL.
+    /// </summary>
+    public string? Url { get; init; }
+
+    /// <summary>
+    /// Gets the optional source locator, such as chapter, page, section, or timestamp.
+    /// </summary>
+    public string? Locator { get; init; }
+
+    /// <summary>
+    /// Gets optional notes about the source.
+    /// </summary>
+    public string? Notes { get; init; }
 }
 
 /// <summary>
@@ -335,6 +386,11 @@ public sealed record WikiPageResponse
     public required DateTime UpdatedAt { get; init; }
 
     /// <summary>
+    /// Gets loose sources attached to the page.
+    /// </summary>
+    public required IReadOnlyCollection<WikiSourceResponse> Sources { get; init; }
+
+    /// <summary>
     /// Gets lightweight quiz questions attached to the page.
     /// </summary>
     public required IReadOnlyCollection<WikiQuizQuestionResponse> QuizQuestions { get; init; }
@@ -343,6 +399,52 @@ public sealed record WikiPageResponse
     /// Gets lightweight flashcards attached to the page.
     /// </summary>
     public required IReadOnlyCollection<WikiFlashcardResponse> Flashcards { get; init; }
+}
+
+/// <summary>
+/// Represents one loose source attached to a wiki page.
+/// </summary>
+public sealed record WikiSourceResponse
+{
+    /// <summary>
+    /// Gets the source identifier.
+    /// </summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>
+    /// Gets the source title.
+    /// </summary>
+    public required string Title { get; init; }
+
+    /// <summary>
+    /// Gets the source type.
+    /// </summary>
+    public string? Type { get; init; }
+
+    /// <summary>
+    /// Gets the optional author or publisher.
+    /// </summary>
+    public string? Author { get; init; }
+
+    /// <summary>
+    /// Gets the optional URL.
+    /// </summary>
+    public string? Url { get; init; }
+
+    /// <summary>
+    /// Gets the optional source locator.
+    /// </summary>
+    public string? Locator { get; init; }
+
+    /// <summary>
+    /// Gets optional notes about the source.
+    /// </summary>
+    public string? Notes { get; init; }
+
+    /// <summary>
+    /// Gets the manual display order inside the page.
+    /// </summary>
+    public required int SortOrder { get; init; }
 }
 
 /// <summary>

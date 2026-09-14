@@ -26,6 +26,11 @@ public sealed class WikiPage
     public ICollection<WikiPage> Children { get; } = [];
 
     /// <summary>
+    /// Gets the loose sources attached to the page.
+    /// </summary>
+    public ICollection<WikiSource> Sources { get; } = [];
+
+    /// <summary>
     /// Gets the lightweight quiz questions attached to the page.
     /// </summary>
     public ICollection<WikiQuizQuestion> QuizQuestions { get; } = [];

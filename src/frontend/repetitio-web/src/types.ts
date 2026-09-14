@@ -1115,10 +1115,34 @@ export interface WikiPage {
   createdAt: string;
   /** Last update date and time. */
   updatedAt: string;
+  /** Loose sources attached to the page. */
+  sources: WikiSource[];
   /** Lightweight quiz questions attached to the page. */
   quizQuestions: WikiQuizQuestion[];
   /** Lightweight flashcards attached to the page. */
   flashcards: WikiFlashcard[];
+}
+
+/**
+ * Represents one loose source attached to a wiki page.
+ */
+export interface WikiSource {
+  /** Unique source identifier. */
+  id: string;
+  /** Source title. */
+  title: string;
+  /** Source type, such as book, article, course, paper, video, or notes. */
+  type?: string | null;
+  /** Optional author or publisher. */
+  author?: string | null;
+  /** Optional URL. */
+  url?: string | null;
+  /** Optional source locator, such as chapter, page, section, or timestamp. */
+  locator?: string | null;
+  /** Optional notes about the source. */
+  notes?: string | null;
+  /** Manual display order inside the page. */
+  sortOrder: number;
 }
 
 /**
@@ -1221,6 +1245,8 @@ export interface CreateWikiPageRequest {
   summary?: string;
   /** Editable markdown content. */
   contentMarkdown?: string;
+  /** Loose sources attached to the page. */
+  sources?: WikiSourceRequest[];
   /** Lightweight quiz questions attached to the page. */
   quizQuestions?: WikiQuizQuestionRequest[];
   /** Lightweight flashcards attached to the page. */
@@ -1249,12 +1275,32 @@ export interface ImportWikiPageNodeRequest {
   summary?: string;
   /** Editable markdown content. */
   contentMarkdown?: string;
+  /** Loose sources attached to the page. */
+  sources?: WikiSourceRequest[];
   /** Lightweight quiz questions attached to the page. */
   quizQuestions?: WikiQuizQuestionRequest[];
   /** Lightweight flashcards attached to the page. */
   flashcards?: WikiFlashcardRequest[];
   /** Nested child pages. */
   children?: ImportWikiPageNodeRequest[];
+}
+
+/**
+ * Represents one loose wiki source request.
+ */
+export interface WikiSourceRequest {
+  /** Source title. */
+  title: string;
+  /** Source type, such as book, article, course, paper, video, or notes. */
+  type?: string;
+  /** Optional author or publisher. */
+  author?: string;
+  /** Optional URL. */
+  url?: string;
+  /** Optional source locator, such as chapter, page, section, or timestamp. */
+  locator?: string;
+  /** Optional notes about the source. */
+  notes?: string;
 }
 
 /**

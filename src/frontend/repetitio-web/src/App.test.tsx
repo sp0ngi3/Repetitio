@@ -238,6 +238,18 @@ const wikiPages: WikiPageRecord[] = [
     childCount: 0,
     createdAt: "2026-09-08T12:00:00Z",
     updatedAt: "2026-09-08T12:00:00Z",
+    sources: [
+      {
+        id: "wiki-source-1",
+        title: "Designing Data-Intensive Applications",
+        type: "Book",
+        author: "Martin Kleppmann",
+        locator: "Chapter 1",
+        notes: "Reference source for fundamentals.",
+        url: null,
+        sortOrder: 0
+      }
+    ],
     quizQuestions: [
       {
         id: "wiki-quiz-1",
