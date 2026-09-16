@@ -88,7 +88,9 @@ On Windows, the root folder can contain a visible launcher executable:
 
 Double-clicking `00-REPETITIO.exe` opens a small console menu with Run, Start, Stop, Restart, and Status actions. `Run` starts Docker Compose, opens the frontend, waits for Enter, and then shuts the stack down.
 
-The executable is generated from `tools/Repetitio.Launcher` and copied into the root folder for convenience.
+The executable is generated from `tools/Repetitio.Launcher` and copied into the root folder for convenience. Double-click `BUILD-REPETITIO-EXE.cmd` whenever you want to rebuild it. The build creates a single self-contained Windows executable and embeds the same icon used by the website.
+
+When starting the application, the launcher checks whether the Docker engine is available. If Docker Desktop is installed but not running, the launcher starts it automatically and waits up to two minutes for it to become ready. If Docker is missing or fails to start, the console shows a concrete recovery message instead of closing silently.
 
 Default local URLs:
 

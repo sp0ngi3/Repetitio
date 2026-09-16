@@ -10,6 +10,7 @@ internal static class Program
 {
     private const string FrontendUrl = "http://localhost:3000";
     private const string AutomaticShutdownBackupUrl = "http://localhost:8080/api/backup/automatic-shutdown";
+    private static readonly TimeSpan DockerStartupTimeout = TimeSpan.FromMinutes(2);
 
     /// <summary>
     /// Runs the launcher command.
@@ -78,6 +79,11 @@ internal static class Program
     /// <returns>The process exit code.</returns>
     private static async Task<int> StartAsync(string workspace)
     {
+        if (!await EnsureDockerReadyAsync())
+        {
+            return 1;
+        }
+
         var exitCode = await RunDockerComposeAsync(workspace, "up", "-d", "--build");
 
         if (exitCode == 0)
@@ -182,12 +188,121 @@ internal static class Program
         process.OutputDataReceived += (_, eventArgs) => WriteLine(eventArgs.Data, Console.Out);
         process.ErrorDataReceived += (_, eventArgs) => WriteLine(eventArgs.Data, Console.Error);
 
-        process.Start();
+        try
+        {
+            process.Start();
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            Console.Error.WriteLine("Docker CLI was not found. Install Docker Desktop and ensure 'docker' is available in PATH.");
+            return 1;
+        }
+
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
         await process.WaitForExitAsync();
 
         return process.ExitCode;
+    }
+
+    /// <summary>
+    /// Ensures that Docker Desktop and its engine are ready before Compose is invoked.
+    /// </summary>
+    /// <returns><see langword="true"/> when Docker is ready.</returns>
+    private static async Task<bool> EnsureDockerReadyAsync()
+    {
+        var probe = await ProbeDockerAsync();
+        if (probe == DockerProbeResult.Ready)
+        {
+            return true;
+        }
+
+        if (probe == DockerProbeResult.CliMissing)
+        {
+            Console.Error.WriteLine("Docker is not installed or its command-line tool is unavailable.");
+            Console.Error.WriteLine("Install Docker Desktop from https://www.docker.com/products/docker-desktop/ and try again.");
+            return false;
+        }
+
+        Console.WriteLine("Docker engine is not running. Starting Docker Desktop...");
+        if (!TryStartDockerDesktop())
+        {
+            Console.Error.WriteLine("Docker Desktop could not be started automatically.");
+            Console.Error.WriteLine("Open Docker Desktop manually, wait until it is ready, and run Repetitio again.");
+            return false;
+        }
+
+        var deadline = DateTime.UtcNow + DockerStartupTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            if (await ProbeDockerAsync() == DockerProbeResult.Ready)
+            {
+                Console.WriteLine("Docker is ready.");
+                return true;
+            }
+
+            Console.Write(".");
+        }
+
+        Console.WriteLine();
+        Console.Error.WriteLine("Docker Desktop did not become ready within two minutes.");
+        Console.Error.WriteLine("Check Docker Desktop for an error, then run Repetitio again.");
+        return false;
+    }
+
+    private static async Task<DockerProbeResult> ProbeDockerAsync()
+    {
+        using var process = new Process();
+        process.StartInfo.FileName = "docker";
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.ArgumentList.Add("info");
+        process.StartInfo.ArgumentList.Add("--format");
+        process.StartInfo.ArgumentList.Add("{{.ServerVersion}}");
+
+        try
+        {
+            process.Start();
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return DockerProbeResult.CliMissing;
+        }
+
+        await process.WaitForExitAsync();
+        return process.ExitCode == 0 ? DockerProbeResult.Ready : DockerProbeResult.EngineUnavailable;
+    }
+
+    private static bool TryStartDockerDesktop()
+    {
+        var candidatePaths = new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Docker", "Docker", "Docker Desktop.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Docker", "Docker Desktop.exe")
+        };
+
+        var executable = candidatePaths.FirstOrDefault(File.Exists);
+        if (executable is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = executable,
+                UseShellExecute = true
+            });
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -316,5 +431,12 @@ internal static class Program
         /// Gets the number of retained automatic backups.
         /// </summary>
         public int RetainedAutomaticBackupCount { get; init; }
+    }
+
+    private enum DockerProbeResult
+    {
+        Ready,
+        CliMissing,
+        EngineUnavailable
     }
 }

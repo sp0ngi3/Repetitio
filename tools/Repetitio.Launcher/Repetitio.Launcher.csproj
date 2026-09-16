@@ -7,6 +7,12 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Repetitio</AssemblyName>
     <RootNamespace>Repetitio.Launcher</RootNamespace>
+    <ApplicationIcon>Assets\repetitio.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Product>Repetitio</Product>
+    <Description>Local Repetitio launcher</Description>
   </PropertyGroup>
 
 </Project>
