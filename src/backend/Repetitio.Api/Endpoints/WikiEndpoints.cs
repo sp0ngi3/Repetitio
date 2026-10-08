@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Repetitio.Application.Wiki;
@@ -39,6 +41,7 @@ public static class WikiEndpoints
         group.MapPost("/", CreateWikiPageAsync).WithName("CreateWikiPage");
         group.MapPost("/batch", ImportWikiPagesAsync).WithName("ImportWikiPages");
         group.MapPost("/images", UploadWikiImageAsync).DisableAntiforgery().WithName("UploadWikiImage");
+        group.MapPost("/images/remote", ImportRemoteImageAsync);
         group.MapPut("/{id:guid}", UpdateWikiPageAsync).WithName("UpdateWikiPage");
         group.MapDelete("/{id:guid}", DeleteWikiPageAsync).WithName("DeleteWikiPage");
 
@@ -246,6 +249,75 @@ public static class WikiEndpoints
         await dbContext.SaveChangesAsync();
 
         return Results.Created($"/api/wiki/images/{image.Id}", ToImageResponse(image));
+    }
+
+    private sealed record RemoteImageRequest(string Url);
+
+    private static async Task<IResult> ImportRemoteImageAsync(RepetitioDbContext dbContext, RemoteImageRequest request)
+    {
+        if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")
+            || !string.IsNullOrEmpty(uri.UserInfo)) return Results.BadRequest("Use a public HTTP or HTTPS image URL.");
+        using var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            UseProxy = false,
+            // Resolve and connect to the validated address to avoid DNS rebinding and local network access.
+            ConnectCallback = async (context, token) =>
+            {
+                var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, token);
+                var address = addresses.FirstOrDefault(IsPublicImageAddress)
+                    ?? throw new HttpRequestException("Only public image hosts are supported.");
+                var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                try { await socket.ConnectAsync(address, context.DnsEndPoint.Port, token); return new NetworkStream(socket, ownsSocket: true); }
+                catch { socket.Dispose(); throw; }
+            }
+        };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Repetitio/1.0 (Local Wiki image import)");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        try
+        {
+            for (var redirect = 0; redirect < 4; redirect++)
+            {
+                using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                if ((int)response.StatusCode is >= 300 and < 400 && response.Headers.Location is Uri location)
+                {
+                    uri = new Uri(uri, location);
+                    if (uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo)) break;
+                    continue;
+                }
+                if (!response.IsSuccessStatusCode) return Results.BadRequest("The image host refused the download. Upload the image file instead.");
+                if (response.Content.Headers.ContentLength > MaxWikiImageBytes) return Results.BadRequest("Wiki images can be at most 10 MB.");
+                await using var source = await response.Content.ReadAsStreamAsync(timeout.Token);
+                using var data = new MemoryStream();
+                var buffer = new byte[81920];
+                int count;
+                while ((count = await source.ReadAsync(buffer, timeout.Token)) > 0)
+                {
+                    if (data.Length + count > MaxWikiImageBytes) return Results.BadRequest("Wiki images can be at most 10 MB.");
+                    data.Write(buffer, 0, count);
+                }
+                data.Position = 0;
+                var fileName = Path.GetFileName(uri.LocalPath);
+                var file = new FormFile(data, 0, data.Length, "file", string.IsNullOrWhiteSpace(fileName) ? "web-image" : fileName)
+                { Headers = new HeaderDictionary(), ContentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream" };
+                return await UploadWikiImageAsync(dbContext, file);
+            }
+        }
+        catch (Exception error) when (error is HttpRequestException or TaskCanceledException or IOException)
+        { return Results.BadRequest("Unable to download this image. Copy the image itself or upload a file instead."); }
+        return Results.BadRequest("Too many image redirects.");
+    }
+
+    private static bool IsPublicImageAddress(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        var bytes = address.GetAddressBytes();
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            return (bytes[0] & 0xe0) == 0x20; // Global unicast only.
+        return !IPAddress.IsLoopback(address) && bytes[0] is not (0 or 10 or 127) && bytes[0] < 224
+            && !(bytes[0] == 169 && bytes[1] == 254) && !(bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+            && !(bytes[0] == 192 && bytes[1] == 168) && !(bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127);
     }
 
     /// <summary>
@@ -1281,6 +1353,10 @@ public static class WikiEndpoints
         IReadOnlyCollection<WikiFlashcardRequest>? flashcards,
         DateTime timestamp)
     {
+        var oldQuestions = await dbContext.WikiQuizQuestions.AsNoTracking().Include(question => question.Options)
+            .Where(question => question.WikiPageId == wikiPage.Id).ToListAsync();
+        var oldCards = await dbContext.WikiFlashcards.AsNoTracking()
+            .Where(card => card.WikiPageId == wikiPage.Id).ToListAsync();
         var existingQuestionIds = await dbContext.WikiQuizQuestions
             .Where(question => question.WikiPageId == wikiPage.Id)
             .Select(question => question.Id)
@@ -1304,6 +1380,28 @@ public static class WikiEndpoints
         wikiPage.QuizQuestions.Clear();
         wikiPage.Flashcards.Clear();
         ApplyWikiPracticeInserts(wikiPage, quizQuestions, flashcards, timestamp);
+        // Keep identities for unchanged checks so editing article text does not reset coverage.
+        foreach (var question in wikiPage.QuizQuestions)
+        {
+            var previous = oldQuestions.FirstOrDefault(old => old.Prompt == question.Prompt
+                && old.Explanation == question.Explanation
+                && old.Options.OrderBy(o => o.SortOrder).Select(o => (o.Text, o.IsCorrect))
+                    .SequenceEqual(question.Options.OrderBy(o => o.SortOrder).Select(o => (o.Text, o.IsCorrect))));
+            if (previous is null) continue;
+            question.Id = previous.Id;
+            question.CreatedAt = previous.CreatedAt;
+            var oldOptions = previous.Options.OrderBy(o => o.SortOrder).ToArray();
+            foreach (var option in question.Options) { option.Id = oldOptions[option.SortOrder].Id; option.WikiQuizQuestionId = question.Id; }
+            oldQuestions.Remove(previous);
+        }
+        foreach (var card in wikiPage.Flashcards)
+        {
+            var previous = oldCards.FirstOrDefault(old => old.Front == card.Front && old.Back == card.Back);
+            if (previous is null) continue;
+            card.Id = previous.Id;
+            card.CreatedAt = previous.CreatedAt;
+            oldCards.Remove(previous);
+        }
         dbContext.WikiQuizQuestions.AddRange(wikiPage.QuizQuestions);
         dbContext.WikiFlashcards.AddRange(wikiPage.Flashcards);
     }

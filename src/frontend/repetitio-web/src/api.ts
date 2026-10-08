@@ -49,6 +49,7 @@ import type {
   WikiPage,
   WikiTreeNode
 } from "./types";
+import type { WikiStudyOverview, WikiStudyAnswerRequest } from "./types";
 
 /**
  * Base URL used for backend API requests.
@@ -77,6 +78,30 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+export function getWikiStudy(): Promise<WikiStudyOverview> {
+  return requestJson("/api/wiki/study");
+}
+
+export function saveWikiStudy(id: string, answers: WikiStudyAnswerRequest[]): Promise<WikiStudyOverview> {
+  return requestJson("/api/wiki/study", { method: "POST", body: JSON.stringify({ id, answers }) });
+}
+
+export function saveWikiStudySettings(intervalDays: number) {
+  return requestJson("/api/wiki/study/settings", { method: "PUT", body: JSON.stringify({ intervalDays }) });
+}
+
+export async function saveWikiReviewPreference(id: string, enabled: boolean, includeDescendants: boolean, intervalDays: number | null) {
+  const response = await fetch(`${apiBaseUrl}/api/wiki/${id}/review-preference`, {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled, includeDescendants, intervalDays })
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
+export function importWikiImageUrl(url: string): Promise<WikiImage> {
+  return requestJson("/api/wiki/images/remote", { method: "POST", body: JSON.stringify({ url }) });
 }
 
 /**

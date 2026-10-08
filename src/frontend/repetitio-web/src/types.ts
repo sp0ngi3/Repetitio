@@ -1089,6 +1089,8 @@ export interface UpdateNotePageRequest extends CreateNotePageRequest {
  * Represents one wiki page returned by the API.
  */
 export interface WikiPage {
+  reviewEnabled?: boolean;
+  reviewIntervalDays?: number | null;
   /** Unique wiki page identifier. */
   id: string;
   /** Optional parent wiki page identifier. */
@@ -1121,6 +1123,42 @@ export interface WikiPage {
   quizQuestions: WikiQuizQuestion[];
   /** Lightweight flashcards attached to the page. */
   flashcards: WikiFlashcard[];
+}
+
+export interface WikiStudyModeProgress {
+  kind: "quiz" | "flashcard";
+  total: number;
+  covered: number;
+  correct: number;
+  lastPracticedAt: string | null;
+  lastCompletedAt: string | null;
+  nextReviewAt: string | null;
+}
+
+export interface WikiStudyPageProgress {
+  id: string;
+  parentId: string | null;
+  title: string;
+  path: string;
+  isArchived: boolean;
+  reviewEnabled: boolean;
+  effectiveReviewEnabled: boolean;
+  intervalDays: number | null;
+  modes: WikiStudyModeProgress[];
+}
+
+export interface WikiStudyOverview {
+  intervalDays: number;
+  pages: WikiStudyPageProgress[];
+  history: { id: string; completedAt: string; answered: number; correct: number }[];
+}
+
+export interface WikiStudyAnswerRequest {
+  pageId: string;
+  itemId: string;
+  kind: "quiz" | "flashcard";
+  optionId?: string;
+  knew?: boolean;
 }
 
 /**

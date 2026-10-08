@@ -19,7 +19,7 @@ Flashcards are stored in the same SQLite database as the rest of the system, so 
 
 The planned next expansion is a local-first knowledge/artifact system: a private Repositorium or wiki, editable functional drawings, and local image storage. The intent is to make Repetitio more than a practice tracker: it should become a personal interview preparation knowledge base where notes, diagrams, images, problems, basics exercises, flashcards, and saved learning sessions can all be connected.
 
-The Wiki now supports local image embeds, downloadable print-to-PDF article exports for a page and its subtopics, and optional lightweight quiz/flashcard inserts that live with the article but do not affect review scheduling.
+The Wiki supports local image embeds, downloadable print-to-PDF article exports for a page and its subtopics, and quiz/flashcard inserts with per-page practice history and optional review scheduling.
 
 ## Product Goals
 
@@ -43,7 +43,7 @@ The application is intentionally local, single-user, and lightweight. The MVP do
 
 Repetitio is expected to grow toward a shared artifact model instead of separate one-off features. The planned modules are:
 
-- Repositorium / Wiki: personal markdown pages with headings, definitions, local images, PDF export, lightweight quiz inserts, flashcard inserts, tags, wiki-style links, and backlinks.
+- Repositorium / Wiki: personal markdown pages with headings, definitions, local images, PDF export, quiz inserts, flashcard inserts, tags, wiki-style links, and backlinks.
 - Functional Drawing: editable diagrams similar in spirit to Excalidraw or draw.io, stored as structured JSON so they remain editable.
 - Local Image Storage: wiki images are stored locally in SQLite with SHA-256 deduplication, so screenshots, sketches, and reference images stay portable.
 - Artifact Links: a shared linking layer that can attach wiki pages, drawings, and images to DSA problems, System Design problems, Basics exercises, Flashcards, saved learning sessions, and other knowledge pages.
@@ -100,6 +100,16 @@ Default local URLs:
 
 When the API starts, it automatically applies pending Entity Framework Core migrations. The SQLite database is stored on the host under `data/repetitio.db` when Docker Compose is used, and pre-import safety backups are stored under `backups/`.
 
+## Wiki Practice
+
+Wiki practice uses one-question/card players in both article knowledge checks and the Study builder. Save results to record the checks answered on their owning pages, including subtopics selected through a parent. Quiz and flashcard coverage are tracked independently; answering a random sample records partial progress, while covering every current check completes that mode and schedules a review. Revealing a flashcard alone does not count as an answer: grade it with "I knew it" or "Need practice".
+
+The Wiki Reviews tab provides paginated due, never-practiced, in-progress, and active topic lists. Settings > Wiki reviews controls the default interval and page exclusions, with an explicit option to apply changes to subtopics. Interval changes recalculate due dates from the latest completion; excluded pages, archived pages and descendants of archived topics receive no new review credit. Existing history remains stored. Unchanged checks keep their identifiers when editing an article.
+
+Overview includes a Wiki study summary with current-cycle check coverage and answer accuracy, due and untouched sections, checks needing practice, prior completions, and recent sessions. Searchable, paginated filters keep large topic collections manageable. A section is one page's quiz or flashcard set; the Practice action opens that exact page and mode directly. Archived and review-excluded topics do not contribute to the summary. Prior completion and a new partial review cycle remain separate, so partial practice never counts as full completion.
+
+Wiki article contents and topic navigation scroll independently. The Markdown editor synchronizes source/preview scrolling. Pasted image files, screenshots, HTML image copies and direct image URLs are saved through the same local image storage and deduplication flow; hosts that refuse downloading require a file upload.
+
 ## Backup And Restore
 
 Open Settings in the frontend to export or import data.
@@ -107,6 +117,8 @@ Open Settings in the frontend to export or import data.
 - Export Data creates a validated `repetitio-backup-YYYY-MM-DD-HHmmss.zip` archive.
 - Validate Backup checks the manifest, SQLite integrity, required tables, and schema version without changing data.
 - Import Data validates the uploaded backup, writes a pre-import backup to `backups/`, and restores the validated SQLite database.
+
+Backups from recognized older application migrations remain supported. Import upgrades the extracted temporary database and validates it before touching the live database, then writes the pre-import backup and restores it. Startup also saves a validated pre-migration ZIP before upgrading an existing database. The Wiki tracking migration only adds tables/columns; existing pages, quizzes, cards and image bytes are retained. New study history and review preferences are included in the SQLite backup automatically. Future or unknown database schemas are rejected.
 
 The backup archive contains `manifest.json` and `repetitio.db`. Because wiki images are stored in the `WikiImages` table, exported backups already include them. Future drawing previews or external media folders may add manifest-level file checks, while import should continue handling obsolete or missing artifact links safely.
 

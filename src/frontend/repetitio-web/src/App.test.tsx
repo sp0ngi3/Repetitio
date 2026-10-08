@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
@@ -32,6 +32,8 @@ import {
   getWikiPage,
   getWikiPages,
   getWikiTree,
+  getWikiStudy,
+  importWikiImageUrl,
   getSystemDesignProblemTemplate,
   getSystemDesignProblems,
   importDsaProblems,
@@ -101,6 +103,11 @@ vi.mock("./api", () => ({
   getWikiPage: vi.fn(),
   getWikiPages: vi.fn(),
   getWikiTree: vi.fn(),
+  getWikiStudy: vi.fn(),
+  saveWikiStudy: vi.fn(),
+  saveWikiStudySettings: vi.fn(),
+  saveWikiReviewPreference: vi.fn(),
+  importWikiImageUrl: vi.fn(),
   getSystemDesignProblemTemplate: vi.fn(),
   getSystemDesignProblems: vi.fn(),
   importDsaProblems: vi.fn(),
@@ -724,6 +731,7 @@ beforeEach(() => {
   }));
   vi.mocked(deleteNotePage).mockResolvedValue();
   vi.mocked(getWikiTree).mockResolvedValue(wikiTreeNodes);
+  vi.mocked(getWikiStudy).mockResolvedValue({ intervalDays: 30, pages: [], history: [] });
   vi.mocked(getWikiPages).mockResolvedValue({
     items: wikiPages,
     totalCount: wikiPages.length,
@@ -739,6 +747,7 @@ beforeEach(() => {
     rootPages: wikiPages
   });
   vi.mocked(uploadWikiImage).mockResolvedValue(wikiImage);
+  vi.mocked(importWikiImageUrl).mockResolvedValue(wikiImage);
   vi.mocked(getBackupStatus).mockResolvedValue(backupStatus);
   vi.mocked(exportBackup).mockResolvedValue({
     blob: new Blob(["backup"], { type: "application/zip" }),
@@ -805,6 +814,21 @@ beforeEach(() => {
 });
 
 describe("App", () => {
+  it.each(["quiz", "flashcard"] as const)("opens the exact Wiki %s player from Overview", async (kind) => {
+    vi.mocked(getWikiStudy).mockResolvedValue({ intervalDays: 30, history: [], pages: [{
+      id: "wiki-1", parentId: null, title: "Algorithm", path: "algorithm", isArchived: false,
+      reviewEnabled: true, effectiveReviewEnabled: true, intervalDays: null, modes: [{
+        kind, total: 1, covered: 0, correct: 0, lastPracticedAt: null, lastCompletedAt: null, nextReviewAt: null
+      }]
+    }] });
+    render(<App />);
+    const label = kind === "quiz" ? "Quiz" : "Flashcards";
+    fireEvent.click(await screen.findByRole("button", { name: `Practice Algorithm ${label}` }));
+    const player = await screen.findByRole("region", { name: "Wiki practice player" });
+    expect(within(player).getByText(kind === "quiz" ? "What is an algorithm?" : "Algorithm", kind === "flashcard" ? { selector: "strong" } : {})).toBeInTheDocument();
+    expect(getWikiPage).toHaveBeenCalledWith("wiki-1");
+    expect(within(player).queryByText(kind === "quiz" ? "Finite procedure for solving a class of problems." : "What is an algorithm?")).not.toBeInTheDocument();
+  });
   /**
    * Verifies that backup settings expose export and import controls.
    */
@@ -982,6 +1006,20 @@ describe("App", () => {
   /**
    * Verifies that wiki quiz and flashcard JSON inserts are saved with the page.
    */
+  it("stores copied web images locally instead of leaving a remote embed", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Wiki" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit source" }));
+    const editor = await screen.findByLabelText("Article source") as HTMLTextAreaElement;
+    editor.setSelectionRange(0, 0);
+    fireEvent.paste(editor, { clipboardData: {
+      files: [], items: [], getData: (format: string) => format === "text/html" ? '<img src="https://example.com/diagram.png">' : ""
+    } });
+    await waitFor(() => expect(importWikiImageUrl).toHaveBeenCalledWith("https://example.com/diagram.png"));
+    expect(editor.value).toContain("wiki-image:11111111-1111-1111-1111-111111111111");
+    expect(editor.value).not.toContain("https://example.com/diagram.png");
+  });
+
   it("saves wiki quiz and flashcard inserts from JSON", async () => {
     render(<App />);
 

@@ -55,6 +55,7 @@ app.MapSystemDesignEndpoints();
 app.MapFlashcardEndpoints();
 app.MapNoteEndpoints();
 app.MapWikiEndpoints();
+app.MapWikiStudyEndpoints();
 app.MapLearningItemEndpoints();
 app.MapTagEndpoints();
 app.MapPracticeSessionEndpoints();

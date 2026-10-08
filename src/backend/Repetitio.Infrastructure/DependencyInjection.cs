@@ -35,6 +35,7 @@ public static class DependencyInjection
         });
         services.AddSingleton<BackupArchiveValidator>();
         services.AddScoped<IRepetitioBackupService, RepetitioBackupService>();
+        services.AddScoped<Repetitio.Infrastructure.Wiki.WikiStudyService>();
 
         return services;
     }

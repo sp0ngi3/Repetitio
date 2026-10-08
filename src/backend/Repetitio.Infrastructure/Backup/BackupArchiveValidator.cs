@@ -1,6 +1,10 @@
 using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Repetitio.Infrastructure.Persistence;
 
 namespace Repetitio.Infrastructure.Backup;
 
@@ -152,7 +156,8 @@ public sealed class BackupArchiveValidator
             return BackupValidationResult.Invalid("Backup database failed SQLite integrity check.", manifest);
         }
 
-        foreach (var tableName in RequiredTables)
+        var tables = RequiredTablesForSchema(manifest.DatabaseSchemaVersion);
+        foreach (var tableName in tables)
         {
             if (!await TableExistsAsync(connection, tableName, cancellationToken))
             {
@@ -162,7 +167,8 @@ public sealed class BackupArchiveValidator
 
         var databaseSchemaVersion = await ReadDatabaseSchemaVersionAsync(connection, cancellationToken);
 
-        if (!string.Equals(databaseSchemaVersion, expectedDatabaseSchemaVersion, StringComparison.Ordinal))
+        if (!string.Equals(databaseSchemaVersion, manifest.DatabaseSchemaVersion, StringComparison.Ordinal)
+            || !IsCompatibleSchema(databaseSchemaVersion, expectedDatabaseSchemaVersion))
         {
             return BackupValidationResult.Invalid("Backup database schema version does not match the current application.", manifest);
         }
@@ -219,13 +225,35 @@ public sealed class BackupArchiveValidator
             return BackupValidationResult.Invalid("Backup manifest schema version is not supported.", manifest);
         }
 
-        if (!string.Equals(manifest.DatabaseSchemaVersion, expectedDatabaseSchemaVersion, StringComparison.Ordinal))
+        if (!IsCompatibleSchema(manifest.DatabaseSchemaVersion, expectedDatabaseSchemaVersion))
         {
             return BackupValidationResult.Invalid("Backup manifest database schema version does not match the current application.", manifest);
         }
 
         return BackupValidationResult.Valid("Backup manifest is valid.", manifest);
     }
+
+    private static bool IsCompatibleSchema(string source, string target)
+    {
+        if (source == target) return true;
+        using var db = CreateSchemaContext();
+        var migrations = db.Database.GetMigrations().ToArray();
+        var sourceIndex = Array.IndexOf(migrations, source);
+        return sourceIndex >= 0 && sourceIndex <= Array.IndexOf(migrations, target);
+    }
+
+    private static string[] RequiredTablesForSchema(string schema)
+    {
+        using var db = CreateSchemaContext();
+        var assembly = db.GetService<IMigrationsAssembly>();
+        if (!assembly.Migrations.TryGetValue(schema, out var migrationType)) return RequiredTables;
+        var model = assembly.CreateMigration(migrationType, db.Database.ProviderName!).TargetModel;
+        return model.GetEntityTypes().Select(entity => entity.GetTableName()!).Distinct()
+            .Append("__EFMigrationsHistory").ToArray();
+    }
+
+    private static RepetitioDbContext CreateSchemaContext() => new(new DbContextOptionsBuilder<RepetitioDbContext>()
+        .UseSqlite("Data Source=:memory:").Options);
 
     /// <summary>
     /// Returns whether a table exists in the SQLite database.

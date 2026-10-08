@@ -7,12 +7,14 @@ import { FlashcardsPage } from "./FlashcardsPage";
 import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
 import { WikiPage } from "./WikiPage";
+import { WikiReviewSettings } from "./WikiLearning";
+import { WikiOverview } from "./WikiOverview";
 import {
   readInitialReviewSchedulePreset,
   saveReviewSchedulePreset,
   type ReviewSchedulePreset
 } from "./reviewSchedule";
-import type { BasicExercise, Dashboard, LearningItem, LearningItemType } from "./types";
+import type { BasicExercise, Dashboard, LearningItem, LearningItemType, WikiStudyModeProgress } from "./types";
 
 /**
  * Application page identifiers.
@@ -69,6 +71,7 @@ export function App() {
   );
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [focusedLearningTarget, setFocusedLearningTarget] = useState<FocusedLearningTarget | null>(null);
+  const [focusedWikiTarget, setFocusedWikiTarget] = useState<{ id: string; kind: WikiStudyModeProgress["kind"]; nonce: number } | null>(null);
   const [basicExercises, setBasicExercises] = useState<BasicExercise[]>([]);
   const [items, setItems] = useState<LearningItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -226,7 +229,7 @@ export function App() {
             >
               Flashcards
             </button>
-            <button className={activePage === "wiki" ? "active" : ""} type="button" onClick={() => setActivePage("wiki")}>
+            <button className={activePage === "wiki" ? "active" : ""} type="button" onClick={() => { setFocusedWikiTarget(null); setActivePage("wiki"); }}>
               Wiki
             </button>
             <button className={activePage === "notes" ? "active" : ""} type="button" onClick={() => setActivePage("notes")}>
@@ -250,6 +253,7 @@ export function App() {
           dashboard={dashboard}
           groupedCounts={groupedCounts}
           onOpenItem={openLearningTarget}
+          onPracticeWiki={(id, kind) => { setFocusedWikiTarget({ id, kind, nonce: Date.now() }); setActivePage("wiki"); }}
         />
       ) : null}
 
@@ -300,7 +304,8 @@ export function App() {
 
       {activePage === "notes" ? <NotesPage /> : null}
 
-      {activePage === "wiki" ? <WikiPage /> : null}
+      {activePage === "wiki" ? <WikiPage key={focusedWikiTarget?.nonce ?? "wiki"}
+        focusPageId={focusedWikiTarget?.id} focusStudyKind={focusedWikiTarget?.kind} /> : null}
 
       {activePage === "settings" ? (
         <SettingsPage
@@ -363,6 +368,7 @@ interface OverviewPageProps {
   groupedCounts: Record<LearningItemType, number>;
   /** Opens a concrete learning item in its owning module. */
   onOpenItem: (target: LearningNavigationTarget) => void;
+  onPracticeWiki: (pageId: string, kind: WikiStudyModeProgress["kind"]) => void;
 }
 
 /**
@@ -469,6 +475,8 @@ function OverviewPage(props: OverviewPageProps) {
           )}
         </section>
       </section>
+
+      <WikiOverview onPractice={props.onPracticeWiki} />
 
       <section className="panel data-panel" aria-labelledby="overview-title">
         <div className="section-heading">
@@ -582,6 +590,7 @@ function SettingsPage(props: SettingsPageProps) {
       </section>
 
       <BackupPage />
+      <WikiReviewSettings />
     </div>
   );
 }

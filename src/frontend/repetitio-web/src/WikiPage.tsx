@@ -6,6 +6,8 @@ import {
   getWikiPage,
   getWikiPages,
   getWikiTree,
+  getWikiStudy,
+  importWikiImageUrl,
   importWikiPages,
   uploadWikiImage,
   updateWikiPage
@@ -20,8 +22,11 @@ import type {
   WikiSourceRequest,
   WikiTreeNode
 } from "./types";
+import type { WikiStudyOverview, WikiStudyPageProgress, WikiStudyModeProgress } from "./types";
+import { WikiLearningPlayer, WikiProgressSummary, WikiReviewDashboard, WikiBranchProgress, studyItems } from "./WikiLearning";
+import type { WikiStudyItem } from "./WikiLearning";
 
-type WikiView = "article" | "explore" | "edit" | "import";
+type WikiView = "article" | "explore" | "edit" | "import" | "study" | "reviews";
 type WikiSort = "updated-newest" | "updated-oldest" | "title" | "tree";
 type WikiStudyScope = "current" | "branch" | "all" | "custom";
 type WikiStudyMode = "quiz" | "flashcards" | "both";
@@ -51,23 +56,6 @@ interface MarkdownHeading {
   text: string;
 }
 
-type WikiStudyItem =
-  | {
-      id: string;
-      type: "quiz";
-      pageId: string;
-      pageTitle: string;
-      pagePath: string;
-      question: WikiPageRecord["quizQuestions"][number];
-    }
-  | {
-      id: string;
-      type: "flashcard";
-      pageId: string;
-      pageTitle: string;
-      pagePath: string;
-      flashcard: WikiPageRecord["flashcards"][number];
-    };
 
 interface WikiImportTable {
   headers?: string[];
@@ -267,12 +255,18 @@ const sampleImport = JSON.stringify(
   2
 );
 
-export function WikiPage() {
+export function WikiPage({ focusPageId, focusStudyKind }: {
+  focusPageId?: string;
+  focusStudyKind?: WikiStudyModeProgress["kind"];
+} = {}) {
+  const [focusedPractice, setFocusedPractice] = useState(!!focusPageId && !!focusStudyKind);
+  const [studyOverview, setStudyOverview] = useState<WikiStudyOverview | null>(null);
+  const [treeSearch, setTreeSearch] = useState("");
   const [treeNodes, setTreeNodes] = useState<WikiTreeNode[]>([]);
   const [pages, setPages] = useState<WikiPageRecord[]>([]);
   const [selectedPage, setSelectedPage] = useState<WikiPageRecord | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<WikiView>("article");
+  const [view, setView] = useState<WikiView>(focusPageId ? "study" : "article");
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<WikiSort>("updated-newest");
@@ -291,6 +285,7 @@ export function WikiPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / wikiPageSize));
   const nestedTree = useMemo(() => buildNestedTree(treeNodes), [treeNodes]);
+  const visibleTree = useMemo(() => filterTopicTree(nestedTree, treeSearch), [nestedTree, treeSearch]);
   const descendantIds = useMemo(
     () => editingPageId ? collectDescendantIds(treeNodes, editingPageId) : new Set<string>(),
     [editingPageId, treeNodes]
@@ -304,15 +299,17 @@ export function WikiPage() {
     [selectedPage, treeNodes]
   );
 
-  async function loadWiki(preferredPageId = selectedPage?.id ?? null) {
+  async function loadWiki(preferredPageId = selectedPage?.id ?? focusPageId ?? null) {
     setError(null);
     setIsLoading(true);
 
     try {
-      const [nextTree, nextPages] = await Promise.all([
+      const [nextTree, nextPages, nextStudy] = await Promise.all([
         getWikiTree(includeArchived),
-        getWikiPages({ search, includeArchived, sort, page, pageSize: wikiPageSize })
+        getWikiPages({ search, includeArchived, sort, page, pageSize: wikiPageSize }),
+        getWikiStudy()
       ]);
+      setStudyOverview(nextStudy);
       setTreeNodes(nextTree);
       setPages(nextPages.items);
       setTotalCount(nextPages.totalCount);
@@ -342,8 +339,15 @@ export function WikiPage() {
     void loadWiki();
   }, [includeArchived, page, search, sort]);
 
+  useEffect(() => {
+    const refresh = () => { void getWikiStudy().then(setStudyOverview).catch(() => setError("Unable to refresh Wiki review progress.")); };
+    window.addEventListener("wiki-study-updated", refresh);
+    return () => window.removeEventListener("wiki-study-updated", refresh);
+  }, []);
+
   async function selectPage(id: string) {
     setError(null);
+    setFocusedPractice(false);
 
     try {
       const pageRecord = await getWikiPage(id);
@@ -549,6 +553,8 @@ export function WikiPage() {
           <button className={view === "explore" ? "active" : ""} type="button" onClick={() => setView("explore")}>
             Explore
           </button>
+          <button className={view === "study" ? "active" : ""} type="button" disabled={!selectedPage} onClick={() => setView("study")}>Study</button>
+          <button className={view === "reviews" ? "active" : ""} type="button" onClick={() => setView("reviews")}>Reviews</button>
           <button className={view === "edit" ? "active" : ""} type="button" onClick={startEditPage}>
             {selectedPage ? "Edit" : "Create"}
           </button>
@@ -561,19 +567,28 @@ export function WikiPage() {
       {error ? <p className="error-banner">{error}</p> : null}
       {batchResult ? <p className="success-banner">{batchResult}</p> : null}
 
+      {selectedPage ? <nav className="wiki-breadcrumbs" aria-label="Current topic location">
+        <button className="text-button" type="button" onClick={() => setView("explore")}>Repository</button>
+        {treeNodes.filter(node => selectedPage.path === node.path || selectedPage.path.startsWith(node.path + "/"))
+          .sort((left, right) => left.depth - right.depth).map(node => <span key={node.id}>
+            <span aria-hidden="true"> / </span><button className="text-button" type="button" aria-current={node.id === selectedPage.id ? "page" : undefined} onClick={() => void selectPage(node.id)}>{node.title}</button>
+          </span>)}
+      </nav> : null}
+
       <div className="wiki-reading-layout">
         <aside className="wiki-left-rail" aria-label="Wiki topic tree">
           <div className="wiki-rail-heading">
-            <strong>Contents</strong>
+            <strong>Topic library</strong>
             <button className="text-button" type="button" onClick={startNewRootPage}>
               Add topic
             </button>
           </div>
+          <label className="wiki-tree-search">Find a topic<input aria-label="Search topic tree" value={treeSearch} onChange={event => setTreeSearch(event.target.value)} placeholder="Topic or path..." /></label>
           {nestedTree.length ? (
             <ul className="wiki-tree">
-              {nestedTree.map((node) => (
+              {visibleTree.map((node) => (
                 <WikiTreeNodeView
-                  expandedIds={expandedIds}
+                  expandedIds={treeSearch ? new Set(treeNodes.map(n => n.id)) : expandedIds}
                   key={node.id}
                   node={node}
                   selectedPageId={selectedPage?.id ?? null}
@@ -589,6 +604,10 @@ export function WikiPage() {
 
         {view === "article" ? (
           <WikiArticle
+            key={selectedPage?.id}
+            progress={studyOverview?.pages.find(p => p.id === selectedPage?.id)}
+            branchProgress={studyOverview?.pages ?? []}
+            onStudy={() => setView("study")}
             childNodes={articleChildren}
             isLoading={isLoading}
             page={selectedPage}
@@ -603,6 +622,7 @@ export function WikiPage() {
 
         {view === "explore" ? (
           <WikiExplore
+            progress={studyOverview?.pages ?? []}
             includeArchived={includeArchived}
             isLoading={isLoading}
             page={page}
@@ -626,6 +646,21 @@ export function WikiPage() {
             onSortChange={setSort}
           />
         ) : null}
+
+        {view === "study" && selectedPage ? <main className="wiki-document wiki-study-view">
+          <header className="wiki-special-header"><div><span className="wiki-path">{selectedPage.path}</span><h1>Study: {selectedPage.title}</h1></div>
+            <button className="secondary-button" type="button" onClick={() => setView("article")}>Back to article</button></header>
+          <WikiProgressSummary progress={studyOverview?.pages.find(p => p.id === selectedPage.id)} />
+          <WikiBranchProgress topics={studyOverview?.pages ?? []} rootId={selectedPage.id} />
+          {focusedPractice && selectedPage.id === focusPageId && studyItems([selectedPage], focusStudyKind === "quiz" ? "quiz" : "flashcards").length
+            ? <WikiLearningPlayer items={studyItems([selectedPage], focusStudyKind === "quiz" ? "quiz" : "flashcards")} onClose={() => setFocusedPractice(false)} />
+            : <WikiStudyBuilder key={selectedPage.id} currentPage={selectedPage} treeNodes={treeNodes.filter(node => !studyOverview?.pages.find(p => p.id === node.id)?.isArchived)} />}
+          {studyOverview?.history.length ? <details className="wiki-session-history"><summary>Recent study sessions</summary>
+            {studyOverview.history.map(session => <div key={session.id}><time>{formatDateTime(session.completedAt)}</time><span>{session.correct} / {session.answered} correct</span></div>)}
+          </details> : null}
+        </main> : null}
+
+        {view === "reviews" ? <main className="wiki-document"><WikiReviewDashboard overview={studyOverview} onSelect={id => void selectPage(id)} /></main> : null}
 
         {view === "edit" ? (
           <WikiEditor
@@ -663,6 +698,9 @@ export function WikiPage() {
 }
 
 function WikiArticle(props: {
+  progress?: WikiStudyPageProgress;
+  branchProgress: WikiStudyPageProgress[];
+  onStudy: () => void;
   page: WikiPageRecord | null;
   renderedMarkdown: { nodes: ReactNode[]; headings: MarkdownHeading[] };
   childNodes: WikiTreeNode[];
@@ -674,6 +712,20 @@ function WikiArticle(props: {
   onOpenChild: (id: string) => void;
 }) {
   const hasKnowledgeChecks = Boolean(props.page && props.treeNodes.length > 0);
+  const [activeHeading, setActiveHeading] = useState("");
+  useEffect(() => {
+    setActiveHeading(props.renderedMarkdown.headings[0]?.id ?? "");
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      if (visible[0]) setActiveHeading(visible[0].target.id);
+    }, { rootMargin: "-5% 0px -75% 0px" });
+    props.renderedMarkdown.headings.forEach(heading => {
+      const element = document.getElementById(heading.id);
+      if (element) observer.observe(element);
+    });
+    return () => observer.disconnect();
+  }, [props.page?.id, props.isLoading, props.renderedMarkdown.headings]);
 
   if (props.isLoading) {
     return <main className="wiki-document"><p className="empty-state">Loading article...</p></main>;
@@ -701,9 +753,9 @@ function WikiArticle(props: {
           </div>
           <div className="wiki-article-actions">
             {hasKnowledgeChecks ? (
-              <a className="secondary-button compact-button wiki-study-link" href="#wiki-study-builder">
+              <button type="button" className="secondary-button compact-button wiki-study-link" onClick={props.onStudy}>
                 Study builder
-              </a>
+              </button>
             ) : null}
             <button className="secondary-button compact-button" type="button" onClick={props.onCreateChild}>
               Add subtopic
@@ -719,11 +771,11 @@ function WikiArticle(props: {
 
         <div className="wiki-article-body-grid">
           <aside className="wiki-page-contents" aria-label="Article contents">
-            <strong>Contents</strong>
+            <strong>On this page</strong>
             {props.renderedMarkdown.headings.length ? (
-              <nav>
+              <nav tabIndex={0}>
                 {props.renderedMarkdown.headings.map((heading) => (
-                  <a className={`level-${heading.level}`} href={`#${heading.id}`} key={heading.id}>
+                  <a className={`level-${heading.level}`} href={`#${heading.id}`} key={heading.id} aria-current={activeHeading === heading.id ? "location" : undefined} onClick={() => setActiveHeading(heading.id)}>
                     {heading.text}
                   </a>
                 ))}
@@ -731,6 +783,8 @@ function WikiArticle(props: {
             ) : (
               <span>No headings</span>
             )}
+            <a href="#wiki-knowledge-checks">Knowledge checks</a>
+            <button className="text-button" type="button" onClick={props.onStudy}>Study this topic tree</button>
           </aside>
 
           <div className="wiki-article-content official-wiki-content">
@@ -738,7 +792,8 @@ function WikiArticle(props: {
             {props.renderedMarkdown.nodes.length ? props.renderedMarkdown.nodes : <p className="empty-state">This article is empty.</p>}
 
             <WikiSourceList sources={props.page.sources} />
-            <WikiStudyBuilder currentPage={props.page} treeNodes={props.treeNodes} />
+            <WikiProgressSummary progress={props.progress} />
+            <WikiBranchProgress topics={props.branchProgress} rootId={props.page.id} />
             <WikiPracticeInserts page={props.page} />
 
             {props.childNodes.length ? (
@@ -841,430 +896,103 @@ function WikiSourceList(props: { sources: WikiPageRecord["sources"] }) {
 
 function WikiStudyBuilder(props: { currentPage: WikiPageRecord; treeNodes: WikiTreeNode[] }) {
   const nestedTree = useMemo(() => buildNestedTree(props.treeNodes), [props.treeNodes]);
-  const orderedTopicIds = useMemo(() => flattenNestedWikiTree(nestedTree).map((node) => node.id), [nestedTree]);
+  const orderedTopicIds = useMemo(() => flattenNestedWikiTree(nestedTree).map(node => node.id), [nestedTree]);
   const [scope, setScope] = useState<WikiStudyScope>("branch");
   const [mode, setMode] = useState<WikiStudyMode>("both");
   const [order, setOrder] = useState<WikiStudyOrder>("page-order");
   const [amount, setAmount] = useState<WikiStudyAmount>("all");
   const [limit, setLimit] = useState(25);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set([props.currentPage.id]));
-  const [isLoading, setIsLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(collectSubtreeIds(props.treeNodes, props.currentPage.id)));
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<WikiStudyItem[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [revealedCards, setRevealedCards] = useState<Record<string, boolean>>({});
+  const [topicSearch, setTopicSearch] = useState("");
 
   useEffect(() => {
-    const branchIds = collectSubtreeIds(props.treeNodes, props.currentPage.id);
-    setScope("custom");
-    setSelectedIds(new Set(branchIds));
+    setScope("branch");
+    setSelectedIds(new Set(collectSubtreeIds(props.treeNodes, props.currentPage.id)));
     setItems([]);
-    setActiveIndex(0);
-    setAnswers({});
-    setRevealedCards({});
-    setError(null);
-  }, [props.currentPage.id, props.treeNodes]);
+  }, [props.currentPage.id]);
 
-  const selectedTopicIds = useMemo(
-    () => orderedTopicIds.filter((id) => selectedIds.has(id)),
-    [orderedTopicIds, selectedIds]
-  );
-
-  const activeItem = items[activeIndex] ?? null;
-  const quizCount = items.filter((item) => item.type === "quiz").length;
-  const flashcardCount = items.filter((item) => item.type === "flashcard").length;
-  const answeredCount = items.filter((item) => item.type === "quiz" && answers[item.id]).length;
-  const correctCount = items.filter((item) => {
-    if (item.type !== "quiz") {
-      return false;
-    }
-
-    const answerId = answers[item.id];
-    return item.question.options.some((option) => option.id === answerId && option.isCorrect);
-  }).length;
-
-  function idsForScope(nextScope: WikiStudyScope) {
-    if (nextScope === "current") {
-      return [props.currentPage.id];
-    }
-
-    if (nextScope === "all") {
-      return orderedTopicIds;
-    }
-
-    return collectSubtreeIds(props.treeNodes, props.currentPage.id);
+  function selectScope(value: WikiStudyScope) {
+    setScope(value);
+    setSelectedIds(new Set(value === "all" ? orderedTopicIds : value === "current" ? [props.currentPage.id] : collectSubtreeIds(props.treeNodes, props.currentPage.id)));
   }
-
-  function selectScope(nextScope: WikiStudyScope) {
-    setScope(nextScope);
-    setSelectedIds(new Set(idsForScope(nextScope)));
-    setItems([]);
-    setError(null);
-  }
-
-  function toggleTopic(nodeId: string) {
-    const subtreeIds = collectSubtreeIds(props.treeNodes, nodeId);
-    setSelectedIds((current) => {
+  function toggleTopic(id: string) {
+    const ids = collectSubtreeIds(props.treeNodes, id);
+    setSelectedIds(current => {
       const next = new Set(current);
-      const shouldSelect = subtreeIds.some((id) => !next.has(id));
-
-      for (const id of subtreeIds) {
-        if (shouldSelect) {
-          next.add(id);
-        } else {
-          next.delete(id);
-        }
-      }
-
+      const add = ids.some(topic => !next.has(topic));
+      ids.forEach(topic => add ? next.add(topic) : next.delete(topic));
       return next;
     });
-    setItems([]);
-    setError(null);
-    setScope("branch");
+    setScope("custom");
   }
-
-  async function startSession(nextOrder = order, nextAmount = amount, nextLimit = limit) {
-    if (!selectedTopicIds.length) {
-      setError("Select at least one wiki topic first.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
+  async function startSession(random = order === "random", itemLimit = amount === "limited" ? limit : null) {
+    setLoading(true); setError(null);
     try {
-      const pages = await Promise.all(
-        selectedTopicIds.map((id) => id === props.currentPage.id ? Promise.resolve(props.currentPage) : getWikiPage(id))
-      );
-      const nextItems = buildWikiStudyItems(pages, mode);
-      const orderedItems = nextOrder === "random" ? shuffleArray(nextItems) : nextItems;
-      const limitedItems = nextAmount === "limited" ? orderedItems.slice(0, Math.max(1, nextLimit)) : orderedItems;
-
-      if (!limitedItems.length) {
-        setItems([]);
-        setActiveIndex(0);
-        setError("No quiz questions or flashcards were found in the selected topics.");
-        return;
+      const ids = orderedTopicIds.filter(id => selectedIds.has(id));
+      if (!ids.length) throw new Error("Select at least one topic.");
+      const pages: WikiPageRecord[] = [];
+      // Bound concurrent requests even for a large repository.
+      for (let offset = 0; offset < ids.length; offset += 8) {
+        pages.push(...await Promise.all(ids.slice(offset, offset + 8).map(id =>
+          id === props.currentPage.id ? Promise.resolve(props.currentPage) : getWikiPage(id))));
       }
-
-      setItems(limitedItems);
-      setActiveIndex(0);
-      setAnswers({});
-      setRevealedCards({});
-    } catch {
-      setError("Could not prepare the wiki study session. Try refreshing the page.");
-    } finally {
-      setIsLoading(false);
-    }
+      const activePages = pages.filter(page => !page.isArchived);
+      const checks = studyItems(activePages, mode);
+      const next = random ? shuffleArray(checks) : checks;
+      const selection = itemLimit === null ? next : next.slice(0, Math.max(1, itemLimit));
+      if (!selection.length) throw new Error("No active quiz questions or flashcards in these topics.");
+      setItems(selection);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to prepare this session."); }
+    finally { setLoading(false); }
   }
-
-  function startPreset(nextOrder: WikiStudyOrder, nextAmount: WikiStudyAmount, nextLimit: number) {
-    setOrder(nextOrder);
-    setAmount(nextAmount);
-    setLimit(nextLimit);
-    void startSession(nextOrder, nextAmount, nextLimit);
-  }
-
-  function move(delta: number) {
-    setActiveIndex((current) => Math.max(0, Math.min(items.length - 1, current + delta)));
-  }
-
-  function resetSession() {
-    setItems([]);
-    setActiveIndex(0);
-    setAnswers({});
-    setRevealedCards({});
-    setError(null);
-  }
-
-  return (
-    <section className="wiki-study-builder" id="wiki-study-builder" aria-label="Wiki study builder">
-      <header className="wiki-study-builder-header">
-        <div>
-          <span className="wiki-practice-kicker">Study builder</span>
-          <h2>Build a session from the wiki tree</h2>
-          <p>Pick one topic, a full branch, or the whole wiki, then practice quiz questions, flashcards, or both.</p>
-        </div>
-        <div className="wiki-study-builder-summary" aria-label="Selected study scope">
-          {scope === "custom" ? (
-            <span>
-              <strong>Custom</strong>
-              <small>selection</small>
-            </span>
-          ) : null}
-          <span>
-            <strong>{selectedTopicIds.length}</strong>
-            <small>topics</small>
-          </span>
-          <span>
-            <strong>{items.length || "-"}</strong>
-            <small>session items</small>
-          </span>
-        </div>
-      </header>
-
-      <div className="wiki-study-presets" aria-label="Quick study presets">
-        <button className="secondary-button compact-button" type="button" onClick={() => startPreset("random", "limited", 10)}>
-          Random 10
-        </button>
-        <button className="secondary-button compact-button" type="button" onClick={() => startPreset("random", "limited", 25)}>
-          Random 25
-        </button>
-        <button className="secondary-button compact-button" type="button" onClick={() => startPreset("page-order", "all", limit)}>
-          All in order
-        </button>
-      </div>
-
-      <div className="wiki-study-builder-grid">
-        <section className="wiki-study-builder-panel" aria-label="Study settings">
-          <div className="wiki-study-control-group">
-            <span>Scope</span>
-            <div className="wiki-study-segmented" role="group" aria-label="Study scope">
-              {(["current", "branch", "all"] as WikiStudyScope[]).map((option) => (
-                <button className={scope === option ? "active" : ""} key={option} type="button" onClick={() => selectScope(option)}>
-                  {option === "current" ? "This page" : option === "branch" ? "This branch" : "All wiki"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="wiki-study-control-group">
-            <span>Practice</span>
-            <div className="wiki-study-segmented" role="group" aria-label="Practice type">
-              {(["quiz", "flashcards", "both"] as WikiStudyMode[]).map((option) => (
-                <button className={mode === option ? "active" : ""} key={option} type="button" onClick={() => setMode(option)}>
-                  {option === "quiz" ? "Quiz" : option === "flashcards" ? "Flashcards" : "Both"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="wiki-study-control-group">
-            <span>Order</span>
-            <div className="wiki-study-segmented" role="group" aria-label="Study order">
-              <button className={order === "page-order" ? "active" : ""} type="button" onClick={() => setOrder("page-order")}>
-                Page order
-              </button>
-              <button className={order === "random" ? "active" : ""} type="button" onClick={() => setOrder("random")}>
-                Random
-              </button>
-            </div>
-          </div>
-
-          <div className="wiki-study-control-group">
-            <span>Amount</span>
-            <div className="wiki-study-amount-row">
-              <label>
-                <input checked={amount === "all"} name="wiki-study-amount" type="radio" onChange={() => setAmount("all")} />
-                All selected
-              </label>
-              <label>
-                <input checked={amount === "limited"} name="wiki-study-amount" type="radio" onChange={() => setAmount("limited")} />
-                Limit
-              </label>
-              <input
-                aria-label="Study item limit"
-                min={1}
-                max={500}
-                type="number"
-                value={limit}
-                onChange={(event) => setLimit(Number(event.target.value) || 1)}
-              />
-            </div>
-          </div>
-
-          <button className="primary-button wiki-study-start-button" type="button" disabled={isLoading} onClick={() => startSession()}>
-            {isLoading ? "Preparing..." : "Start study session"}
-          </button>
-          {error ? <p className="error-banner compact-error">{error}</p> : null}
-        </section>
-
-        <section className="wiki-study-builder-panel" aria-label="Topic picker">
-          <div className="wiki-study-topic-heading">
-            <div>
-              <span>Topic picker</span>
-              <strong>{selectedTopicIds.length} selected</strong>
-            </div>
-            <button className="text-button" type="button" onClick={() => setSelectedIds(new Set())}>
-              Clear
-            </button>
-          </div>
-          <div className="wiki-study-tree">
-            {nestedTree.map((node) => (
-              <WikiStudyTopicNode
-                key={node.id}
-                node={node}
-                selectedIds={selectedIds}
-                onToggle={toggleTopic}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {activeItem ? (
-        <WikiStudySession
-          activeIndex={activeIndex}
-          answers={answers}
-          correctCount={correctCount}
-          flashcardCount={flashcardCount}
-          item={activeItem}
-          items={items}
-          quizCount={quizCount}
-          revealedCards={revealedCards}
-          answeredCount={answeredCount}
-          onAnswer={(itemId, optionId) => setAnswers((current) => ({ ...current, [itemId]: optionId }))}
-          onMove={move}
-          onReset={resetSession}
-          onToggleCard={(itemId) => setRevealedCards((current) => ({ ...current, [itemId]: !current[itemId] }))}
-        />
-      ) : null}
-    </section>
-  );
-}
-
-function WikiStudyTopicNode(props: {
-  node: NestedWikiTreeNode;
-  selectedIds: Set<string>;
-  onToggle: (id: string) => void;
-}) {
-  const isSelected = props.selectedIds.has(props.node.id);
-
-  return (
-    <div className="wiki-study-topic-node">
-      <label className={isSelected ? "wiki-study-topic-row selected" : "wiki-study-topic-row"}>
-        <input checked={isSelected} type="checkbox" onChange={() => props.onToggle(props.node.id)} />
-        <span>{props.node.title}</span>
-        <small>{props.node.children.length ? `${props.node.children.length} subtopics` : "Article"}</small>
-      </label>
-      {props.node.children.length ? (
-        <div className="wiki-study-topic-children">
-          {props.node.children.map((child) => (
-            <WikiStudyTopicNode key={child.id} node={child} selectedIds={props.selectedIds} onToggle={props.onToggle} />
-          ))}
-        </div>
-      ) : null}
+  if (items.length) return <WikiLearningPlayer key={items.map(i => i.id).join("-")} items={items} onClose={() => setItems([])} />;
+  return <section className="wiki-study-builder" id="wiki-study-builder" aria-label="Wiki study builder">
+    <header className="wiki-study-builder-header"><div><span className="wiki-practice-kicker">Study builder</span><h2>Choose your topics</h2></div><span>{selectedIds.size} selected</span></header>
+    <div className="wiki-study-presets">
+      <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(true, 10)}>Random 10</button>
+      <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(true, 25)}>Random 25</button>
+      <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(false, null)}>All in order</button>
     </div>
-  );
+    <div className="wiki-study-builder-grid">
+      <div className="wiki-study-builder-panel">
+        <div className="wiki-study-control-group"><span>Topics</span><div className="wiki-study-segmented">
+          {(["current", "branch", "all"] as WikiStudyScope[]).map(value => <button type="button" key={value} disabled={loading} className={scope === value ? "active" : ""} onClick={() => selectScope(value)}>{value === "current" ? "This page" : value === "branch" ? "This branch" : "All Wiki"}</button>)}
+        </div></div>
+        <div className="wiki-study-control-group"><span>Practice</span><div className="wiki-study-segmented">
+          {(["quiz","flashcards","both"] as WikiStudyMode[]).map(value => <button type="button" key={value} disabled={loading} className={mode === value ? "active" : ""} onClick={() => setMode(value)}>{value === "quiz" ? "Quiz" : value === "flashcards" ? "Flashcards" : "Both"}</button>)}
+        </div></div>
+        <label>Order<select value={order} disabled={loading} onChange={event => setOrder(event.target.value as WikiStudyOrder)}><option value="page-order">Page order</option><option value="random">Random</option></select></label>
+        <label>Amount<select value={amount} disabled={loading} onChange={event => setAmount(event.target.value as WikiStudyAmount)}><option value="all">All selected checks</option><option value="limited">Limited sample</option></select></label>
+        {amount === "limited" ? <label>Number of checks<input type="number" min={1} max={5000} value={limit} onChange={event => setLimit(Math.max(1, Number(event.target.value) || 1))} /></label> : null}
+        <button className="primary-button" type="button" disabled={loading} onClick={() => void startSession()}>{loading ? "Preparing..." : "Start session"}</button>
+        {error ? <p className="error-banner" role="alert">{error}</p> : null}
+      </div>
+      <div className="wiki-study-builder-panel">
+        <div className="wiki-study-topic-heading"><strong>{scope === "custom" ? "Custom selection" : "Topic tree"}</strong><button type="button" className="text-button" disabled={loading} onClick={() => { setSelectedIds(new Set()); setScope("custom"); }}>Clear</button></div>
+        <label>Find a topic<input value={topicSearch} onChange={event => setTopicSearch(event.target.value)} /></label>
+        <div className="wiki-study-tree">{topicSearch ? props.treeNodes.filter(n => n.title.toLowerCase().includes(topicSearch.toLowerCase()) || n.path.toLowerCase().includes(topicSearch.toLowerCase())).map(node =>
+          <label className="wiki-study-topic-row" key={node.id}><input type="checkbox" checked={selectedIds.has(node.id)} onChange={() => toggleTopic(node.id)} /><span>{node.title}</span><small>{node.path}</small></label>)
+          : nestedTree.map(node => <WikiStudyTopicNode key={node.id} node={node} selectedIds={selectedIds} onToggle={toggleTopic} />)}</div>
+      </div>
+    </div>
+  </section>;
 }
 
-function WikiStudySession(props: {
-  item: WikiStudyItem;
-  items: WikiStudyItem[];
-  activeIndex: number;
-  answers: Record<string, string>;
-  revealedCards: Record<string, boolean>;
-  quizCount: number;
-  flashcardCount: number;
-  answeredCount: number;
-  correctCount: number;
-  onAnswer: (itemId: string, optionId: string) => void;
-  onToggleCard: (itemId: string) => void;
-  onMove: (delta: number) => void;
-  onReset: () => void;
-}) {
-  const progress = Math.round(((props.activeIndex + 1) / props.items.length) * 100);
-  const selectedOptionId = props.item.type === "quiz" ? props.answers[props.item.id] ?? "" : "";
-  const selectedOption = props.item.type === "quiz"
-    ? props.item.question.options.find((option) => option.id === selectedOptionId) ?? null
-    : null;
-  const isRevealed = props.item.type === "flashcard" ? Boolean(props.revealedCards[props.item.id]) : false;
-
-  return (
-    <section className="wiki-study-session" aria-label="Active wiki study session">
-      <header className="wiki-study-session-header">
-        <div>
-          <span>Session player</span>
-          <h3>
-            Item {props.activeIndex + 1} / {props.items.length}
-          </h3>
-          <p>{props.item.pagePath}</p>
-        </div>
-        <div className="wiki-study-session-stats">
-          <span>{props.quizCount} quiz</span>
-          <span>{props.flashcardCount} cards</span>
-          <span>{props.correctCount}/{props.answeredCount || 0} correct</span>
-        </div>
-      </header>
-
-      <div className="wiki-study-progress" aria-label={`Study progress ${progress}%`}>
-        <span style={{ width: `${progress}%` }} />
-      </div>
-
-      <article className="wiki-study-session-card">
-        <div className="wiki-study-session-meta">
-          <span>{props.item.type === "quiz" ? "Quiz question" : "Flashcard"}</span>
-          <strong>{props.item.pageTitle}</strong>
-        </div>
-
-        {props.item.type === "quiz" ? (
-          <>
-            <h3>{props.item.question.prompt}</h3>
-            <div className="wiki-quiz-options wiki-session-options">
-              {props.item.question.options.map((option, optionIndex) => {
-                const isSelected = selectedOptionId === option.id;
-                const isAnswered = Boolean(selectedOptionId);
-                const optionClass = isAnswered && option.isCorrect
-                  ? "correct"
-                  : isSelected && !option.isCorrect
-                    ? "incorrect"
-                    : "";
-
-                return (
-                  <button
-                    className={`${optionClass}${isSelected ? " selected" : ""}`.trim()}
-                    key={option.id}
-                    type="button"
-                    onClick={() => props.onAnswer(props.item.id, option.id)}
-                  >
-                    <strong aria-hidden="true">{String.fromCharCode(65 + optionIndex)}</strong>
-                    <span>{option.text}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {selectedOption ? (
-              <div className={selectedOption.isCorrect ? "wiki-quiz-feedback correct" : "wiki-quiz-feedback incorrect"}>
-                <strong>{selectedOption.isCorrect ? "Correct" : "Review this one"}</strong>
-                {props.item.question.explanation ? <p>{props.item.question.explanation}</p> : null}
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <button
-            className={isRevealed ? "wiki-study-flashcard wiki-study-session-flashcard revealed" : "wiki-study-flashcard wiki-study-session-flashcard"}
-            type="button"
-            onClick={() => props.onToggleCard(props.item.id)}
-          >
-            <span>{isRevealed ? "Answer" : "Prompt"}</span>
-            <strong>{isRevealed ? props.item.flashcard.back : props.item.flashcard.front}</strong>
-            <small>{isRevealed ? "Click to hide answer" : "Click to reveal answer"}</small>
-          </button>
-        )}
-      </article>
-
-      <div className="wiki-study-session-actions">
-        <button className="secondary-button compact-button" type="button" disabled={props.activeIndex === 0} onClick={() => props.onMove(-1)}>
-          Previous
-        </button>
-        <button className="secondary-button compact-button" type="button" onClick={props.onReset}>
-          Back to builder
-        </button>
-        <button
-          className="primary-button compact-button"
-          type="button"
-          disabled={props.activeIndex >= props.items.length - 1}
-          onClick={() => props.onMove(1)}
-        >
-          Next
-        </button>
-      </div>
-    </section>
-  );
+function WikiStudyTopicNode(props: { node: NestedWikiTreeNode; selectedIds: Set<string>; onToggle: (id: string) => void }) {
+  return <div className="wiki-study-topic-node">
+    <label className={props.selectedIds.has(props.node.id) ? "wiki-study-topic-row selected" : "wiki-study-topic-row"}>
+      <input type="checkbox" checked={props.selectedIds.has(props.node.id)} onChange={() => props.onToggle(props.node.id)} />
+      <span>{props.node.title}</span><small>{props.node.children.length ? `${props.node.children.length} subtopics` : "Article"}</small>
+    </label>
+    {props.node.children.length ? <details className="wiki-study-topic-children" open><summary>Subtopics</summary>{props.node.children.map(child => <WikiStudyTopicNode key={child.id} node={child} selectedIds={props.selectedIds} onToggle={props.onToggle} />)}</details> : null}
+  </div>;
 }
 
 function WikiExplore(props: {
+  progress: WikiStudyPageProgress[];
   pages: WikiPageRecord[];
   selectedPageId: string | null;
   search: string;
@@ -1347,6 +1075,7 @@ function WikiExplore(props: {
                 <small>
                   {wikiPage.path} · {wikiPage.childCount} subtopics · updated {formatDateTime(wikiPage.updatedAt)}
                 </small>
+                <WikiProgressSummary progress={props.progress.find(p => p.id === wikiPage.id)} />
               </button>
             </li>
           ))}
@@ -1381,211 +1110,18 @@ function WikiExplore(props: {
 }
 
 function WikiPracticeInserts(props: { page: WikiPageRecord }) {
-  const [mode, setMode] = useState<"menu" | "quiz" | "flashcards">("menu");
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
-  const [isFlashcardRevealed, setIsFlashcardRevealed] = useState(false);
-  const [flashcardIndex, setFlashcardIndex] = useState(0);
-  const hasQuiz = props.page.quizQuestions.length > 0;
-  const hasFlashcards = props.page.flashcards.length > 0;
-  const answeredQuizCount = props.page.quizQuestions.filter((question) => selectedOptions[question.id]).length;
-  const correctQuizCount = props.page.quizQuestions.filter((question) => {
-    const selectedOptionId = selectedOptions[question.id];
-    return question.options.some((option) => option.id === selectedOptionId && option.isCorrect);
-  }).length;
-  const activeFlashcard = props.page.flashcards[flashcardIndex] ?? null;
-
-  if (!hasQuiz && !hasFlashcards) {
-    return null;
-  }
-
-  function openFlashcards(index: number) {
-    setFlashcardIndex(Math.max(0, Math.min(props.page.flashcards.length - 1, index)));
-    setIsFlashcardRevealed(false);
-    setMode("flashcards");
-  }
-
-  function moveFlashcard(delta: number) {
-    setFlashcardIndex((current) => {
-      const next = Math.max(0, Math.min(props.page.flashcards.length - 1, current + delta));
-      return next;
-    });
-    setIsFlashcardRevealed(false);
-  }
-
-  return (
-    <section className="wiki-practice-inserts" id="wiki-knowledge-checks" aria-label="Knowledge checks">
-      <header className="wiki-practice-header">
-        <div>
-          <span className="wiki-practice-kicker">Study insert</span>
-          <h2>Knowledge checks</h2>
-          <p>Quick recall prompts attached to this article. They are local to the wiki page and do not affect review scheduling.</p>
-        </div>
-        <div className="wiki-practice-stats" aria-label="Knowledge check progress">
-          {hasQuiz ? (
-            <span>
-              <strong>{correctQuizCount}</strong>
-              <small>correct</small>
-            </span>
-          ) : null}
-          {hasQuiz ? (
-            <span>
-              <strong>{answeredQuizCount}/{props.page.quizQuestions.length}</strong>
-              <small>answered</small>
-            </span>
-          ) : null}
-          {hasFlashcards ? (
-            <span>
-              <strong>{props.page.flashcards.length}</strong>
-              <small>flashcards</small>
-            </span>
-          ) : null}
-        </div>
-      </header>
-
-      <div className="wiki-study-tabs" role="tablist" aria-label="Knowledge check modes">
-        <button className={mode === "menu" ? "active" : ""} type="button" onClick={() => setMode("menu")}>
-          Menu
-        </button>
-        {hasQuiz ? (
-          <button className={mode === "quiz" ? "active" : ""} type="button" onClick={() => setMode("quiz")}>
-            Quiz
-          </button>
-        ) : null}
-        {hasFlashcards ? (
-          <button className={mode === "flashcards" ? "active" : ""} type="button" onClick={() => openFlashcards(flashcardIndex)}>
-            Flashcards
-          </button>
-        ) : null}
-      </div>
-
-      {mode === "menu" ? (
-        <div className="wiki-study-menu">
-          {hasQuiz ? (
-            <button className="wiki-study-mode-card" type="button" onClick={() => setMode("quiz")}>
-              <span>Quiz mode</span>
-              <strong>{props.page.quizQuestions.length} questions</strong>
-              <small>Answer multiple-choice checks with instant feedback.</small>
-            </button>
-          ) : null}
-          {hasFlashcards ? (
-            <button className="wiki-study-mode-card" type="button" onClick={() => openFlashcards(0)}>
-              <span>Flashcard mode</span>
-              <strong>{props.page.flashcards.length} cards</strong>
-              <small>Review one card at a time without scrolling through the whole article.</small>
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {hasQuiz ? (
-        <div className={mode === "quiz" ? "wiki-check-section" : "wiki-check-section hidden"}>
-          <div className="wiki-check-section-heading">
-            <span>Quiz</span>
-            <strong>{props.page.quizQuestions.length} questions</strong>
-          </div>
-          <div className="wiki-quiz-stack">
-          {props.page.quizQuestions.map((question, questionIndex) => {
-            const selectedOptionId = selectedOptions[question.id] ?? "";
-            const selectedOption = question.options.find((option) => option.id === selectedOptionId) ?? null;
-
-            return (
-              <article className="wiki-quiz-card" key={question.id}>
-                <div className="wiki-quiz-card-heading">
-                  <span>Question {questionIndex + 1}</span>
-                  {selectedOption ? (
-                    <small className={selectedOption.isCorrect ? "correct" : "incorrect"}>
-                      {selectedOption.isCorrect ? "Correct" : "Review"}
-                    </small>
-                  ) : (
-                    <small>Not answered</small>
-                  )}
-                </div>
-                <h3>{question.prompt}</h3>
-                <div className="wiki-quiz-options">
-                  {question.options.map((option, optionIndex) => {
-                    const isSelected = selectedOptionId === option.id;
-                    const isAnswered = Boolean(selectedOptionId);
-                    const optionClass = isAnswered && option.isCorrect
-                      ? "correct"
-                      : isSelected && !option.isCorrect
-                        ? "incorrect"
-                        : "";
-
-                    return (
-                      <button
-                        className={`${optionClass}${isSelected ? " selected" : ""}`.trim()}
-                        key={option.id}
-                        type="button"
-                        onClick={() => setSelectedOptions((current) => ({ ...current, [question.id]: option.id }))}
-                      >
-                        <strong aria-hidden="true">{String.fromCharCode(65 + optionIndex)}</strong>
-                        <span>{option.text}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {selectedOption ? (
-                  <div className={selectedOption.isCorrect ? "wiki-quiz-feedback correct" : "wiki-quiz-feedback incorrect"}>
-                    <strong>{selectedOption.isCorrect ? "Nice, that is the answer." : "Close, review this point."}</strong>
-                    {question.explanation ? <p>{question.explanation}</p> : null}
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
-          </div>
-        </div>
-      ) : null}
-
-      {hasFlashcards && activeFlashcard ? (
-        <div className="wiki-check-section">
-          <div className={mode === "flashcards" ? "wiki-check-section-heading" : "wiki-check-section-heading hidden"}>
-            <span>Flashcards</span>
-            <strong>
-              Card {flashcardIndex + 1} / {props.page.flashcards.length}
-            </strong>
-          </div>
-          {mode === "flashcards" ? (
-            <div className="wiki-flashcard-player">
-              <button
-                className={isFlashcardRevealed ? "wiki-study-flashcard revealed" : "wiki-study-flashcard"}
-                type="button"
-                onClick={() => setIsFlashcardRevealed((current) => !current)}
-              >
-                <span>{isFlashcardRevealed ? "Answer" : "Prompt"}</span>
-                <strong>{isFlashcardRevealed ? activeFlashcard.back : activeFlashcard.front}</strong>
-                <small>{isFlashcardRevealed ? "Click to hide answer" : "Click to reveal answer"}</small>
-              </button>
-              <div className="wiki-flashcard-player-actions">
-                <button className="secondary-button compact-button" type="button" disabled={flashcardIndex === 0} onClick={() => moveFlashcard(-1)}>
-                  Previous
-                </button>
-                <button className="secondary-button compact-button" type="button" onClick={() => setIsFlashcardRevealed((current) => !current)}>
-                  {isFlashcardRevealed ? "Hide answer" : "Reveal answer"}
-                </button>
-                <button className="secondary-button compact-button" type="button" disabled={flashcardIndex >= props.page.flashcards.length - 1} onClick={() => moveFlashcard(1)}>
-                  Next
-                </button>
-              </div>
-              <div className="wiki-flashcard-strip" aria-label="Flashcard picker">
-                {props.page.flashcards.map((flashcard, index) => (
-                  <button
-                    className={index === flashcardIndex ? "active" : ""}
-                    key={flashcard.id}
-                    type="button"
-                    onClick={() => openFlashcards(index)}
-                    title={flashcard.front}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
-  );
+  const [mode, setMode] = useState<"quiz" | "flashcards" | "both" | null>(null);
+  useEffect(() => { setMode(null); }, [props.page.id]);
+  if (!props.page.quizQuestions.length && !props.page.flashcards.length) return null;
+  return <section className="wiki-practice-inserts" id="wiki-knowledge-checks" aria-label="Knowledge checks">
+    <header className="wiki-practice-header"><div><span className="wiki-practice-kicker">Practice</span><h2>Knowledge checks</h2></div></header>
+    {mode ? <WikiLearningPlayer key={props.page.id + mode} items={studyItems([props.page], mode)} onClose={() => setMode(null)} /> :
+      <div className="wiki-study-menu">
+        {props.page.quizQuestions.length ? <button type="button" className="wiki-study-mode-card" onClick={() => setMode("quiz")}><span>Quiz</span><strong>{props.page.quizQuestions.length} questions</strong></button> : null}
+        {props.page.flashcards.length ? <button type="button" className="wiki-study-mode-card" onClick={() => setMode("flashcards")}><span>Flashcards</span><strong>{props.page.flashcards.length} cards</strong></button> : null}
+        {props.page.quizQuestions.length && props.page.flashcards.length ? <button type="button" className="wiki-study-mode-card" onClick={() => setMode("both")}><span>Combined</span><strong>All checks</strong></button> : null}
+      </div>}
+  </section>;
 }
 
 function WikiEditor(props: {
@@ -1601,9 +1137,20 @@ function WikiEditor(props: {
   onCancel: () => void;
 }) {
   const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const scrollGuard = useRef<HTMLElement | null>(null);
   const [imageUploadStatus, setImageUploadStatus] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const preview = useMemo(() => renderMarkdown(props.form.contentMarkdown), [props.form.contentMarkdown]);
+
+  function syncScroll(source: HTMLElement, target: HTMLElement | null) {
+    if (!target || scrollGuard.current === source) return;
+    const max = source.scrollHeight - source.clientHeight;
+    const targetMax = target.scrollHeight - target.clientHeight;
+    scrollGuard.current = target;
+    target.scrollTop = max > 0 ? (source.scrollTop / max) * targetMax : 0;
+    requestAnimationFrame(() => { scrollGuard.current = null; });
+  }
 
   function insertSnippet(snippet: string, fallbackSelection = "") {
     const textarea = sourceTextareaRef.current;
@@ -1668,11 +1215,34 @@ function WikiEditor(props: {
     const imageFile = findClipboardImage(event);
 
     if (!imageFile) {
+      const html = event.clipboardData.getData("text/html");
+      const text = event.clipboardData.getData("text/plain").trim();
+      const source = html ? new DOMParser().parseFromString(html, "text/html").querySelector("img")?.getAttribute("src") : null;
+      const url = source ?? (/^https?:\/\/\S+\.(png|jpe?g|webp|gif)(\?\S*)?$/i.test(text) ? text : null);
+      if (url && /^(https?:|data:image\/)/i.test(url)) {
+        event.preventDefault();
+        void insertImageUrl(url, event.currentTarget.selectionStart, event.currentTarget.selectionEnd);
+      }
       return;
     }
 
     event.preventDefault();
     void insertImageFile(imageFile, event.currentTarget.selectionStart, event.currentTarget.selectionEnd);
+  }
+
+  async function insertImageUrl(url: string, start?: number, end?: number) {
+    setIsUploadingImage(true); setImageUploadStatus(null);
+    try {
+      if (url.startsWith("data:image/")) {
+        const blob = await (await fetch(url)).blob();
+        await insertImageFile(new File([blob], "pasted-image.png", { type: blob.type }), start, end);
+      } else {
+        const image = await importWikiImageUrl(url);
+        insertSnippetAt(image.markdownSnippet, start, end);
+        setImageUploadStatus("Image saved locally.");
+      }
+    } catch (failure) { setImageUploadStatus(failure instanceof Error ? failure.message : "Unable to copy this image. Try uploading the file."); }
+    finally { setIsUploadingImage(false); }
   }
 
   return (
@@ -1693,6 +1263,8 @@ function WikiEditor(props: {
           </div>
         </header>
 
+        <details className="wiki-article-details" open={!props.editingPageId}>
+        <summary>Article details</summary>
         <div className="wiki-edit-metadata">
           <label>
             Parent topic
@@ -1736,8 +1308,10 @@ function WikiEditor(props: {
           />
         </label>
 
-        <label className="wiki-wide-label">
-          Article source
+        </details>
+
+        <section className="wiki-editor-section">
+          <h2>Article source</h2>
           <div className="wiki-editor-workspace">
             <section className="wiki-source-panel" aria-label="Markdown source editor">
               <div className="wiki-markdown-toolbar" aria-label="Markdown helpers">
@@ -1780,6 +1354,7 @@ function WikiEditor(props: {
                 value={props.form.contentMarkdown}
                 onChange={(event) => props.onUpdate("contentMarkdown", event.target.value)}
                 onPaste={handleSourcePaste}
+                onScroll={event => syncScroll(event.currentTarget, previewRef.current)}
                 placeholder="Use headings, bullet points, comparison tables, code snippets and links."
               />
             </section>
@@ -1788,13 +1363,13 @@ function WikiEditor(props: {
                 <span>Live preview</span>
                 <strong>{props.form.title || "Untitled article"}</strong>
               </div>
-              <div className="official-wiki-content">
+              <div className="official-wiki-content wiki-preview-scroll" ref={previewRef} onScroll={event => syncScroll(event.currentTarget, sourceTextareaRef.current)}>
                 {props.form.summary.trim() ? <p className="wiki-lead">{props.form.summary}</p> : null}
                 {preview.nodes.length ? preview.nodes : <p className="empty-state">Nothing to preview yet.</p>}
               </div>
             </aside>
           </div>
-        </label>
+        </section>
 
         <section className="wiki-practice-editor wiki-sources-editor" aria-label="Article sources">
           <header>
@@ -2022,39 +1597,17 @@ function flattenNestedWikiTree(nodes: NestedWikiTreeNode[]) {
   return flattened;
 }
 
-function buildWikiStudyItems(pages: WikiPageRecord[], mode: WikiStudyMode): WikiStudyItem[] {
-  const items: WikiStudyItem[] = [];
-
-  for (const page of pages) {
-    if (mode === "quiz" || mode === "both") {
-      for (const question of page.quizQuestions) {
-        items.push({
-          id: `quiz-${page.id}-${question.id}`,
-          pageId: page.id,
-          pagePath: page.path,
-          pageTitle: page.title,
-          question,
-          type: "quiz"
-        });
-      }
-    }
-
-    if (mode === "flashcards" || mode === "both") {
-      for (const flashcard of page.flashcards) {
-        items.push({
-          flashcard,
-          id: `flashcard-${page.id}-${flashcard.id}`,
-          pageId: page.id,
-          pagePath: page.path,
-          pageTitle: page.title,
-          type: "flashcard"
-        });
-      }
-    }
-  }
-
-  return items;
+function filterTopicTree(nodes: NestedWikiTreeNode[], search: string): NestedWikiTreeNode[] {
+  const query = search.trim().toLowerCase();
+  if (!query) return nodes;
+  return nodes.flatMap(node => {
+    const children = filterTopicTree(node.children, query);
+    return node.title.toLowerCase().includes(query) || node.path.toLowerCase().includes(query)
+      ? [node] : children.length ? [{ ...node, children }] : [];
+  });
 }
+
+
 
 function shuffleArray<T>(items: T[]) {
   const shuffled = [...items];

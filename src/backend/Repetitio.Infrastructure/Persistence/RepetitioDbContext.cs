@@ -114,6 +114,11 @@ public sealed class RepetitioDbContext : DbContext
     /// </summary>
     public DbSet<WikiFlashcard> WikiFlashcards => Set<WikiFlashcard>();
 
+    public DbSet<WikiStudySession> WikiStudySessions => Set<WikiStudySession>();
+    public DbSet<WikiStudyAnswer> WikiStudyAnswers => Set<WikiStudyAnswer>();
+    public DbSet<WikiStudyProgress> WikiStudyProgress => Set<WikiStudyProgress>();
+    public DbSet<WikiStudySettings> WikiStudySettings => Set<WikiStudySettings>();
+
     /// <summary>
     /// Configures the database model.
     /// </summary>
@@ -121,6 +126,33 @@ public sealed class RepetitioDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.Entity<WikiPage>().Property(page => page.ReviewEnabled).HasDefaultValue(true);
+        modelBuilder.Entity<WikiStudySettings>().HasKey(settings => settings.Id);
+        modelBuilder.Entity<WikiStudySession>(entity =>
+        {
+            entity.HasKey(session => session.Id);
+            entity.HasIndex(session => session.CompletedAt);
+        });
+        modelBuilder.Entity<WikiStudyAnswer>(entity =>
+        {
+            entity.HasKey(answer => answer.Id);
+            entity.Property(answer => answer.Kind).HasMaxLength(16);
+            entity.HasIndex(answer => new { answer.SessionId, answer.ItemId, answer.Kind }).IsUnique();
+            entity.HasIndex(answer => new { answer.WikiPageId, answer.Kind, answer.ItemId });
+            entity.HasOne(answer => answer.Session).WithMany(session => session.Answers)
+                .HasForeignKey(answer => answer.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(answer => answer.WikiPage).WithMany()
+                .HasForeignKey(answer => answer.WikiPageId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<WikiStudyProgress>(entity =>
+        {
+            entity.HasKey(progress => new { progress.WikiPageId, progress.Kind });
+            entity.Property(progress => progress.Kind).HasMaxLength(16);
+            entity.HasIndex(progress => progress.LastPracticedAt);
+            entity.HasOne(progress => progress.WikiPage).WithMany()
+                .HasForeignKey(progress => progress.WikiPageId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<LearningItem>(entity =>
         {

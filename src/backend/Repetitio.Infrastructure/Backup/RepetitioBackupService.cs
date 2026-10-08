@@ -148,6 +148,24 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
             };
         }
 
+        // Upgrade only the extracted copy; a migration failure cannot alter the live database.
+        try
+        {
+            await using var importContext = new RepetitioDbContext(new DbContextOptionsBuilder<RepetitioDbContext>()
+                .UseSqlite(CreateUnpooledConnectionString(validatedBackup.DatabasePath)).Options);
+            await importContext.Database.MigrateAsync(cancellationToken);
+            var upgradedValidation = await validator.ValidateDatabaseAsync(validatedBackup.DatabasePath,
+                await GetCurrentDatabaseSchemaVersionAsync(cancellationToken),
+                CreateManifest(DateTimeOffset.UtcNow, await GetCurrentDatabaseSchemaVersionAsync(cancellationToken)), cancellationToken);
+            if (!upgradedValidation.IsValid)
+                return new BackupImport { Imported = false, Message = upgradedValidation.Message, Validation = upgradedValidation };
+        }
+        catch (Exception exception) when (exception is SqliteException or DbUpdateException or InvalidOperationException)
+        {
+            return new BackupImport { Imported = false, Message = "Backup could not be upgraded. The current database was not changed.",
+                Validation = BackupValidationResult.Invalid("Backup migration failed: " + exception.Message) };
+        }
+
         var preImportBackup = await ExportAsync(cancellationToken);
         var backupDirectory = GetBackupDirectoryPath();
         Directory.CreateDirectory(backupDirectory);

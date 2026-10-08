@@ -21,6 +21,17 @@ public static class DatabaseMigrationExtensions
         using var scope = services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<RepetitioDbContext>();
         EnsureSqliteDirectoryExists(dbContext);
+        var applied = await dbContext.Database.GetAppliedMigrationsAsync();
+        var pending = await dbContext.Database.GetPendingMigrationsAsync();
+        if (applied.Any() && pending.Any())
+        {
+            var backupService = scope.ServiceProvider.GetRequiredService<Repetitio.Infrastructure.Backup.IRepetitioBackupService>();
+            var backup = await backupService.ExportAsync();
+            var status = await backupService.GetStatusAsync();
+            Directory.CreateDirectory(status.BackupDirectory);
+            var path = Path.Combine(status.BackupDirectory, $"repetitio-pre-migration-{DateTime.UtcNow:yyyy-MM-dd-HHmmss}-{Guid.NewGuid():N}.zip");
+            await File.WriteAllBytesAsync(path, backup.Contents);
+        }
         await dbContext.Database.MigrateAsync();
     }
 
