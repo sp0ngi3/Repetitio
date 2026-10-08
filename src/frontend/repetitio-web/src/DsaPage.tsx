@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AttemptScorecard,
@@ -643,10 +644,10 @@ function DsaDashboard(props: DsaDashboardProps) {
         </div>
         <div className="editor-actions">
           <button className="secondary-button" type="button" onClick={props.onImport}>
-            Batch import
+            <ActionIcon label="Import" />Batch import
           </button>
           <button className="secondary-button" type="button" onClick={props.onAdd}>
-            Add problem
+            <ActionIcon label="Add problem" />Add problem
           </button>
         </div>
       </div>
@@ -813,7 +814,7 @@ function DsaBatchImportPage(props: DsaBatchImportPageProps) {
                 />
               </label>
               <button className="secondary-button compact-button" type="button" onClick={props.onToggleBatchStructure}>
-                JSON structure
+                <ActionIcon label="JSON structure" />JSON structure
               </button>
               <button className="primary-button compact-button" type="submit" disabled={props.isSaving}>
                 {props.isSaving ? "Importing..." : "Import problems"}
@@ -887,7 +888,7 @@ function PaginationBar(props: {
           type="button"
           onClick={() => props.onPageChange(Math.min(props.totalPages, props.page + 1))}
         >
-          Next
+          <ActionIcon label="Next" />Next
         </button>
       </div>
     </nav>
@@ -934,7 +935,7 @@ function DsaProblemCreatePage(props: DsaProblemCreatePageProps) {
           </div>
           <MetadataFields form={props.form} onChange={props.onChange} />
           <button className="primary-button" type="submit" disabled={props.isSaving}>
-            {props.isSaving ? "Saving..." : "Save problem"}
+            <ActionIcon label="Save problem" />{props.isSaving ? "Saving..." : "Save problem"}
           </button>
         </aside>
       </form>
@@ -992,10 +993,10 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
         <ProblemEditorPanel form={props.problemForm} onChange={props.onProblemChange} showExternalUrlTools showTagsEditor>
           <div className="editor-actions">
             <button className="secondary-button" type="button" onClick={props.onSaveMetadata} disabled={props.isSaving}>
-              Save metadata
+              <ActionIcon label="Save metadata" />Save metadata
             </button>
             <button className="danger-button" type="button" onClick={props.onDelete} disabled={props.isSaving}>
-              Delete
+              <ActionIcon label="Delete" />Delete
             </button>
           </div>
         </ProblemEditorPanel>
@@ -1195,7 +1196,7 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
             </div>
 
             <button className="primary-button" type="submit" disabled={props.isSaving}>
-              {props.isSaving ? "Saving attempt..." : "Save attempt"}
+              <ActionIcon label="Save attempt" />{props.isSaving ? "Saving attempt..." : "Save attempt"}
             </button>
           </form>
 
@@ -1232,7 +1233,7 @@ function PageBackHeader(props: PageBackHeaderProps) {
         <h2>{props.title}</h2>
       </div>
       <button className="secondary-button" type="button" onClick={props.onBack}>
-        Back
+        <ActionIcon label="Back" />Back
       </button>
     </div>
   );
@@ -1364,7 +1365,7 @@ function ExternalUrlEditor(props: ExternalUrlEditorProps) {
           onClick={() => openExternalUrl(props.value)}
           disabled={!hasUrl}
         >
-          Open link
+          <ActionIcon label="Open link" />Open link
         </button>
       </div>
     </label>

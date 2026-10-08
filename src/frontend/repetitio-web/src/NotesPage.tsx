@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createNotePage, deleteNotePage, getNotePages, updateNotePage } from "./api";
 import { confirmDelete } from "./confirmDelete";
@@ -271,7 +272,7 @@ export function NotesPage(props: NotesPageProps) {
           <h2 id="notes-title">Notebook</h2>
         </div>
         <button className="secondary-button" type="button" onClick={startNewPage}>
-          New page
+          <ActionIcon label="New page" />New page
         </button>
       </div>
 
@@ -350,7 +351,7 @@ export function NotesPage(props: NotesPageProps) {
                   type="button"
                   onClick={() => setPage(Math.min(totalPages, normalizedPage + 1))}
                 >
-                  Next
+                  <ActionIcon label="Next" />Next
                 </button>
               </div>
             </nav>
@@ -388,7 +389,7 @@ export function NotesPage(props: NotesPageProps) {
 
           <div className="editor-actions">
             <button className="primary-button compact-button" type="submit" disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save page"}
+              <ActionIcon label="Save page" />{isSaving ? "Saving..." : "Save page"}
             </button>
             <button
               className="secondary-button compact-button"
@@ -400,7 +401,7 @@ export function NotesPage(props: NotesPageProps) {
             </button>
             {selectedNote ? (
               <button className="danger-button" type="button" onClick={handleDelete} disabled={isSaving}>
-                Delete
+                <ActionIcon label="Delete" />Delete
               </button>
             ) : null}
           </div>
@@ -521,7 +522,7 @@ export function NotesCompanion() {
         type="button"
         onClick={() => setIsOpen((current) => !current)}
       >
-        Notes
+        <ActionIcon label="New note" />Notes
       </button>
       {isOpen ? (
         <aside className="notes-companion" aria-label="Global notes">
@@ -531,7 +532,7 @@ export function NotesCompanion() {
               <h2>Notes</h2>
             </div>
             <button className="secondary-button compact-button" type="button" onClick={() => setIsOpen(false)}>
-              Close
+              <ActionIcon label="Close" />Close
             </button>
           </div>
 

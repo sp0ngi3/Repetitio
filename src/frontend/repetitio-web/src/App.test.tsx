@@ -968,6 +968,37 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Switch to light mode" })).toBeInTheDocument();
   });
 
+  it("selects both Vaporwave color modes in Settings without writing learning data", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Vaporwave" }));
+    expect(document.documentElement.dataset.style).toBe("vaporwave");
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(localStorage.getItem("repetitio-visual-style")).toBe("vaporwave");
+    fireEvent.change(screen.getByRole("combobox", { name: "Motion preference" }), { target: { value: "reduced" } });
+    expect(document.documentElement.dataset.motion).toBe("reduced");
+    fireEvent.click(screen.getByRole("radio", { name: "Professional" }));
+    expect(document.documentElement.dataset.style).toBe("professional");
+    expect(updateWikiPage).not.toHaveBeenCalled();
+    expect(createPracticeSession).not.toHaveBeenCalled();
+    expect(importBackup).not.toHaveBeenCalled();
+  });
+
+  it("restores appearance preferences on startup and exposes current navigation", async () => {
+    localStorage.setItem("repetitio-theme", "dark");
+    localStorage.setItem("repetitio-visual-style", "vaporwave");
+    render(<App />);
+    expect(document.documentElement.dataset).toMatchObject({ style: "vaporwave", theme: "dark" });
+    expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("radio", { name: "Vaporwave" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Dark" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
+  });
+
   /**
    * Verifies that pasted screenshots are uploaded into local wiki storage and embedded in markdown.
    */

@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { createPracticeSession, executeBasicExercise } from "./api";
@@ -255,7 +256,7 @@ export function BasicsPage(props: BasicsPageProps) {
             <h2 id="basics-detail-title">{selectedExercise.title}</h2>
           </div>
           <button className="secondary-button" type="button" onClick={returnToDashboard}>
-            Back
+            <ActionIcon label="Back" />Back
           </button>
         </div>
 
@@ -337,7 +338,7 @@ export function BasicsPage(props: BasicsPageProps) {
                   placeholder="Write your solution here."
                   toolbarEnd={
                     <button className="secondary-button compact-button" type="button" onClick={handleRunTests} disabled={isRunning}>
-                      {isRunning ? "Running..." : "Run tests"}
+                      <ActionIcon label="Run tests" />{isRunning ? "Running..." : "Run tests"}
                     </button>
                   }
                 />
@@ -612,7 +613,7 @@ function PaginationBar(props: PaginationBarProps) {
           disabled={props.currentPage === 1}
           onClick={() => props.onPageChange(props.currentPage - 1)}
         >
-          Previous page
+          <ActionIcon label="Previous page" />Previous page
         </button>
         <span>
           {props.currentPage}/{props.pageCount}
@@ -623,7 +624,7 @@ function PaginationBar(props: PaginationBarProps) {
           disabled={props.currentPage === props.pageCount}
           onClick={() => props.onPageChange(props.currentPage + 1)}
         >
-          Next page
+          <ActionIcon label="Next page" />Next page
         </button>
       </div>
     </nav>

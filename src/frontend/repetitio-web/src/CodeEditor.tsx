@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import type { KeyboardEvent, ReactNode } from "react";
 
 const codeEditorIndent = "    ";
@@ -60,13 +61,13 @@ export function CodeEditor(props: CodeEditorProps) {
         <div className="dsa-code-actions">
           {props.toolbarEnd}
           <button className="secondary-button compact-button" type="button" disabled={props.disabled} onClick={() => props.onFormat ? props.onFormat() : props.onChange(formatCode(props.value))}>
-            Format
+            <ActionIcon label="Format" />Format
           </button>
           {props.copyAction ?? <button className="secondary-button compact-button" type="button" disabled={props.disabled} onClick={() => void copyCode()}>
-            Copy
+            <ActionIcon label="Copy" />Copy
           </button>}
           {props.allowClear !== false ? <button className="danger-button compact-button" type="button" disabled={props.disabled} onClick={() => props.onChange("")}>
-            Clear
+            <ActionIcon label="Clear" />Clear
           </button> : null}
         </div>
       </div>

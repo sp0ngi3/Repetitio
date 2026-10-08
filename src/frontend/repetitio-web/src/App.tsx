@@ -8,6 +8,10 @@ import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
 import { WikiReviewSettings } from "./WikiLearning";
 import { WikiOverview } from "./WikiOverview";
+import { AppFooter, AppHeader, appPages, type AppPage } from "./AppChrome";
+import { AppearanceSettings } from "./AppearanceSettings";
+import { applyAppearance, readColorMode, readMotionPreference, readVisualStyle, type ColorMode, type MotionPreference, type VisualStyle } from "./appearance";
+import { Activity, CalendarDays, CircleDashed, History, ArrowUpRight, Target } from "lucide-react";
 import {
   readInitialReviewSchedulePreset,
   saveReviewSchedulePreset,
@@ -16,11 +20,6 @@ import {
 import type { BasicExercise, Dashboard, LearningItem, LearningItemType, WikiStudyModeProgress } from "./types";
 
 const WikiPage = lazy(() => import("./WikiPage").then(module => ({ default: module.WikiPage })));
-
-/**
- * Application page identifiers.
- */
-type AppPage = "overview" | "dsa" | "system-design" | "basics" | "flashcards" | "wiki" | "notes" | "settings";
 
 /**
  * Internal navigation target for opening a concrete learning item.
@@ -45,11 +44,6 @@ interface FocusedLearningTarget extends LearningNavigationTarget {
 }
 
 /**
- * Visual themes supported by the application shell.
- */
-type AppTheme = "light" | "dark";
-
-/**
  * Database connection states shown in the app shell.
  */
 type DatabaseConnectionState = "checking" | "connected" | "disconnected";
@@ -66,7 +60,9 @@ const databaseHealthPollMs = 10_000;
  */
 export function App() {
   const [activePage, setActivePage] = useState<AppPage>("overview");
-  const [theme, setTheme] = useState<AppTheme>(readInitialTheme);
+  const [theme, setTheme] = useState<ColorMode>(readColorMode);
+  const [visualStyle, setVisualStyle] = useState<VisualStyle>(readVisualStyle);
+  const [motion, setMotion] = useState<MotionPreference>(readMotionPreference);
   const [reviewSchedulePreset, setReviewSchedulePreset] = useState<ReviewSchedulePreset>(
     readInitialReviewSchedulePreset
   );
@@ -145,9 +141,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("repetitio-theme", theme);
-  }, [theme]);
+    applyAppearance(theme, visualStyle, motion);
+  }, [theme, visualStyle, motion]);
 
   useEffect(() => {
     saveReviewSchedulePreset(reviewSchedulePreset);
@@ -184,68 +179,13 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="top-bar" aria-labelledby="page-title">
-        <div>
-          <p className="eyebrow">Local learning system</p>
-          <h1 id="page-title">Repetitio</h1>
-        </div>
-        <div className="top-bar-actions">
-          <div className="top-bar-utility-row">
-            <DatabaseConnectionIndicator checkedAt={databaseCheckedAt} state={databaseConnection} />
-            <button
-              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className={`theme-toggle ${theme}`}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              type="button"
-              onClick={() => setTheme(toggleTheme)}
-            >
-              <span className="theme-toggle-track" aria-hidden="true">
-                <span className="theme-toggle-thumb" />
-              </span>
-              <span>{theme === "dark" ? "Dark" : "Light"}</span>
-            </button>
-          </div>
-          <nav className="app-nav" aria-label="Primary navigation">
-            <button className={activePage === "overview" ? "active" : ""} type="button" onClick={() => setActivePage("overview")}>
-              Overview
-            </button>
-            <button className={activePage === "dsa" ? "active" : ""} type="button" onClick={() => setActivePage("dsa")}>
-              DSA
-            </button>
-            <button
-              className={activePage === "system-design" ? "active" : ""}
-              type="button"
-              onClick={() => setActivePage("system-design")}
-            >
-              System Design
-            </button>
-            <button className={activePage === "basics" ? "active" : ""} type="button" onClick={() => setActivePage("basics")}>
-              Basics
-            </button>
-            <button
-              className={activePage === "flashcards" ? "active" : ""}
-              type="button"
-              onClick={() => setActivePage("flashcards")}
-            >
-              Flashcards
-            </button>
-            <button className={activePage === "wiki" ? "active" : ""} type="button" onClick={() => { setFocusedWikiTarget(null); setActivePage("wiki"); }}>
-              Wiki
-            </button>
-            <button className={activePage === "notes" ? "active" : ""} type="button" onClick={() => setActivePage("notes")}>
-              Notes
-            </button>
-            <button
-              className={activePage === "settings" ? "active" : ""}
-              type="button"
-              onClick={() => setActivePage("settings")}
-            >
-              Settings
-            </button>
-          </nav>
-        </div>
-      </section>
+    <div className="app-shell">
+      <AppHeader page={activePage} mode={theme}
+        connection={<DatabaseConnectionIndicator checkedAt={databaseCheckedAt} state={databaseConnection} />}
+        onToggleMode={() => setTheme(value => value === "dark" ? "light" : "dark")}
+        onNavigate={page => { if (page === "wiki") setFocusedWikiTarget(null); setActivePage(page); }} />
+      <main id="workspace" className="app-workspace" data-page={activePage} tabIndex={-1}>
+      <div className="workspace-location"><span>Workspace</span><span aria-hidden="true">/</span><strong>{appPages.find(page => page.id === activePage)?.label}</strong><time dateTime={new Date().toISOString().slice(0, 10)}>{new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</time></div>
 
       {error ? <p className="error-banner">{error}</p> : null}
 
@@ -312,13 +252,17 @@ export function App() {
 
       {activePage === "settings" ? (
         <SettingsPage
+          mode={theme} style={visualStyle} motion={motion}
+          onModeChange={setTheme} onStyleChange={setVisualStyle} onMotionChange={setMotion}
           reviewSchedulePreset={reviewSchedulePreset}
           onReviewSchedulePresetChange={setReviewSchedulePreset}
         />
       ) : null}
 
       <NotesCompanion />
-    </main>
+      </main>
+      <AppFooter mode={theme} style={visualStyle} />
+    </div>
   );
 }
 
@@ -384,10 +328,10 @@ function OverviewPage(props: OverviewPageProps) {
   return (
     <>
       <section className="metric-grid" aria-label="Learning metrics">
-        <Metric label="Practices today" value={props.dashboard?.practicesToday ?? 0} />
-        <Metric label="This week" value={props.dashboard?.practicesThisWeek ?? 0} />
-        <Metric label="Due reviews" value={props.dashboard?.dueReviewCount ?? 0} />
-        <Metric label="Never practiced" value={props.dashboard?.neverPracticedCount ?? 0} />
+        <Metric label="Practices today" value={props.dashboard?.practicesToday ?? 0} icon={Activity} />
+        <Metric label="This week" value={props.dashboard?.practicesThisWeek ?? 0} icon={CalendarDays} />
+        <Metric label="Due reviews" value={props.dashboard?.dueReviewCount ?? 0} icon={History} />
+        <Metric label="Never practiced" value={props.dashboard?.neverPracticedCount ?? 0} icon={CircleDashed} />
       </section>
 
       <section className="dashboard-focus-grid" aria-label="Daily interview focus">
@@ -395,7 +339,7 @@ function OverviewPage(props: OverviewPageProps) {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Daily interview plan</p>
-              <h2 id="today-plan-title">Today</h2>
+              <h2 id="today-plan-title"><Target size={19} aria-hidden="true" />Today</h2>
             </div>
             <span className="confidence">{props.dashboard?.interviewPlan?.length ?? 0}/5</span>
           </div>
@@ -422,6 +366,7 @@ function OverviewPage(props: OverviewPageProps) {
                       onClick={() => props.onOpenItem(item)}
                     >
                       {getLearningTargetActionLabel(item, "Open")}
+                      <ArrowUpRight size={15} aria-hidden="true" />
                     </button>
                   </div>
                 </li>
@@ -468,6 +413,7 @@ function OverviewPage(props: OverviewPageProps) {
                       }}
                     >
                       {weakness.drillTarget ? getLearningTargetActionLabel(weakness.drillTarget, "Drill") : "Drill"}
+                      <ArrowUpRight size={15} aria-hidden="true" />
                     </button>
                   </div>
                 </li>
@@ -543,10 +489,11 @@ function getLearningTargetActionLabel(target: LearningNavigationTarget, fallback
  * @param props - Component props.
  * @returns A metric card.
  */
-function Metric(props: { label: string; value: number }) {
+function Metric(props: { label: string; value: number; icon: typeof Activity }) {
+  const Icon = props.icon;
   return (
     <article className="metric-card">
-      <span>{props.label}</span>
+      <span><Icon size={18} aria-hidden="true" />{props.label}</span>
       <strong>{props.value}</strong>
     </article>
   );
@@ -556,6 +503,12 @@ function Metric(props: { label: string; value: number }) {
  * Props accepted by the settings page.
  */
 interface SettingsPageProps {
+  mode: ColorMode;
+  style: VisualStyle;
+  motion: MotionPreference;
+  onModeChange: (mode: ColorMode) => void;
+  onStyleChange: (style: VisualStyle) => void;
+  onMotionChange: (motion: MotionPreference) => void;
   /** Selected default review schedule preset. */
   reviewSchedulePreset: ReviewSchedulePreset;
   /** Updates the default review schedule preset. */
@@ -571,6 +524,8 @@ interface SettingsPageProps {
 function SettingsPage(props: SettingsPageProps) {
   return (
     <div className="settings-stack">
+      <AppearanceSettings mode={props.mode} style={props.style} motion={props.motion}
+        onModeChange={props.onModeChange} onStyleChange={props.onStyleChange} onMotionChange={props.onMotionChange} />
       <section className="panel settings-panel" aria-labelledby="practice-settings-title">
         <div className="panel-heading">
           <div>
@@ -630,24 +585,6 @@ function toAppPage(type: LearningItemType): AppPage {
   return "basics";
 }
 
-/**
- * Reads the saved application theme from local storage.
- *
- * @returns The initial application theme.
- */
-function readInitialTheme(): AppTheme {
-  return localStorage.getItem("repetitio-theme") === "dark" ? "dark" : "light";
-}
-
-/**
- * Toggles the application theme.
- *
- * @param currentTheme - Current application theme.
- * @returns The next application theme.
- */
-function toggleTheme(currentTheme: AppTheme): AppTheme {
-  return currentTheme === "dark" ? "light" : "dark";
-}
 
 /**
  * Formats the last health check timestamp for a tooltip.

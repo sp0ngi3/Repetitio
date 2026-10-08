@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { useEffect, useState } from "react";
 import { getWikiStudy } from "./api";
 import type { WikiStudyModeProgress, WikiStudyOverview } from "./types";
@@ -65,7 +66,7 @@ export function WikiOverview({ onPractice }: {
       <div><p className="eyebrow">Knowledge practice</p><h2 id="wiki-overview-title">Wiki study</h2></div>
       {overview ? <span className="confidence">{new Set(rows.map(row => row.topic.id)).size} active topics</span> : null}
     </header>
-    {error ? <p className="error-banner" role="alert">{error} <button className="text-button" type="button" onClick={() => setReload(value => value + 1)}>Retry</button></p> : null}
+    {error ? <p className="error-banner" role="alert">{error} <button className="text-button" type="button" onClick={() => setReload(value => value + 1)}><ActionIcon label="Retry" />Retry</button></p> : null}
     {loading && !overview ? <p role="status">Loading Wiki progress...</p> : null}
     {overview ? <>
       <div className="wiki-overview-coverage">
@@ -102,15 +103,15 @@ export function WikiOverview({ onPractice }: {
               <span>Last completed: {date(row.mode.lastCompletedAt)}</span>
               <span>Next review: {row.mode.nextReviewAt ? date(row.mode.nextReviewAt) : "Complete remaining checks"}</span></div>
             <button className="secondary-button compact-button" type="button" aria-label={`Practice ${row.topic.title} ${label}`}
-              onClick={() => onPractice(row.topic.id, row.mode.kind)}>Practice</button>
+              onClick={() => onPractice(row.topic.id, row.mode.kind)}><ActionIcon label="Practice" />Practice</button>
           </li>;
         })}
       </ul>
       {!filtered.length ? <p className="empty-state">{rows.length ? "No sections match this view." : "No active Wiki quizzes or flashcards yet."}</p> : null}
       {filtered.length ? <div className="pagination-row">
-        <button className="secondary-button" type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</button>
+        <button className="secondary-button" type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}><ActionIcon label="Previous" />Previous</button>
         <span>{currentPage} / {pageCount} · {filtered.length} {filtered.length === 1 ? "section" : "sections"}</span>
-        <button className="secondary-button" type="button" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next</button>
+        <button className="secondary-button" type="button" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}><ActionIcon label="Next" />Next</button>
       </div> : null}
       {overview.history.length ? <details className="wiki-session-history"><summary>Recent Wiki sessions</summary>
         {overview.history.slice(0, 5).map(session => <div key={session.id}><time>{new Date(session.completedAt).toLocaleString()}</time>

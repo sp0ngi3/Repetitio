@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   completeFlashcardSession,
@@ -1045,17 +1046,17 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
         </div>
         <div className="flashcards-hero-actions">
           <button className="secondary-button" type="button" onClick={openNewCard}>
-            Add flashcard
+            <ActionIcon label="Add flashcard" />Add flashcard
           </button>
           <label className="secondary-button file-action-button">
             Batch import
             <input accept="application/json,.json" type="file" disabled={isImporting} onChange={handleFlashcardImport} />
           </label>
           <button className="secondary-button" type="button" onClick={() => setShowImportExample((isShown) => !isShown)}>
-            JSON structure
+            <ActionIcon label="JSON structure" />JSON structure
           </button>
           <button className="secondary-button" type="button" onClick={openNewDeck} disabled={flashcardTotalCount === 0}>
-            Create learning session
+            <ActionIcon label="Create learning session" />Create learning session
           </button>
         </div>
         <div className="flashcards-metric-strip" aria-label="Flashcard metrics">
@@ -1344,7 +1345,7 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                       </label>
                       <div className="editor-actions compact-actions">
                         <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void startStudy(deck)}>
-                          Start
+                          <ActionIcon label="Start" />Start
                         </button>
                         <button
                           className="secondary-button"
@@ -1352,10 +1353,10 @@ export function FlashcardsPage(props: FlashcardsPageProps) {
                           disabled={isSaving || !hasMissedDeckReviews(deck)}
                           onClick={() => void startMissedStudy(deck)}
                         >
-                          Review missed
+                          <ActionIcon label="Review missed" />Review missed
                         </button>
                         <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void openEditDeck(deck)}>
-                          Edit
+                          <ActionIcon label="Edit" />Edit
                         </button>
                       </div>
                     </div>
@@ -1461,7 +1462,7 @@ function PageHeading(props: PageHeadingProps) {
         <h2>{props.title}</h2>
       </div>
       <button className="secondary-button" type="button" onClick={props.onBack}>
-        Back
+        <ActionIcon label="Back" />Back
       </button>
     </div>
   );
@@ -1544,7 +1545,7 @@ function FlashcardImportReviewPanel(props: FlashcardImportReviewPanelProps) {
           {props.isImporting ? "Importing..." : "Import reviewed flashcards"}
         </button>
         <button className="secondary-button" type="button" disabled={props.isImporting} onClick={props.onClear}>
-          Clear import
+          <ActionIcon label="Clear import" />Clear import
         </button>
       </div>
 
@@ -1599,7 +1600,7 @@ function FlashcardImportReviewPanel(props: FlashcardImportReviewPanelProps) {
                 disabled={props.isImporting}
                 onClick={() => props.onRemove(draft.id)}
               >
-                Remove
+                <ActionIcon label="Remove" />Remove
               </button>
             </div>
 
@@ -1790,7 +1791,7 @@ function FlashcardFormPanel(props: FlashcardFormPanelProps) {
         </button>
         {props.selectedCard ? (
           <button className="danger-button" type="button" onClick={props.onDelete} disabled={props.isSaving}>
-            Delete
+            <ActionIcon label="Delete" />Delete
           </button>
         ) : null}
       </div>
@@ -1950,7 +1951,7 @@ function FlashcardDeckFormPanel(props: FlashcardDeckFormPanelProps) {
               <span>Also delete the flashcards in this session</span>
             </label>
             <button className="danger-button" type="button" onClick={props.onDelete} disabled={props.isSaving}>
-              Delete
+              <ActionIcon label="Delete" />Delete
             </button>
           </div>
         ) : null}
@@ -2031,7 +2032,7 @@ function StudySessionPage(props: StudySessionPageProps) {
 
         <div className="flashcard-study-actions">
           <button className="secondary-button" type="button" onClick={props.onFlip}>
-            Flip
+            <ActionIcon label="Flip" />Flip
           </button>
           <button
             className="danger-button"
@@ -2039,7 +2040,7 @@ function StudySessionPage(props: StudySessionPageProps) {
             disabled={!props.session.isFlipped || props.isSaving}
             onClick={() => props.onEvaluate(false)}
           >
-            Did not know
+            <ActionIcon label="Did not know" />Did not know
           </button>
           <button
             className="secondary-button"
@@ -2047,7 +2048,7 @@ function StudySessionPage(props: StudySessionPageProps) {
             disabled={!props.session.isFlipped || props.isSaving}
             onClick={() => props.onEvaluate(true)}
           >
-            Knew it
+            <ActionIcon label="Knew it" />Knew it
           </button>
         </div>
       </section>
@@ -2431,7 +2432,7 @@ function PaginationBar(props: PaginationBarProps) {
           disabled={props.currentPage === 1}
           onClick={() => props.onPageChange(props.currentPage - 1)}
         >
-          Previous page
+          <ActionIcon label="Previous page" />Previous page
         </button>
         <span>
           {props.currentPage}/{props.pageCount}
@@ -2442,7 +2443,7 @@ function PaginationBar(props: PaginationBarProps) {
           disabled={props.currentPage === props.pageCount}
           onClick={() => props.onPageChange(props.currentPage + 1)}
         >
-          Next page
+          <ActionIcon label="Next page" />Next page
         </button>
       </div>
     </nav>

@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { ChangeEvent, ClipboardEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   createWikiPage,
@@ -557,12 +558,12 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
         </div>
         <nav className="wiki-page-tabs" aria-label="Wiki navigation">
           <button className={view === "article" ? "active" : ""} type="button" onClick={() => setView("article")}>
-            Article
+            <ActionIcon label="Article" />Article
           </button>
           <button className={view === "explore" ? "active" : ""} type="button" onClick={() => setView("explore")}>
             Explore
           </button>
-          <button className={view === "study" ? "active" : ""} type="button" disabled={!selectedPage} onClick={() => setView("study")}>Study</button>
+          <button className={view === "study" ? "active" : ""} type="button" disabled={!selectedPage} onClick={() => setView("study")}><ActionIcon label="Study" />Study</button>
           <button className={view === "reviews" ? "active" : ""} type="button" onClick={() => setView("reviews")}>Reviews</button>
           <button className={view === "edit" ? "active" : ""} type="button" onClick={startEditPage}>
             {selectedPage ? "Edit" : "Create"}
@@ -589,7 +590,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
           <div className="wiki-rail-heading">
             <strong>Topic library</strong>
             <button className="text-button" type="button" onClick={startNewRootPage}>
-              Add topic
+              <ActionIcon label="Add topic" />Add topic
             </button>
           </div>
           <label className="wiki-tree-search">Find a topic<input aria-label="Search topic tree" value={treeSearch} onChange={event => setTreeSearch(event.target.value)} placeholder="Topic or path..." /></label>
@@ -659,7 +660,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
 
         {view === "study" && selectedPage ? <main className="wiki-document wiki-study-view">
           <header className="wiki-special-header"><div><span className="wiki-path">{selectedPage.path}</span><h1>Study: {selectedPage.title}</h1></div>
-            <button className="secondary-button" type="button" onClick={() => setView("article")}>Back to article</button></header>
+            <button className="secondary-button" type="button" onClick={() => setView("article")}><ActionIcon label="Back to article" />Back to article</button></header>
           <WikiProgressSummary progress={studyOverview?.pages.find(p => p.id === selectedPage.id)} />
           <WikiBranchProgress topics={studyOverview?.pages ?? []} rootId={selectedPage.id} />
           {focusedPractice && selectedPage.id === focusPageId && studyItems([selectedPage], focusStudyKind === "quiz" ? "quiz" : "flashcards").length
@@ -751,7 +752,7 @@ function WikiArticle(props: {
         <h1>Wiki repository</h1>
         <p>Create the first page and start building your own interview knowledge base.</p>
         <button className="primary-button compact-button" type="button" onClick={props.onCreateChild}>
-          Create first article
+          <ActionIcon label="Create first article" />Create first article
         </button>
       </main>
     );
@@ -768,17 +769,17 @@ function WikiArticle(props: {
           <div className="wiki-article-actions">
             {hasKnowledgeChecks ? (
               <button type="button" className="secondary-button compact-button wiki-study-link" onClick={props.onStudy}>
-                Study builder
+                <ActionIcon label="Study builder" />Study builder
               </button>
             ) : null}
             <button className="secondary-button compact-button" type="button" onClick={props.onCreateChild}>
-              Add subtopic
+              <ActionIcon label="Add subtopic" />Add subtopic
             </button>
             <button className="secondary-button compact-button" type="button" onClick={props.onDownloadPdf}>
-              Download PDF
+              <ActionIcon label="Download PDF" />Download PDF
             </button>
             <button className="primary-button compact-button" type="button" onClick={props.onEdit}>
-              Edit source
+              <ActionIcon label="Edit source" />Edit source
             </button>
             <button className="secondary-button compact-button" type="button" onClick={props.onEditJson}><FileJson size={16} /> Edit JSON</button>
           </div>
@@ -799,7 +800,7 @@ function WikiArticle(props: {
               <span>No headings</span>
             )}
             <a href="#wiki-knowledge-checks">Knowledge checks</a>
-            <button className="text-button" type="button" onClick={props.onStudy}>Study this topic tree</button>
+            <button className="text-button" type="button" onClick={props.onStudy}><ActionIcon label="Study this topic tree" />Study this topic tree</button>
           </aside>
 
           <div className="wiki-article-content official-wiki-content">
@@ -967,8 +968,8 @@ function WikiStudyBuilder(props: { currentPage: WikiPageRecord; treeNodes: WikiT
   return <section className="wiki-study-builder" id="wiki-study-builder" aria-label="Wiki study builder">
     <header className="wiki-study-builder-header"><div><span className="wiki-practice-kicker">Study builder</span><h2>Choose your topics</h2></div><span>{selectedIds.size} selected</span></header>
     <div className="wiki-study-presets">
-      <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(true, 10)}>Random 10</button>
-      <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(true, 25)}>Random 25</button>
+      <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(true, 10)}><ActionIcon label="Random 10" />Random 10</button>
+      <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(true, 25)}><ActionIcon label="Random 25" />Random 25</button>
       <button className="secondary-button" type="button" disabled={loading} onClick={() => void startSession(false, null)}>All in order</button>
     </div>
     <div className="wiki-study-builder-grid">
@@ -986,7 +987,7 @@ function WikiStudyBuilder(props: { currentPage: WikiPageRecord; treeNodes: WikiT
         {error ? <p className="error-banner" role="alert">{error}</p> : null}
       </div>
       <div className="wiki-study-builder-panel">
-        <div className="wiki-study-topic-heading"><strong>{scope === "custom" ? "Custom selection" : "Topic tree"}</strong><button type="button" className="text-button" disabled={loading} onClick={() => { setSelectedIds(new Set()); setScope("custom"); }}>Clear</button></div>
+        <div className="wiki-study-topic-heading"><strong>{scope === "custom" ? "Custom selection" : "Topic tree"}</strong><button type="button" className="text-button" disabled={loading} onClick={() => { setSelectedIds(new Set()); setScope("custom"); }}><ActionIcon label="Clear" />Clear</button></div>
         <label>Find a topic<input value={topicSearch} onChange={event => setTopicSearch(event.target.value)} /></label>
         <div className="wiki-study-tree">{topicSearch ? props.treeNodes.filter(n => n.title.toLowerCase().includes(topicSearch.toLowerCase()) || n.path.toLowerCase().includes(topicSearch.toLowerCase())).map(node =>
           <label className="wiki-study-topic-row" key={node.id}><input type="checkbox" checked={selectedIds.has(node.id)} onChange={() => toggleTopic(node.id)} /><span>{node.title}</span><small>{node.path}</small></label>)
@@ -1032,7 +1033,7 @@ function WikiExplore(props: {
           <h1>Search repository</h1>
         </div>
         <button className="primary-button compact-button" type="button" onClick={props.onCreate}>
-          New article
+          <ActionIcon label="New article" />New article
         </button>
       </header>
 
@@ -1106,7 +1107,7 @@ function WikiExplore(props: {
           disabled={props.page <= 1}
           onClick={() => props.onPageChange(Math.max(1, props.page - 1))}
         >
-          Previous
+          <ActionIcon label="Previous" />Previous
         </button>
         <span>
           Page {props.page} / {props.totalPages} · {props.totalCount} articles
@@ -1117,7 +1118,7 @@ function WikiExplore(props: {
           disabled={props.page >= props.totalPages}
           onClick={() => props.onPageChange(Math.min(props.totalPages, props.page + 1))}
         >
-          Next
+          <ActionIcon label="Next" />Next
         </button>
       </div>
     </main>
@@ -1270,7 +1271,7 @@ function WikiEditor(props: {
           </div>
           <div className="wiki-article-actions">
             <button className="secondary-button compact-button" type="button" onClick={props.onCancel}>
-              Cancel
+              <ActionIcon label="Cancel" />Cancel
             </button>
             <button className="primary-button compact-button" type="submit" disabled={props.isSaving}>
               {props.isSaving ? "Saving..." : "Save article"}
@@ -1471,7 +1472,7 @@ function WikiEditor(props: {
           </label>
           {props.editingPageId ? (
             <button className="danger-button" type="button" onClick={props.onDelete} disabled={props.isSaving}>
-              Delete article and subtopics
+              <ActionIcon label="Delete article and subtopics" />Delete article and subtopics
             </button>
           ) : null}
         </footer>
@@ -1516,7 +1517,7 @@ function WikiBatchImport(props: {
               />
             </label>
             <button className="secondary-button compact-button" type="button" onClick={props.onToggleImportStructure}>
-              JSON structure
+              <ActionIcon label="JSON structure" />JSON structure
             </button>
             <button className="primary-button compact-button" type="submit" disabled={props.isSaving}>
               {props.isSaving ? "Importing..." : "Import tree"}

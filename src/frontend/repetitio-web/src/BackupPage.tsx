@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { ChangeEvent, useEffect, useState } from "react";
 import { exportBackup, getBackupStatus, importBackup, validateBackup } from "./api";
 import type { BackupStatus, BackupValidation, ImportBackupResult } from "./types";
@@ -162,7 +163,7 @@ export function BackupPage() {
           </div>
           <p className="muted-copy">Exports a validated zip archive with manifest.json and repetitio.db.</p>
           <button className="primary-button" type="button" onClick={handleExport} disabled={isBusy}>
-            {isBusy ? "Working..." : "Export Data"}
+            <ActionIcon label="Export Data" />{isBusy ? "Working..." : "Export Data"}
           </button>
         </article>
 
@@ -181,10 +182,10 @@ export function BackupPage() {
 
           <div className="editor-actions">
             <button className="secondary-button" type="button" onClick={handleValidate} disabled={isBusy || !selectedFile}>
-              Validate Backup
+              <ActionIcon label="Confirm backup" />Validate Backup
             </button>
             <button className="danger-button" type="button" onClick={handleImport} disabled={isBusy || !selectedFile}>
-              Import Data
+              <ActionIcon label="Import Data" />Import Data
             </button>
           </div>
 

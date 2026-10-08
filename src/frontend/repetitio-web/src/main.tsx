@@ -2,6 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import "./styles.css";
+import "./design.css";
+import { applyAppearance, readColorMode, readMotionPreference, readVisualStyle } from "./appearance";
+
+applyAppearance(readColorMode(), readVisualStyle(), readMotionPreference());
 
 /**
  * Root DOM element used by the React application.

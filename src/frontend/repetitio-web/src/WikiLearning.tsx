@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { useEffect, useRef, useState } from "react";
 import { getWikiStudy, saveWikiStudy, saveWikiStudySettings, saveWikiReviewPreference } from "./api";
 import type { WikiPage, WikiStudyAnswerRequest, WikiStudyOverview, WikiStudyPageProgress } from "./types";
@@ -99,21 +100,21 @@ export function WikiLearningPlayer({ items, onClose }: { items: WikiStudyItem[];
           <button className="secondary-button" type="button" disabled={!!result || saving} onClick={() => setAnswers(current => ({ ...current,
             [item.id]: { pageId: item.pageId, itemId: item.flashcard.id, kind: "flashcard", knew: false } }))}>Need practice</button>
           <button className="primary-button" type="button" disabled={!!result || saving} onClick={() => setAnswers(current => ({ ...current,
-            [item.id]: { pageId: item.pageId, itemId: item.flashcard.id, kind: "flashcard", knew: true } }))}>I knew it</button>
+            [item.id]: { pageId: item.pageId, itemId: item.flashcard.id, kind: "flashcard", knew: true } }))}><ActionIcon label="I knew it" />I knew it</button>
         </div> : null}
         {result ? <p role="status">{result.knew ? "Marked as known" : "Marked for practice"}</p> : null}
       </>}
     </div>
     {error ? <p className="error-banner" role="alert">{error}</p> : null}
     <footer className="wiki-player-footer">
-      {summary ? <button className="primary-button" type="button" onClick={onClose}>Back to topics</button> : <>
+      {summary ? <button className="primary-button" type="button" onClick={onClose}><ActionIcon label="Back to topics" />Back to topics</button> : <>
         <button className="secondary-button" aria-label="Previous check" title="Previous check" type="button" disabled={index === 0 || saving} onClick={() => move(-1)}>&larr;</button>
         <span>{index + 1} / {items.length}</span>
         <button className="secondary-button" aria-label="Next check" title="Next check" type="button" disabled={index === items.length - 1 || saving} onClick={() => move(1)}>&rarr;</button>
         <button className="primary-button" type="button" disabled={!values.length || saving || saved} onClick={finish}>{saving ? "Saving..." : "Save results"}</button>
         <button className="text-button" type="button" disabled={saving} onClick={() => {
           if (!values.length || saved || window.confirm("Leave without saving these results?")) onClose();
-        }}>Close</button>
+        }}><ActionIcon label="Close" />Close</button>
       </>}
     </footer>
   </section>;
@@ -169,8 +170,8 @@ export function WikiReviewSettings() {
           <option value="">Default interval</option>{[7,14,30,60,90].map(days => <option value={days} key={days}>{days} days</option>)}
         </select>
       </div>)}</div>
-    <div className="pagination-row"><button className="secondary-button" type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</button>
-      <span>{page} / {Math.max(1, Math.ceil(filtered.length / 15))}</span><button className="secondary-button" type="button" disabled={page * 15 >= filtered.length} onClick={() => setPage(p => p + 1)}>Next</button></div>
+    <div className="pagination-row"><button className="secondary-button" type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)}><ActionIcon label="Previous" />Previous</button>
+      <span>{page} / {Math.max(1, Math.ceil(filtered.length / 15))}</span><button className="secondary-button" type="button" disabled={page * 15 >= filtered.length} onClick={() => setPage(p => p + 1)}><ActionIcon label="Next" />Next</button></div>
   </section>;
 }
 
@@ -213,8 +214,8 @@ export function WikiReviewDashboard({ overview, onSelect }: { overview: WikiStud
           <span>{mode.covered} / {mode.total} covered</span><span>Last: {displayDate(mode.lastPracticedAt)}</span>
           <span>Due: {mode.nextReviewAt ? displayDate(mode.nextReviewAt) : "Not completed"}</span>
         </button>)}</div>}
-    <div className="pagination-row"><button className="secondary-button" type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</button>
-      <span>{page} / {Math.max(1, Math.ceil(filtered.length / 15))} · {filtered.length} topics</span><button className="secondary-button" type="button" disabled={page * 15 >= filtered.length} onClick={() => setPage(p => p + 1)}>Next</button></div>
+    <div className="pagination-row"><button className="secondary-button" type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)}><ActionIcon label="Previous" />Previous</button>
+      <span>{page} / {Math.max(1, Math.ceil(filtered.length / 15))} · {filtered.length} topics</span><button className="secondary-button" type="button" disabled={page * 15 >= filtered.length} onClick={() => setPage(p => p + 1)}><ActionIcon label="Next" />Next</button></div>
   </section>;
 }
 

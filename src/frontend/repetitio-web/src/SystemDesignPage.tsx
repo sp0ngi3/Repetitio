@@ -1,3 +1,4 @@
+import { ActionIcon } from "./ActionIcon";
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AttemptScorecard,
@@ -497,7 +498,7 @@ function SystemDesignDashboard(props: SystemDesignDashboardProps) {
           <h2 id="system-design-title">Problems</h2>
         </div>
         <button className="secondary-button" type="button" onClick={props.onAdd}>
-          Add problem
+          <ActionIcon label="Add problem" />Add problem
         </button>
       </div>
 
@@ -697,10 +698,10 @@ function SystemDesignDetailPage(props: SystemDesignDetailPageProps) {
         <SystemDesignEditorPanel form={props.form} onChange={props.onChange} showExternalUrlTools showTagsEditor>
           <div className="editor-actions">
             <button className="secondary-button" type="button" onClick={props.onSave} disabled={props.isSaving}>
-              Save design
+              <ActionIcon label="Save design" />Save design
             </button>
             <button className="danger-button" type="button" onClick={props.onDelete} disabled={props.isSaving}>
-              Delete
+              <ActionIcon label="Delete" />Delete
             </button>
           </div>
         </SystemDesignEditorPanel>
@@ -971,7 +972,7 @@ function ExternalUrlEditor(props: ExternalUrlEditorProps) {
           onClick={() => openExternalUrl(props.value)}
           disabled={!hasUrl}
         >
-          Open link
+          <ActionIcon label="Open link" />Open link
         </button>
       </div>
     </label>
@@ -1119,7 +1120,7 @@ function PageBackHeader(props: PageBackHeaderProps) {
         <h2>{props.title}</h2>
       </div>
       <button className="secondary-button" type="button" onClick={props.onBack}>
-        Back
+        <ActionIcon label="Back" />Back
       </button>
     </div>
   );
