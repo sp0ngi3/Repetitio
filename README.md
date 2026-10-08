@@ -21,6 +21,10 @@ The planned next expansion is a local-first knowledge/artifact system: a private
 
 The Wiki supports local image embeds, downloadable print-to-PDF article exports for a page and its subtopics, and quiz/flashcard inserts with per-page practice history and optional review scheduling.
 
+Wiki batch import also supports nested lists, definitions, callouts, worked examples, read-only checklists, takeaways and expandable hints/answers. All additions are optional; the original JSON structure remains supported, with no database migration. Article, editor preview and PDF use a shared Markdown renderer. See [Wiki batch import](docs/wiki-batch-import.md) for the complete format and an optional addition to existing AI prompts.
+
+Articles also support **Edit JSON**: copy or download an article and optionally its subpages, revise it with AI, preview changes and save the existing pages atomically. Local image markers keep their placement; the JSON includes an image-reference manifest. Missing fields and omitted subpages are retained, accidental image unlinking is blocked, and stale exports cannot overwrite newer edits. Unchanged knowledge checks and their study history remain intact. Optional `appendSections` can add vocabulary/definitions without replacing the original text. JSON editing adds no migration; full database backups still include image bytes.
+
 ## Product Goals
 
 Repetitio should help answer questions like:

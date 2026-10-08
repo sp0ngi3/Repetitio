@@ -8,6 +8,11 @@ interface CodeEditorProps {
   value: string;
   placeholder?: string;
   toolbarEnd?: ReactNode;
+  label?: string;
+  onFormat?: () => void;
+  copyAction?: ReactNode;
+  allowClear?: boolean;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -54,24 +59,25 @@ export function CodeEditor(props: CodeEditorProps) {
         <span>{props.language}</span>
         <div className="dsa-code-actions">
           {props.toolbarEnd}
-          <button className="secondary-button compact-button" type="button" onClick={() => props.onChange(formatCode(props.value))}>
+          <button className="secondary-button compact-button" type="button" disabled={props.disabled} onClick={() => props.onFormat ? props.onFormat() : props.onChange(formatCode(props.value))}>
             Format
           </button>
-          <button className="secondary-button compact-button" type="button" onClick={() => void copyCode()}>
+          {props.copyAction ?? <button className="secondary-button compact-button" type="button" disabled={props.disabled} onClick={() => void copyCode()}>
             Copy
-          </button>
-          <button className="danger-button compact-button" type="button" onClick={() => props.onChange("")}>
+          </button>}
+          {props.allowClear !== false ? <button className="danger-button compact-button" type="button" disabled={props.disabled} onClick={() => props.onChange("")}>
             Clear
-          </button>
+          </button> : null}
         </div>
       </div>
       <div className="dsa-code-surface">
         <pre aria-hidden="true" className="dsa-code-lines">{lineNumbers}</pre>
         <textarea
           id={props.id}
-          aria-label="Source code"
+          aria-label={props.label ?? "Source code"}
           className="code-input dsa-code-input"
           spellCheck={false}
+          disabled={props.disabled}
           value={props.value}
           onChange={(event) => props.onChange(event.target.value)}
           onKeyDown={handleKeyDown}

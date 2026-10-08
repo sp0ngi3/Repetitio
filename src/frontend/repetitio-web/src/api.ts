@@ -49,7 +49,7 @@ import type {
   WikiPage,
   WikiTreeNode
 } from "./types";
-import type { WikiStudyOverview, WikiStudyAnswerRequest } from "./types";
+import type { WikiStudyOverview, WikiStudyAnswerRequest, WikiJsonDocument, WikiJsonUpdateRequest } from "./types";
 
 /**
  * Base URL used for backend API requests.
@@ -82,6 +82,14 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getWikiStudy(): Promise<WikiStudyOverview> {
   return requestJson("/api/wiki/study");
+}
+
+export function getWikiJson(id: string, includeChildren: boolean): Promise<WikiJsonDocument> {
+  return requestJson(`/api/wiki/${id}/json?includeChildren=${includeChildren}`);
+}
+
+export function updateWikiJson(id: string, request: WikiJsonUpdateRequest): Promise<{ updatedCount: number }> {
+  return requestJson(`/api/wiki/${id}/json`, { method: "PUT", body: JSON.stringify(request) });
 }
 
 export function saveWikiStudy(id: string, answers: WikiStudyAnswerRequest[]): Promise<WikiStudyOverview> {

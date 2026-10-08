@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\backend\Repetitio.Api\Repetitio.Api.csproj" />
     <ProjectReference Include="..\..\src\backend\Repetitio.Application\Repetitio.Application.csproj" />
     <ProjectReference Include="..\..\src\backend\Repetitio.Domain\Repetitio.Domain.csproj" />
     <ProjectReference Include="..\..\src\backend\Repetitio.Infrastructure\Repetitio.Infrastructure.csproj" />

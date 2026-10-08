@@ -13,7 +13,7 @@ namespace Repetitio.Api.Endpoints;
 /// <summary>
 /// Maps wiki repository API endpoints.
 /// </summary>
-public static class WikiEndpoints
+public static partial class WikiEndpoints
 {
     private const long MaxWikiImageBytes = 10 * 1024 * 1024;
     private const int MaxBatchImportPageCount = 500;
@@ -43,6 +43,8 @@ public static class WikiEndpoints
         group.MapPost("/images", UploadWikiImageAsync).DisableAntiforgery().WithName("UploadWikiImage");
         group.MapPost("/images/remote", ImportRemoteImageAsync);
         group.MapPut("/{id:guid}", UpdateWikiPageAsync).WithName("UpdateWikiPage");
+        group.MapGet("/{id:guid}/json", GetWikiJsonAsync);
+        group.MapPut("/{id:guid}/json", UpdateWikiJsonAsync);
         group.MapDelete("/{id:guid}", DeleteWikiPageAsync).WithName("DeleteWikiPage");
 
         return app;
@@ -501,15 +503,26 @@ public static class WikiEndpoints
             return Results.BadRequest("A wiki page cannot be moved under its own descendant.");
         }
 
-        var oldPath = wikiPage.Path;
-        var oldDepth = wikiPage.Depth;
         var slug = await CreateUniqueSlugAsync(dbContext, request.Slug, request.Title, request.ParentId, id);
-        var newPath = BuildPath(parent, slug);
-        var newDepth = parent is null ? 0 : parent.Depth + 1;
         var now = DateTime.UtcNow;
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
+        await ApplyWikiPageUpdateAsync(dbContext, wikiPage, request, parent, slug, now);
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        var childCount = await dbContext.WikiPages.CountAsync(page => page.ParentId == id);
+        return Results.Ok(ToResponse(wikiPage, childCount));
+    }
+
+    private static async Task ApplyWikiPageUpdateAsync(RepetitioDbContext dbContext, WikiPage wikiPage,
+        UpdateWikiPageRequest request, WikiPage? parent, string slug, DateTime now, bool replaceSources = true, bool replacePractice = true)
+    {
+        var oldPath = wikiPage.Path;
+        var oldDepth = wikiPage.Depth;
+        var newPath = BuildPath(parent, slug);
+        var newDepth = parent is null ? 0 : parent.Depth + 1;
         wikiPage.ParentId = request.ParentId;
         wikiPage.Title = request.Title.Trim();
         wikiPage.Slug = slug;
@@ -520,19 +533,14 @@ public static class WikiEndpoints
         wikiPage.ContentMarkdown = TrimContent(request.ContentMarkdown);
         wikiPage.IsArchived = request.IsArchived;
         wikiPage.UpdatedAt = now;
-        await ReplaceWikiSourcesAsync(dbContext, wikiPage, request.Sources, now);
-        await ReplaceWikiPracticeInsertsAsync(dbContext, wikiPage, request.QuizQuestions, request.Flashcards, now);
+        if (replaceSources) await ReplaceWikiSourcesAsync(dbContext, wikiPage, request.Sources, now);
+        if (replacePractice) await ReplaceWikiPracticeInsertsAsync(dbContext, wikiPage, request.QuizQuestions, request.Flashcards, now);
 
         if (!string.Equals(oldPath, newPath, StringComparison.Ordinal) || oldDepth != newDepth)
         {
             await UpdateDescendantPathsAsync(dbContext, oldPath, newPath, oldDepth, newDepth, now);
         }
 
-        await dbContext.SaveChangesAsync();
-        await transaction.CommitAsync();
-
-        var childCount = await dbContext.WikiPages.CountAsync(page => page.ParentId == id);
-        return Results.Ok(ToResponse(wikiPage, childCount));
     }
 
     /// <summary>
@@ -1301,6 +1309,8 @@ public static class WikiEndpoints
             .Where(source => source.WikiPageId == wikiPage.Id)
             .ExecuteDeleteAsync();
 
+        foreach (var entry in dbContext.ChangeTracker.Entries<WikiSource>().Where(entry => entry.Entity.WikiPageId == wikiPage.Id).ToArray())
+            entry.State = EntityState.Detached;
         wikiPage.Sources.Clear();
         ApplyWikiSources(wikiPage, sources, timestamp);
         dbContext.WikiSources.AddRange(wikiPage.Sources);
@@ -1377,6 +1387,13 @@ public static class WikiEndpoints
             .Where(flashcard => flashcard.WikiPageId == wikiPage.Id)
             .ExecuteDeleteAsync();
 
+        // Bulk deletes bypass tracking; detach loaded rows before reusing unchanged check IDs.
+        foreach (var entry in dbContext.ChangeTracker.Entries<WikiQuizOption>().Where(entry => existingQuestionIds.Contains(entry.Entity.WikiQuizQuestionId)).ToArray())
+            entry.State = EntityState.Detached;
+        foreach (var entry in dbContext.ChangeTracker.Entries<WikiQuizQuestion>().Where(entry => entry.Entity.WikiPageId == wikiPage.Id).ToArray())
+            entry.State = EntityState.Detached;
+        foreach (var entry in dbContext.ChangeTracker.Entries<WikiFlashcard>().Where(entry => entry.Entity.WikiPageId == wikiPage.Id).ToArray())
+            entry.State = EntityState.Detached;
         wikiPage.QuizQuestions.Clear();
         wikiPage.Flashcards.Clear();
         ApplyWikiPracticeInserts(wikiPage, quizQuestions, flashcards, timestamp);

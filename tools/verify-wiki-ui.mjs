@@ -113,8 +113,63 @@ try {
   await wikiOverview.getByRole("button", { name: "Never practiced", exact: true }).click();
   await wikiOverview.getByRole("button", { name: `Practice ${rootTitle} Flashcards`, exact: true }).click();
   await page.getByRole("button", { name: /Prompt What is a load balancer/ }).waitFor();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.evaluate(() => document.documentElement.dataset.theme = "light");
+  await page.getByRole("button", { name: "Batch import", exact: true }).click();
+  await page.getByRole("button", { name: "JSON structure", exact: true }).click();
+  const richTemplate = JSON.parse(await page.locator(".wiki-import-reference pre").innerText());
+  const importedTitle = "Rich learning article " + Date.now();
+  richTemplate.pages[0].title = importedTitle;
+  richTemplate.pages[0].slug = "rich-learning-" + Date.now();
+  await page.getByRole("textbox", { name: /^JSON tree/ }).fill(JSON.stringify(richTemplate));
+  const importedResponse = page.waitForResponse(response => response.url() === api + "/api/wiki/batch" && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Import tree", exact: true }).click();
+  const imported = await (await importedResponse).json();
+  const richPage = imported.rootPages[0];
+  await page.getByRole("heading", { name: importedTitle, exact: true }).waitFor();
+  assert(richPage.contentMarkdown.includes(":::definition Invariant"), "Learning content is stored in the existing Markdown field");
+  const article = page.locator(".official-wiki-content").first();
+  await article.locator(".wiki-learning-pitfall").scrollIntoViewIfNeeded();
+  assert.equal(await article.locator(".wiki-definition").count(), 2);
+  assert.equal(await article.locator("li ul").count(), 2);
+  assert.equal(await article.locator("input[type=checkbox][disabled]").count(), 2);
+  const recall = article.locator(".wiki-learning-important");
+  const answer = recall.locator("details").nth(1).locator("p");
+  assert(!(await answer.isVisible()), "Recall answer starts hidden");
+  await recall.getByText("Reveal answer", { exact: true }).click();
+  assert(await answer.isVisible(), "Recall answer can be revealed");
+  await page.screenshot({ path: output + "/rich-import-light.png" });
+  await page.evaluate(() => document.documentElement.dataset.theme = "dark");
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: output + "/rich-import-dark.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await recall.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: output + "/rich-import-mobile-dark.png" });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2), "Rich articles have no mobile overflow");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.context().addInitScript(() => { window.print = () => {}; });
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Download PDF", exact: true }).click();
+  const pdf = await popupPromise;
+  await pdf.locator(".wiki-definition").first().waitFor();
+  assert.equal(await pdf.locator("details:not([open])").count(), 0, "PDF includes expanded explanations and answers");
+  assert.equal(await pdf.locator(".wiki-learning-pitfall").count(), 1);
+  await pdf.close();
+  const legacyTitle = "Legacy import " + Date.now();
+  await page.getByRole("button", { name: "Batch import", exact: true }).click();
+  await page.getByRole("textbox", { name: /^JSON tree/ }).fill(JSON.stringify({ pages: [{
+    title: legacyTitle, lead: ["Original introductory text."], infobox: { Area: "Computer science" },
+    sections: [{ heading: "Legacy section", paragraphs: ["Original explanation remains intact."], list: ["First point", "Second point"],
+      steps: ["First step", "Second step"], table: { headers: ["Key", "Value"], rows: [["A", "B"]] },
+      code: { language: "csharp", content: "int value = 1;\nConsole.WriteLine(value);" } }],
+    sources: [], references: [], externalLinks: [], seeAlso: [], quizQuestions: [], flashcards: [], children: []
+  }] }));
+  await page.getByRole("button", { name: "Import tree", exact: true }).click();
+  await page.getByRole("heading", { name: legacyTitle, exact: true }).waitFor();
+  await article.getByText("Original explanation remains intact.", { exact: true }).waitFor();
+  assert.equal(await article.locator("table").count(), 2, "Legacy infobox and table still render");
   assert.deepEqual(errors, []);
-  console.log("Verified: scrollable contents, synchronized preview, stable check IDs, one-at-a-time quiz, per-page results, study builder, dark/mobile layouts, review queue, Overview progress and direct quiz/flashcard practice links.");
+  console.log("Verified: scrollable contents, synchronized preview, stable check IDs, one-at-a-time quiz, per-page results, study builder, dark/mobile layouts, review queue, Overview practice links, old/new JSON imports, rich learning blocks and expanded PDF answers.");
 } catch (error) {
   console.log((await page.locator("body").innerText()).slice(0, 2000));
   console.log(errors);

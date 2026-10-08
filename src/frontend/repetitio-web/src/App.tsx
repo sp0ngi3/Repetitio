@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getBasicExercises, getDashboard, getHealthStatus, getLearningItems } from "./api";
 import { BackupPage } from "./BackupPage";
 import { BasicsPage } from "./BasicsPage";
@@ -6,7 +6,6 @@ import { DsaPage } from "./DsaPage";
 import { FlashcardsPage } from "./FlashcardsPage";
 import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
-import { WikiPage } from "./WikiPage";
 import { WikiReviewSettings } from "./WikiLearning";
 import { WikiOverview } from "./WikiOverview";
 import {
@@ -15,6 +14,8 @@ import {
   type ReviewSchedulePreset
 } from "./reviewSchedule";
 import type { BasicExercise, Dashboard, LearningItem, LearningItemType, WikiStudyModeProgress } from "./types";
+
+const WikiPage = lazy(() => import("./WikiPage").then(module => ({ default: module.WikiPage })));
 
 /**
  * Application page identifiers.
@@ -304,8 +305,10 @@ export function App() {
 
       {activePage === "notes" ? <NotesPage /> : null}
 
-      {activePage === "wiki" ? <WikiPage key={focusedWikiTarget?.nonce ?? "wiki"}
-        focusPageId={focusedWikiTarget?.id} focusStudyKind={focusedWikiTarget?.kind} /> : null}
+      {activePage === "wiki" ? <Suspense fallback={<p role="status">Loading Wiki...</p>}>
+        <WikiPage key={focusedWikiTarget?.nonce ?? "wiki"}
+          focusPageId={focusedWikiTarget?.id} focusStudyKind={focusedWikiTarget?.kind} />
+      </Suspense> : null}
 
       {activePage === "settings" ? (
         <SettingsPage

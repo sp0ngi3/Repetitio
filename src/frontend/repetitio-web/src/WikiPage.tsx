@@ -2,7 +2,6 @@ import { ChangeEvent, ClipboardEvent, FormEvent, ReactNode, useEffect, useMemo, 
 import {
   createWikiPage,
   deleteWikiPage,
-  getWikiImageUrl,
   getWikiPage,
   getWikiPages,
   getWikiTree,
@@ -15,7 +14,6 @@ import {
 import { confirmDelete } from "./confirmDelete";
 import type {
   CreateWikiPageRequest,
-  ImportWikiPageNodeRequest,
   WikiPage as WikiPageRecord,
   WikiFlashcardRequest,
   WikiQuizQuestionRequest,
@@ -25,8 +23,13 @@ import type {
 import type { WikiStudyOverview, WikiStudyPageProgress, WikiStudyModeProgress } from "./types";
 import { WikiLearningPlayer, WikiProgressSummary, WikiReviewDashboard, WikiBranchProgress, studyItems } from "./WikiLearning";
 import type { WikiStudyItem } from "./WikiLearning";
+import { renderWikiMarkdown as renderMarkdown, renderWikiMarkdownHtml, type MarkdownHeading } from "./wikiMarkdown";
+import { parseWikiBatchImport, parseWikiSourcesJson, parseWikiQuizJson, parseWikiFlashcardJson, wikiLearningContainer } from "./wikiImport";
+import { WikiJsonEditor } from "./WikiJsonEditor";
+import { FileJson } from "lucide-react";
+export { parseWikiBatchImport } from "./wikiImport";
 
-type WikiView = "article" | "explore" | "edit" | "import" | "study" | "reviews";
+type WikiView = "article" | "explore" | "edit" | "json" | "import" | "study" | "reviews";
 type WikiSort = "updated-newest" | "updated-oldest" | "title" | "tree";
 type WikiStudyScope = "current" | "branch" | "all" | "custom";
 type WikiStudyMode = "quiz" | "flashcards" | "both";
@@ -48,19 +51,6 @@ interface WikiForm {
 
 interface NestedWikiTreeNode extends WikiTreeNode {
   children: NestedWikiTreeNode[];
-}
-
-interface MarkdownHeading {
-  id: string;
-  level: number;
-  text: string;
-}
-
-
-interface WikiImportTable {
-  headers?: string[];
-  columns?: string[];
-  rows?: Array<string[] | Record<string, unknown>>;
 }
 
 const wikiPageSize = 15;
@@ -127,7 +117,7 @@ const sampleWikiFlashcardsJson = JSON.stringify(
   2
 );
 
-const sampleImport = JSON.stringify(
+export const sampleImport = JSON.stringify(
   {
     pages: [
       {
@@ -192,8 +182,27 @@ const sampleImport = JSON.stringify(
             ],
             code: {
               language: "csharp",
-              content: "public int Max(int[] nums)\\n{\\n    int best = nums[0];\\n    foreach (var value in nums)\\n    {\\n        best = Math.Max(best, value);\\n    }\\n    return best;\\n}"
+              content: "public int Max(int[] nums)\n{\n    int best = nums[0];\n    foreach (var value in nums)\n    {\n        best = Math.Max(best, value);\n    }\n    return best;\n}"
             }
+          },
+          {
+            heading: "Study guide",
+            definitions: [
+              { term: "Invariant", definition: "A property that remains true before and after each step of an algorithm." },
+              { term: "Time complexity", definition: "How the number of operations grows with the input size; for example, **O(n)** for a single scan." }
+            ],
+            list: [
+              { text: "Before coding", items: ["Clarify the input and output.", "Choose an invariant."] },
+              { text: "After coding", items: ["Trace edge cases.", "Explain time and space complexity."] }
+            ],
+            checklist: ["Explain the invariant without looking at the code.", { text: "Trace the algorithm on negative inputs.", checked: false }],
+            blocks: [
+              { type: "callout", kind: "pitfall", title: "Do not assume inputs are positive", text: "Initializing the maximum to zero fails when every input value is negative. Initialize it to the first element." },
+              { type: "example", title: "Tracing a maximum scan", input: "`[-5, -2, -7]`", steps: ["Set best to -5.", "Compare -2 with -5 and update best to -2.", "Compare -7 with -2; keep best at -2."], output: "`-2`", explanation: "The current best is the largest value in the prefix already visited." },
+              { type: "recall", prompt: "Maximum scan: why is initializing best to zero incorrect for an all-negative array?", hint: "Trace `[-5, -2, -7]`.", answer: "Zero is not in the input and is greater than every value. Initialize best to the first element instead." },
+              { type: "details", title: "Why one pass is enough", paragraphs: ["Each element is compared with the best value seen so far. After the final element, the best covers the entire input."], code: { language: "csharp", content: "int best = nums[0];\nforeach (int value in nums)\n{\n    best = Math.Max(best, value);\n}" } },
+              { type: "takeaways", items: ["State the invariant before coding.", "Check empty and negative inputs.", "A single scan takes O(n) time and O(1) extra space."] }
+            ]
           }
         ],
         seeAlso: ["Data structures", "Time complexity", "Dynamic programming"],
@@ -540,7 +549,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
   }
 
   return (
-    <section className="wiki-page wiki-wikipedia-page" aria-labelledby="wiki-title">
+    <section className="wiki-page wiki-wikipedia-page" data-view={view} aria-labelledby="wiki-title">
       <header className="wiki-shell-header">
         <div>
           <p className="eyebrow">Repositorium</p>
@@ -616,6 +625,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
             onCreateChild={() => startNewChildPage()}
             onDownloadPdf={handleDownloadPdf}
             onEdit={startEditPage}
+            onEditJson={() => setView("json")}
             onOpenChild={selectPage}
           />
         ) : null}
@@ -662,6 +672,9 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
 
         {view === "reviews" ? <main className="wiki-document"><WikiReviewDashboard overview={studyOverview} onSelect={id => void selectPage(id)} /></main> : null}
 
+        {view === "json" && selectedPage ? <WikiJsonEditor key={selectedPage.id} pageId={selectedPage.id}
+          onCancel={() => setView("article")} onSaved={async id => { await loadWiki(id); setView("article"); }} /> : null}
+
         {view === "edit" ? (
           <WikiEditor
             descendantIds={descendantIds}
@@ -707,6 +720,7 @@ function WikiArticle(props: {
   treeNodes: WikiTreeNode[];
   isLoading: boolean;
   onEdit: () => void;
+  onEditJson: () => void;
   onCreateChild: () => void;
   onDownloadPdf: () => void;
   onOpenChild: (id: string) => void;
@@ -766,6 +780,7 @@ function WikiArticle(props: {
             <button className="primary-button compact-button" type="button" onClick={props.onEdit}>
               Edit source
             </button>
+            <button className="secondary-button compact-button" type="button" onClick={props.onEditJson}><FileJson size={16} /> Edit JSON</button>
           </div>
         </header>
 
@@ -1336,6 +1351,15 @@ function WikiEditor(props: {
                 <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("| Topic | Notes |\n| --- | --- |\n|  |  |")}>
                   Table
                 </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet(wikiLearningContainer("tip", "Key point", "{{selection}}"), "Explain the important idea.")}>
+                  Note
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet(wikiLearningContainer("definition", "{{selection}}", "Explain the term and give an example."), "Term")}>
+                  Definition
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet(wikiLearningContainer("important", "Active recall", "{{selection}}\n\n" + wikiLearningContainer("details", "Reveal answer", "Write the answer and reasoning here.")), "Ask a self-contained question.")}>
+                  Recall
+                </button>
                 <label className="secondary-button compact-button file-action-button wiki-image-action" title="Add image">
                   {isUploadingImage ? "Uploading..." : "Image"}
                   <input
@@ -1519,7 +1543,7 @@ function WikiBatchImport(props: {
               <label>
                 JSON tree
                 <span className="wiki-field-hint">
-                Use contentMarkdown for raw markdown, or lead, infobox, sections, tables, code, quizQuestions, flashcards, references, and children for a full Wikipedia-style page.
+                contentMarkdown or structured sections: paragraphs, nested lists, steps, tables, code, definitions, checklist, learning blocks, quizQuestions, flashcards, sources, and children.
                 </span>
               <textarea
                 className="wiki-import-textarea"
@@ -1704,7 +1728,7 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
       <p class="path">${escapeHtml(page.path)}</p>
       <h1>${escapeHtml(page.title)}</h1>
       ${page.summary ? `<p class="lead">${escapeHtml(page.summary)}</p>` : ""}
-      ${renderMarkdownToHtml(page.contentMarkdown)}
+      ${renderWikiMarkdownHtml(page.contentMarkdown, true).html}
       ${renderWikiSourcesToHtml(page)}
       ${renderWikiPracticeInsertsToHtml(page)}
     </article>
@@ -1730,6 +1754,13 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
     pre { overflow-wrap: anywhere; white-space: pre-wrap; border: 1px solid #a2a9b1; padding: 10px; background: #f8f9fa; }
     code { font-family: Consolas, monospace; font-size: 10pt; }
     blockquote { margin: 12px 0; border-left: 4px solid #a2a9b1; padding: 8px 12px; background: #f8f9fa; }
+    .wiki-learning-block { margin: 16px 0; padding: 12px 16px; border-left: 4px solid #305eab; background: #f6f7f9; }
+    .wiki-learning-label { display: block; margin-bottom: 8px; }
+    .wiki-learning-pitfall, .wiki-learning-warning { border-left-color: #b33f36; }
+    .wiki-definition { margin: 14px 0; } .wiki-definition dt { font-weight: 700; } .wiki-definition dd { margin: 4px 0 0 16px; }
+    .wiki-reveal { margin: 12px 0; border-block: 1px solid #c8cdd3; padding: 10px 0; }
+    .wiki-reveal summary { font-weight: 700; margin-bottom: 8px; }
+    .wiki-code-block > span { display: block; font: 9pt Arial, sans-serif; color: #54595d; margin-bottom: 6px; }
     .checks { margin-top: 24px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
     .sources { margin-top: 20px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
     .source-card { break-inside: avoid; border: 1px solid #a2a9b1; margin: 8px 0; padding: 8px 10px; font-family: Arial, sans-serif; font-size: 10pt; }
@@ -1745,113 +1776,6 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
   <main>${articleHtml}</main>
 </body>
 </html>`;
-}
-
-function renderMarkdownToHtml(markdown: string) {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-  const html: string[] = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-
-    if (!line.trim()) {
-      index++;
-      continue;
-    }
-
-    if (line.startsWith("```")) {
-      const codeLines: string[] = [];
-      index++;
-
-      while (index < lines.length && !lines[index].startsWith("```")) {
-        codeLines.push(lines[index]);
-        index++;
-      }
-
-      index++;
-      html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
-      continue;
-    }
-
-    const headingMatch = line.match(/^(#{1,5})\s+(.+)$/);
-
-    if (headingMatch) {
-      const level = Math.min(5, Math.max(2, headingMatch[1].length + 1));
-      html.push(`<h${level}>${formatInlineHtml(headingMatch[2].trim())}</h${level}>`);
-      index++;
-      continue;
-    }
-
-    if (isTableStart(lines, index)) {
-      const tableLines = [lines[index]];
-      index += 2;
-
-      while (index < lines.length && lines[index].includes("|")) {
-        tableLines.push(lines[index]);
-        index++;
-      }
-
-      html.push(renderTableHtml(tableLines));
-      continue;
-    }
-
-    if (/^\s*[-*]\s+/.test(line)) {
-      const items: string[] = [];
-
-      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
-        items.push(`<li>${formatInlineHtml(lines[index].replace(/^\s*[-*]\s+/, ""))}</li>`);
-        index++;
-      }
-
-      html.push(`<ul>${items.join("")}</ul>`);
-      continue;
-    }
-
-    if (/^\s*\d+\.\s+/.test(line)) {
-      const items: string[] = [];
-
-      while (index < lines.length && /^\s*\d+\.\s+/.test(lines[index])) {
-        items.push(`<li>${formatInlineHtml(lines[index].replace(/^\s*\d+\.\s+/, ""))}</li>`);
-        index++;
-      }
-
-      html.push(`<ol>${items.join("")}</ol>`);
-      continue;
-    }
-
-    if (line.startsWith(">")) {
-      const quoteLines: string[] = [];
-
-      while (index < lines.length && lines[index].startsWith(">")) {
-        quoteLines.push(lines[index].replace(/^>\s?/, ""));
-        index++;
-      }
-
-      html.push(`<blockquote>${formatInlineHtml(quoteLines.join(" "))}</blockquote>`);
-      continue;
-    }
-
-    const paragraphLines = [line.trim()];
-    index++;
-
-    while (index < lines.length && lines[index].trim() && !isSpecialMarkdownLine(lines, index)) {
-      paragraphLines.push(lines[index].trim());
-      index++;
-    }
-
-    html.push(`<p>${formatInlineHtml(paragraphLines.join(" "))}</p>`);
-  }
-
-  return html.join("\n");
-}
-
-function renderTableHtml(tableLines: string[]) {
-  const [headerLine, ...bodyLines] = tableLines;
-  const headers = splitTableRow(headerLine);
-  const rows = bodyLines.map(splitTableRow);
-
-  return `<table><thead><tr>${headers.map((header) => `<th>${formatInlineHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${headers.map((_, cellIndex) => `<td>${formatInlineHtml(row[cellIndex] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
 }
 
 function renderWikiPracticeInsertsToHtml(page: WikiPageRecord) {
@@ -1894,17 +1818,6 @@ function renderWikiSourcesToHtml(page: WikiPageRecord) {
   }).join("");
 
   return `<section class="sources"><h2>Sources</h2>${sourcesHtml}</section>`;
-}
-
-function formatInlineHtml(text: string) {
-  return escapeHtml(text)
-    .replace(/!\[([^\]]*)]\(([^)]+)\)/g, (_, alt: string, source: string) => {
-      const resolvedSource = resolveWikiImageSource(source);
-      return resolvedSource ? `<img alt="${escapeHtml(alt)}" src="${escapeHtml(resolvedSource)}" />` : "";
-    })
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\[([^\]]+)]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 }
 
 function escapeHtml(value: string) {
@@ -2021,512 +1934,6 @@ function findClipboardImage(event: ClipboardEvent<HTMLTextAreaElement>) {
   return Array.from(event.clipboardData.files ?? []).find((file) => file.type.startsWith("image/")) ?? null;
 }
 
-function parseWikiBatchImport(contents: string): ImportWikiPageNodeRequest[] {
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(contents);
-  } catch {
-    throw new Error("Import file must contain valid JSON.");
-  }
-
-  const rawPages = Array.isArray(parsed)
-    ? parsed
-    : isRecord(parsed) && Array.isArray(parsed.pages)
-      ? parsed.pages
-      : null;
-
-  if (!rawPages || rawPages.length === 0) {
-    throw new Error("JSON must contain a non-empty pages array, or be a non-empty array of pages.");
-  }
-
-  return rawPages.map((page, index) => normalizeImportedWikiPage(page, `pages[${index}]`));
-}
-
-function normalizeImportedWikiPage(value: unknown, path: string): ImportWikiPageNodeRequest {
-  if (!isRecord(value)) {
-    throw new Error(`${path} must be a JSON object.`);
-  }
-
-  const title = readRequiredWikiString(value, "title", path);
-  const leadParagraphs = readWikiStringArray(value.lead, `${path}.lead`);
-  const rawContentMarkdown = readOptionalWikiString(value.contentMarkdown);
-  const contentMarkdown = rawContentMarkdown || buildWikiArticleMarkdown(value, leadParagraphs);
-  const children = Array.isArray(value.children)
-    ? value.children.map((child, index) => normalizeImportedWikiPage(child, `${path}.children[${index}]`))
-    : undefined;
-
-  return {
-    title,
-    slug: readOptionalWikiString(value.slug) || undefined,
-    summary: readOptionalWikiString(value.summary) || leadParagraphs[0] || undefined,
-    contentMarkdown,
-    sources: readWikiSources(value.sources ?? value.references, `${path}.sources`),
-    quizQuestions: readWikiQuizQuestions(value.quizQuestions ?? value.quiz, `${path}.quizQuestions`),
-    flashcards: readWikiFlashcards(value.flashcards, `${path}.flashcards`),
-    children
-  };
-}
-
-function parseWikiSourcesJson(contents: string): WikiSourceRequest[] {
-  const trimmed = contents.trim();
-
-  if (!trimmed) {
-    return [];
-  }
-
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    throw new Error("Sources JSON must be valid JSON.");
-  }
-
-  const rawSources = Array.isArray(parsed)
-    ? parsed
-    : isRecord(parsed) && Array.isArray(parsed.sources)
-      ? parsed.sources
-      : isRecord(parsed) && Array.isArray(parsed.references)
-        ? parsed.references
-        : null;
-
-  if (!rawSources) {
-    throw new Error("Sources JSON must be an array or an object with sources/references.");
-  }
-
-  return readWikiSources(rawSources, "sources");
-}
-
-function parseWikiQuizJson(contents: string): WikiQuizQuestionRequest[] {
-  const trimmed = contents.trim();
-
-  if (!trimmed) {
-    return [];
-  }
-
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    throw new Error("Quiz JSON must be valid JSON.");
-  }
-
-  const rawQuestions = Array.isArray(parsed)
-    ? parsed
-    : isRecord(parsed) && Array.isArray(parsed.quizQuestions)
-      ? parsed.quizQuestions
-      : isRecord(parsed) && Array.isArray(parsed.questions)
-        ? parsed.questions
-        : null;
-
-  if (!rawQuestions) {
-    throw new Error("Quiz JSON must be an array or an object with quizQuestions/questions.");
-  }
-
-  return readWikiQuizQuestions(rawQuestions, "quizQuestions");
-}
-
-function parseWikiFlashcardJson(contents: string): WikiFlashcardRequest[] {
-  const trimmed = contents.trim();
-
-  if (!trimmed) {
-    return [];
-  }
-
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    throw new Error("Flashcards JSON must be valid JSON.");
-  }
-
-  const rawFlashcards = Array.isArray(parsed)
-    ? parsed
-    : isRecord(parsed) && Array.isArray(parsed.flashcards)
-      ? parsed.flashcards
-      : null;
-
-  if (!rawFlashcards) {
-    throw new Error("Flashcards JSON must be an array or an object with flashcards.");
-  }
-
-  return readWikiFlashcards(rawFlashcards, "flashcards");
-}
-
-function readWikiSources(value: unknown, path: string): WikiSourceRequest[] {
-  if (value === undefined || value === null || value === "") {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    throw new Error(`${path} must be an array.`);
-  }
-
-  return value.map((source, index) => {
-    if (!isRecord(source)) {
-      throw new Error(`${path}[${index}] must be a JSON object.`);
-    }
-
-    return {
-      title: readRequiredWikiString(source, "title", `${path}[${index}]`),
-      type: readOptionalWikiString(source.type) || readOptionalWikiString(source.kind) || undefined,
-      author: readOptionalWikiString(source.author) || readOptionalWikiString(source.authors) || undefined,
-      url: readOptionalWikiString(source.url) || undefined,
-      locator: readOptionalWikiString(source.locator)
-        || readOptionalWikiString(source.location)
-        || readOptionalWikiString(source.chapter)
-        || undefined,
-      notes: readOptionalWikiString(source.notes) || readOptionalWikiString(source.note) || undefined
-    };
-  });
-}
-
-function readWikiQuizQuestions(value: unknown, path: string): WikiQuizQuestionRequest[] {
-  if (value === undefined || value === null || value === "") {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    throw new Error(`${path} must be an array.`);
-  }
-
-  return value.map((question, index) => {
-    if (!isRecord(question)) {
-      throw new Error(`${path}[${index}] must be a JSON object.`);
-    }
-
-    const prompt = readRequiredWikiString(question, "prompt", `${path}[${index}]`);
-    const rawOptions = question.options;
-
-    if (!Array.isArray(rawOptions)) {
-      throw new Error(`${path}[${index}].options must be an array.`);
-    }
-
-    const options = rawOptions.map((option, optionIndex) => {
-      if (!isRecord(option)) {
-        throw new Error(`${path}[${index}].options[${optionIndex}] must be a JSON object.`);
-      }
-
-      return {
-        text: readRequiredWikiString(option, "text", `${path}[${index}].options[${optionIndex}]`),
-        isCorrect: Boolean(option.isCorrect)
-      };
-    });
-
-    return {
-      prompt,
-      explanation: readOptionalWikiString(question.explanation) || undefined,
-      options
-    };
-  });
-}
-
-function readWikiFlashcards(value: unknown, path: string): WikiFlashcardRequest[] {
-  if (value === undefined || value === null || value === "") {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    throw new Error(`${path} must be an array.`);
-  }
-
-  return value.map((flashcard, index) => {
-    if (!isRecord(flashcard)) {
-      throw new Error(`${path}[${index}] must be a JSON object.`);
-    }
-
-    return {
-      front: readRequiredWikiString(flashcard, "front", `${path}[${index}]`),
-      back: readRequiredWikiString(flashcard, "back", `${path}[${index}]`)
-    };
-  });
-}
-
-function buildWikiArticleMarkdown(page: Record<string, unknown>, leadParagraphs: string[]) {
-  const chunks: string[] = [];
-  const infoboxMarkdown = renderWikiInfobox(page.infobox, "infobox");
-
-  if (infoboxMarkdown) {
-    chunks.push(infoboxMarkdown);
-  }
-
-  if (leadParagraphs.length > 0) {
-    chunks.push(leadParagraphs.join("\n\n"));
-  }
-
-  const sections = Array.isArray(page.sections) ? page.sections : [];
-  sections.forEach((section, index) => {
-    chunks.push(renderWikiSection(section, `sections[${index}]`, 2));
-  });
-
-  const seeAlso = readWikiStringArray(page.seeAlso, "seeAlso");
-  if (seeAlso.length > 0) {
-    chunks.push(["## See also", ...seeAlso.map((item) => `- ${item}`)].join("\n"));
-  }
-
-  const references = renderWikiLinks(page.references, "References");
-  if (references) {
-    chunks.push(references);
-  }
-
-  const externalLinks = renderWikiLinks(page.externalLinks, "External links");
-  if (externalLinks) {
-    chunks.push(externalLinks);
-  }
-
-  const categories = readWikiStringArray(page.categories, "categories");
-  if (categories.length > 0) {
-    chunks.push(["## Categories", ...categories.map((category) => `- ${category}`)].join("\n"));
-  }
-
-  return chunks.filter(Boolean).join("\n\n");
-}
-
-function renderWikiSection(value: unknown, path: string, fallbackLevel: number): string {
-  if (!isRecord(value)) {
-    throw new Error(`${path} must be a JSON object.`);
-  }
-
-  const heading = readOptionalWikiString(value.heading) || readOptionalWikiString(value.title);
-  if (!heading) {
-    throw new Error(`${path} must include heading or title.`);
-  }
-
-  const level = clampHeadingLevel(readOptionalWikiNumber(value.level) ?? fallbackLevel);
-  const chunks = [`${"#".repeat(level)} ${heading}`];
-  chunks.push(...renderWikiContentBlocks(value, path));
-
-  const sections = Array.isArray(value.sections) ? value.sections : [];
-  sections.forEach((section, index) => {
-    chunks.push(renderWikiSection(section, `${path}.sections[${index}]`, Math.min(level + 1, 4)));
-  });
-
-  return chunks.filter(Boolean).join("\n\n");
-}
-
-function renderWikiContentBlocks(value: Record<string, unknown>, path: string) {
-  const chunks: string[] = [];
-  const text = readOptionalWikiString(value.text);
-  const paragraphs = readWikiStringArray(value.paragraphs, `${path}.paragraphs`);
-  const quote = readOptionalWikiString(value.quote);
-  const bullets = readWikiStringArray(value.list ?? value.bullets, `${path}.list`);
-  const steps = readWikiStringArray(value.steps ?? value.orderedList, `${path}.steps`);
-  const table = renderWikiTable(value.table, `${path}.table`);
-  const code = renderWikiCode(value.code, `${path}.code`);
-  const blocks = Array.isArray(value.blocks) ? value.blocks : [];
-
-  if (text) {
-    chunks.push(text);
-  }
-
-  if (paragraphs.length > 0) {
-    chunks.push(paragraphs.join("\n\n"));
-  }
-
-  if (quote) {
-    chunks.push(`> ${quote}`);
-  }
-
-  if (bullets.length > 0) {
-    chunks.push(bullets.map((item) => `- ${item}`).join("\n"));
-  }
-
-  if (steps.length > 0) {
-    chunks.push(steps.map((item, index) => `${index + 1}. ${item}`).join("\n"));
-  }
-
-  if (table) {
-    chunks.push(table);
-  }
-
-  if (code) {
-    chunks.push(code);
-  }
-
-  blocks.forEach((block, index) => {
-    chunks.push(renderWikiBlock(block, `${path}.blocks[${index}]`));
-  });
-
-  return chunks.filter(Boolean);
-}
-
-function renderWikiBlock(value: unknown, path: string): string {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (!isRecord(value)) {
-    throw new Error(`${path} must be a string or JSON object.`);
-  }
-
-  const type = readOptionalWikiString(value.type).toLowerCase();
-
-  if (type === "heading" || type === "section") {
-    return renderWikiSection(value, path, 2);
-  }
-
-  if (type === "quote") {
-    const text = readRequiredWikiString(value, "text", path);
-    return `> ${text}`;
-  }
-
-  if (type === "list") {
-    const items = readWikiStringArray(value.items, `${path}.items`);
-    return items.map((item) => `- ${item}`).join("\n");
-  }
-
-  if (type === "steps" || type === "ordered-list") {
-    const items = readWikiStringArray(value.items, `${path}.items`);
-    return items.map((item, index) => `${index + 1}. ${item}`).join("\n");
-  }
-
-  if (type === "table") {
-    return renderWikiTable(value, path);
-  }
-
-  if (type === "code") {
-    return renderWikiCode(value, path);
-  }
-
-  return readRequiredWikiString(value, "text", path);
-}
-
-function renderWikiInfobox(value: unknown, path: string) {
-  if (!isRecord(value)) {
-    return "";
-  }
-
-  const rows = Object.entries(value)
-    .map(([key, rowValue]) => [key, readOptionalWikiString(rowValue)])
-    .filter(([, rowValue]) => rowValue);
-
-  if (rows.length === 0) {
-    return "";
-  }
-
-  return renderWikiTable({ headers: ["Property", "Value"], rows }, path);
-}
-
-function renderWikiLinks(value: unknown, heading: string) {
-  const links = Array.isArray(value) ? value : [];
-  const lines = links.map((link, index) => {
-    if (typeof link === "string") {
-      return `- ${link.trim()}`;
-    }
-
-    if (!isRecord(link)) {
-      throw new Error(`${heading}[${index}] must be a string or JSON object.`);
-    }
-
-    const label = readRequiredWikiString(link, "label", `${heading}[${index}]`);
-    const url = readOptionalWikiString(link.url);
-    return url ? `- [${label}](${url})` : `- ${label}`;
-  });
-
-  return lines.length > 0 ? [`## ${heading}`, ...lines].join("\n") : "";
-}
-
-function renderWikiTable(value: unknown, path: string): string {
-  if (!isRecord(value)) {
-    return "";
-  }
-
-  const table = value as WikiImportTable;
-  const headers = readWikiStringArray(table.headers ?? table.columns, `${path}.headers`);
-  const rows = Array.isArray(table.rows) ? table.rows : [];
-
-  if (headers.length === 0 || rows.length === 0) {
-    return "";
-  }
-
-  const normalizedRows = rows.map((row, rowIndex) => {
-    if (Array.isArray(row)) {
-      return headers.map((_, cellIndex) => sanitizeWikiTableCell(readOptionalWikiString(row[cellIndex])));
-    }
-
-    if (isRecord(row)) {
-      return headers.map((header) => sanitizeWikiTableCell(readOptionalWikiString(row[header])));
-    }
-
-    throw new Error(`${path}.rows[${rowIndex}] must be an array or JSON object.`);
-  });
-
-  return [
-    `| ${headers.map(sanitizeWikiTableCell).join(" | ")} |`,
-    `| ${headers.map(() => "---").join(" | ")} |`,
-    ...normalizedRows.map((row) => `| ${row.join(" | ")} |`)
-  ].join("\n");
-}
-
-function renderWikiCode(value: unknown, path: string) {
-  if (typeof value === "string") {
-    return `\`\`\`\n${value}\n\`\`\``;
-  }
-
-  if (!isRecord(value)) {
-    return "";
-  }
-
-  const content = readRequiredWikiString(value, "content", path);
-  const language = readOptionalWikiString(value.language);
-  return `\`\`\`${language}\n${content}\n\`\`\``;
-}
-
-function readRequiredWikiString(value: Record<string, unknown>, field: string, path: string) {
-  const fieldValue = readOptionalWikiString(value[field]);
-
-  if (!fieldValue) {
-    throw new Error(`${path}.${field} is required.`);
-  }
-
-  return fieldValue;
-}
-
-function readOptionalWikiString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readOptionalWikiNumber(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readWikiStringArray(value: unknown, path: string) {
-  if (value === undefined || value === null || value === "") {
-    return [];
-  }
-
-  if (typeof value === "string") {
-    return value.trim() ? [value.trim()] : [];
-  }
-
-  if (!Array.isArray(value)) {
-    throw new Error(`${path} must be a string or an array of strings.`);
-  }
-
-  return value.map((item, index) => {
-    if (typeof item !== "string") {
-      throw new Error(`${path}[${index}] must be a string.`);
-    }
-
-    return item.trim();
-  }).filter(Boolean);
-}
-
-function sanitizeWikiTableCell(value: string) {
-  return value.replace(/\|/g, "\\|").replace(/\n+/g, " ");
-}
-
-function clampHeadingLevel(value: number) {
-  return Math.min(4, Math.max(2, Math.round(value)));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function shouldRenderSummaryLead(page: WikiPageRecord) {
   const summary = page.summary?.trim();
 
@@ -2535,244 +1942,6 @@ function shouldRenderSummaryLead(page: WikiPageRecord) {
   }
 
   return !page.contentMarkdown.trim().startsWith(summary);
-}
-
-function renderMarkdown(markdown: string): { nodes: ReactNode[]; headings: MarkdownHeading[] } {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-  const nodes: ReactNode[] = [];
-  const headings: MarkdownHeading[] = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-
-    if (!line.trim()) {
-      index++;
-      continue;
-    }
-
-    if (line.startsWith("```")) {
-      const language = line.slice(3).trim();
-      const codeLines: string[] = [];
-      index++;
-
-      while (index < lines.length && !lines[index].startsWith("```")) {
-        codeLines.push(lines[index]);
-        index++;
-      }
-
-      index++;
-      nodes.push(
-        <pre className="wiki-code-block" key={`code-${index}`}>
-          {language ? <span>{language}</span> : null}
-          <code>{codeLines.join("\n")}</code>
-        </pre>
-      );
-      continue;
-    }
-
-    const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
-
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const text = headingMatch[2].trim();
-      const id = createHeadingId(text, headings.length);
-      headings.push({ id, level, text });
-      nodes.push(renderHeading(level, id, text));
-      index++;
-      continue;
-    }
-
-    if (isTableStart(lines, index)) {
-      const tableLines = [lines[index]];
-      index += 2;
-
-      while (index < lines.length && lines[index].includes("|")) {
-        tableLines.push(lines[index]);
-        index++;
-      }
-
-      nodes.push(renderTable(tableLines, `table-${index}`));
-      continue;
-    }
-
-    if (/^\s*[-*]\s+/.test(line)) {
-      const listItems: ReactNode[] = [];
-
-      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
-        listItems.push(<li key={`li-${index}`}>{formatInline(lines[index].replace(/^\s*[-*]\s+/, ""))}</li>);
-        index++;
-      }
-
-      nodes.push(<ul key={`ul-${index}`}>{listItems}</ul>);
-      continue;
-    }
-
-    if (/^\s*\d+\.\s+/.test(line)) {
-      const listItems: ReactNode[] = [];
-
-      while (index < lines.length && /^\s*\d+\.\s+/.test(lines[index])) {
-        listItems.push(<li key={`oli-${index}`}>{formatInline(lines[index].replace(/^\s*\d+\.\s+/, ""))}</li>);
-        index++;
-      }
-
-      nodes.push(<ol key={`ol-${index}`}>{listItems}</ol>);
-      continue;
-    }
-
-    if (line.startsWith(">")) {
-      const quoteLines: string[] = [];
-
-      while (index < lines.length && lines[index].startsWith(">")) {
-        quoteLines.push(lines[index].replace(/^>\s?/, ""));
-        index++;
-      }
-
-      nodes.push(<blockquote key={`quote-${index}`}>{formatInline(quoteLines.join(" "))}</blockquote>);
-      continue;
-    }
-
-    const paragraphLines = [line.trim()];
-    index++;
-
-    while (index < lines.length && lines[index].trim() && !isSpecialMarkdownLine(lines, index)) {
-      paragraphLines.push(lines[index].trim());
-      index++;
-    }
-
-    nodes.push(<p key={`p-${index}`}>{formatInline(paragraphLines.join(" "))}</p>);
-  }
-
-  return { nodes, headings };
-}
-
-function renderHeading(level: number, id: string, text: string) {
-  if (level <= 1) {
-    return <h2 id={id} key={id}>{text}</h2>;
-  }
-
-  if (level === 2) {
-    return <h3 id={id} key={id}>{text}</h3>;
-  }
-
-  if (level === 3) {
-    return <h4 id={id} key={id}>{text}</h4>;
-  }
-
-  return <h5 id={id} key={id}>{text}</h5>;
-}
-
-function isTableStart(lines: string[], index: number) {
-  return lines[index]?.includes("|") && /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(lines[index + 1] ?? "");
-}
-
-function isSpecialMarkdownLine(lines: string[], index: number) {
-  const line = lines[index];
-
-  return line.startsWith("```")
-    || /^(#{1,4})\s+/.test(line)
-    || /^\s*[-*]\s+/.test(line)
-    || /^\s*\d+\.\s+/.test(line)
-    || line.startsWith(">")
-    || isTableStart(lines, index);
-}
-
-function renderTable(tableLines: string[], key: string) {
-  const [headerLine, ...bodyLines] = tableLines;
-  const headers = splitTableRow(headerLine);
-  const rows = bodyLines.map(splitTableRow);
-
-  return (
-    <div className="wiki-table-wrap" key={key}>
-      <table>
-        <thead>
-          <tr>
-            {headers.map((header, index) => <th key={`h-${index}`}>{formatInline(header)}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={`r-${rowIndex}`}>
-              {headers.map((_, cellIndex) => (
-                <td key={`c-${cellIndex}`}>{formatInline(row[cellIndex] ?? "")}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function splitTableRow(row: string) {
-  return row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
-}
-
-function formatInline(text: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|!\[[^\]]*]\([^)]+\)|\[[^\]]+\]\([^)]+\))/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
-    }
-
-    const token = match[0];
-
-    if (token.startsWith("`")) {
-      nodes.push(<code key={`${match.index}-code`}>{token.slice(1, -1)}</code>);
-    } else if (token.startsWith("**")) {
-      nodes.push(<strong key={`${match.index}-strong`}>{token.slice(2, -2)}</strong>);
-    } else if (token.startsWith("![")) {
-      const imageMatch = token.match(/^!\[([^\]]*)]\(([^)]+)\)$/);
-      const alt = imageMatch?.[1] ?? "";
-      const src = resolveWikiImageSource(imageMatch?.[2] ?? "");
-
-      if (src) {
-        nodes.push(<img alt={alt} className="wiki-content-image" key={`${match.index}-image`} src={src} />);
-      } else {
-        nodes.push(token);
-      }
-    } else {
-      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-      const href = linkMatch?.[2] ?? "";
-      nodes.push(
-        <a href={href} key={`${match.index}-link`} rel="noreferrer" target="_blank">
-          {linkMatch?.[1] ?? token}
-        </a>
-      );
-    }
-
-    lastIndex = match.index + token.length;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-
-  return nodes;
-}
-
-function resolveWikiImageSource(source: string) {
-  const trimmedSource = source.trim();
-  const localImageMatch = trimmedSource.match(/^wiki-image:([0-9a-fA-F-]{36})$/);
-
-  if (localImageMatch) {
-    return getWikiImageUrl(localImageMatch[1]);
-  }
-
-  return trimmedSource;
-}
-
-function createHeadingId(text: string, index: number) {
-  const slug = text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
-    .replace(/^-|-$/g, "");
-
-  return `${slug || "section"}-${index}`;
 }
 
 function formatDateTime(value: string) {

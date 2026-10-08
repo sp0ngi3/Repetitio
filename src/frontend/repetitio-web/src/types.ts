@@ -1161,6 +1161,15 @@ export interface WikiStudyAnswerRequest {
   knew?: boolean;
 }
 
+export interface WikiJsonPage extends WikiPage {
+  children: WikiJsonPage[];
+  images: { id: string; fileName: string | null; reference: string; url: string; sha256: string | null; occurrences: number; lines: number[] }[];
+}
+
+export interface WikiJsonDocument { pages: WikiJsonPage[]; }
+export interface WikiJsonPageUpdate { id: string; expectedUpdatedAt: string; page: UpdateWikiPageRequest; }
+export interface WikiJsonUpdateRequest { updates: WikiJsonPageUpdate[]; allowImageRemoval: boolean; }
+
 /**
  * Represents one loose source attached to a wiki page.
  */
