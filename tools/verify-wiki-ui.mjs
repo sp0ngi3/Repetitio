@@ -3,8 +3,8 @@ import { mkdir } from "node:fs/promises";
 import { strict as assert } from "node:assert";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
-const api = "http://localhost:5190";
-const url = "http://localhost:5174";
+const api = process.env.REPETITIO_VERIFY_API ?? "http://localhost:5190";
+const url = process.env.REPETITIO_VERIFY_URL ?? "http://localhost:5174";
 const output = new URL("../.artifacts/wiki-verification/", import.meta.url).pathname.replace(/^\/(\w:)/, "$1");
 await mkdir(output, { recursive: true });
 async function json(path, body, method = "POST") {
@@ -12,6 +12,8 @@ async function json(path, body, method = "POST") {
   assert(response.ok, await response.clone().text());
   return response.json();
 }
+const status = await (await fetch(api + "/api/backup/status")).json();
+assert(status.databasePath.replaceAll("\\", "/").includes("/.artifacts/wiki-verification/preview.db"), "Never seed production data");
 const question = index => ({ prompt: `Question ${index}: which operation is correct?`, options: [
   { text: "The correct operation", isCorrect: true }, { text: "An incorrect operation", isCorrect: false }
 ] });
@@ -132,7 +134,7 @@ try {
   await article.locator(".wiki-learning-pitfall").scrollIntoViewIfNeeded();
   assert.equal(await article.locator(".wiki-definition").count(), 2);
   assert.equal(await article.locator("li ul").count(), 2);
-  assert.equal(await article.locator("input[type=checkbox][disabled]").count(), 2);
+  assert.equal(await article.locator("input[type=checkbox]:not([disabled])").count(), 2);
   const recall = article.locator(".wiki-learning-important");
   const answer = recall.locator("details").nth(1).locator("p");
   assert(!(await answer.isVisible()), "Recall answer starts hidden");

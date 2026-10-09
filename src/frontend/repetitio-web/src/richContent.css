@@ -1,0 +1,72 @@
+/* Explicit surface/text pairs prevent legacy dark gradients from inverting contrast. */
+html[data-style] .flashcard-count-badge { color: var(--text); background: var(--surface-soft); border-color: var(--border); }
+html[data-style] .dashboard-mode-toggle { background: var(--surface); }
+html[data-style] .dashboard-mode-toggle button { color: var(--muted); background: transparent; box-shadow: none; }
+html[data-style] .dashboard-mode-toggle button:hover { color: var(--text); background: var(--surface-hover); }
+html[data-style] .dashboard-mode-toggle button.active { color: var(--accent); background: var(--accent-soft); }
+
+.syntax-highlight { --syntax-keyword: #d7b8ff; --syntax-string: #a5deb4; --syntax-number: #ffc7a1; --syntax-comment: #a6b8b5; --syntax-type: #91deed; --syntax-name: #f7d58a; --syntax-property: #9fcfff; }
+html[data-style] .syntax-highlight span { display: inline; border: 0; padding: 0; margin: 0; background: transparent; color: inherit; font: inherit; white-space: inherit; }
+html[data-style] .syntax-highlight :is(.hljs-keyword, .hljs-selector-tag, .hljs-meta .hljs-keyword) { color: var(--syntax-keyword); }
+html[data-style] .syntax-highlight :is(.hljs-string, .hljs-regexp, .hljs-template-variable) { color: var(--syntax-string); }
+html[data-style] .syntax-highlight :is(.hljs-number, .hljs-literal) { color: var(--syntax-number); }
+html[data-style] .syntax-highlight :is(.hljs-comment, .hljs-quote) { color: var(--syntax-comment); font-style: italic; }
+html[data-style] .syntax-highlight :is(.hljs-type, .hljs-built_in, .hljs-title.class_) { color: var(--syntax-type); }
+html[data-style] .syntax-highlight :is(.hljs-title, .hljs-section, .hljs-selector-class) { color: var(--syntax-name); }
+html[data-style] .syntax-highlight :is(.hljs-attr, .hljs-attribute, .hljs-property, .hljs-meta) { color: var(--syntax-property); }
+
+html[data-style] .wiki-code-block { margin: 20px 0; padding: 0; overflow: hidden; min-width: 0; font-family: var(--font-code); }
+html[data-style] .wiki-code-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; min-height: 44px; border-bottom: 1px solid var(--code-border); background: var(--code-toolbar); color: var(--code-text); }
+html[data-style] .wiki-code-language { display: inline; padding: 0; margin: 0; background: transparent; color: var(--code-muted); font: 500 12px/1.4 var(--font-ui); }
+html[data-style] .wiki-code-actions { display: inline-flex; margin: 0; padding: 0; }
+html[data-style] .wiki-code-block pre { overflow: auto; margin: 0; padding: 16px 18px; max-height: 680px; border: 0; border-radius: 0; background: var(--code-surface); color: var(--code-text); white-space: pre; tab-size: 4; }
+html[data-style] .wiki-code-block code { display: block; padding: 0; margin: 0; border: 0; background: transparent; color: var(--code-text); font: 400 14px/1.7 var(--font-code); white-space: pre; overflow-wrap: normal; }
+html[data-style] .code-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-height: 32px; padding: 0; border: 1px solid var(--code-border); border-radius: var(--radius); color: var(--code-text); background: var(--code-toolbar); box-shadow: none; }
+html[data-style] .code-icon-button:hover:not(:disabled) { background: var(--code-border); }
+html[data-style] .code-icon-button[aria-pressed="true"] { border-color: var(--accent); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+html[data-style] .dsa-code-surface { position: relative; display: block; padding-left: 54px; min-height: 420px; }
+html[data-style] .dsa-code-lines { position: absolute; inset: 0 auto 0 0; width: 54px; min-height: 0; height: 100%; overflow: hidden; padding: 14px 10px; }
+.dsa-code-overlay { position: relative; min-width: 0; }
+html[data-style] :is(.dsa-code-input, .dsa-code-highlight, .dsa-code-lines) { font: 400 14px/1.6 var(--font-code); tab-size: 4; }
+html[data-style] .dsa-code-highlight { position: absolute; inset: 0; margin: 0; padding: 14px; border: 0; overflow: hidden; white-space: pre; background: var(--code-surface); color: var(--code-text); pointer-events: none; }
+html[data-style] .dsa-code-overlay > .dsa-code-input { position: relative; display: block; width: 100%; height: 420px; min-height: 420px; margin: 0; padding: 14px; border: 0; border-radius: 0; color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--code-text); background: transparent; overflow: auto; white-space: pre; overflow-wrap: normal; }
+html[data-style] .dsa-code-input::placeholder { color: var(--code-muted); -webkit-text-fill-color: var(--code-muted); }
+html[data-style] .dsa-code-input::selection { background: color-mix(in srgb, var(--accent-2) 30%, transparent); }
+html[data-style] .wiki-json-workspace .dsa-code-input { height: 68dvh; }
+
+html[data-style] .wiki-checklist-item { display: flex; align-items: flex-start; gap: 10px; margin: 8px 0; padding: 8px 10px; border-radius: var(--radius); background: var(--surface-soft); color: var(--text); font: inherit; cursor: pointer; }
+html[data-style] .wiki-checklist-item:has(input:disabled) { cursor: default; }
+html[data-style] .wiki-checklist-item:has(input:checked) { border-left: 2px solid var(--success); background: var(--success-soft); }
+html[data-style] .wiki-checklist-item input[type="checkbox"] { flex: 0 0 18px; width: 18px; height: 18px; margin: 5px 0 0; accent-color: var(--accent); cursor: inherit; opacity: 1; }
+.wiki-checklist-text { flex: 1; min-width: 0; }
+html[data-style] .wiki-checklist-item:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+html[data-style] .wiki-reveal summary { padding: 6px 4px; color: var(--accent); list-style: disclosure-closed; }
+html[data-style] .wiki-reveal[open] > summary { list-style: disclosure-open; }
+
+.wiki-diagram-preview:empty { display: none; }
+html[data-style] .wiki-diagram-player { background: var(--surface); color: var(--text); }
+.wiki-diagram-controls { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.wiki-diagram-viewport { overflow: auto; min-height: 180px; max-height: 650px; padding: 20px; scrollbar-gutter: stable; }
+.wiki-diagram-svg { min-width: 160px; margin-inline: auto; }
+.wiki-diagram-svg svg { display: block; width: 100%; max-width: none !important; height: auto; }
+.diagram-error, .diagram-loading { margin: 12px; color: var(--muted); font: 14px/1.6 var(--font-ui); }
+.diagram-error { color: var(--danger); }
+html[data-style] .wiki-code-language-picker { width: auto; max-width: 185px; min-height: 34px; margin: 0; font-size: 13px; }
+
+@media (max-width: 760px) {
+  html[data-style] .wiki-json-workspace .dsa-code-input { height: 50dvh; }
+  html[data-style] .wiki-code-block pre { padding: 12px; max-height: 480px; }
+  .wiki-diagram-viewport { padding: 12px; max-height: 440px; }
+}
+@media (forced-colors: active) {
+  html[data-style] .dsa-code-overlay > .dsa-code-input { color: CanvasText; -webkit-text-fill-color: CanvasText; background: Canvas; caret-color: CanvasText; }
+  .dsa-code-highlight { visibility: hidden; }
+}
+@media print {
+  .wiki-code-actions, .wiki-diagram-controls { display: none !important; }
+  .wiki-diagram-viewport { max-height: none; overflow: visible; }
+  html[data-style] .wiki-code-block pre { max-height: none; overflow: visible; white-space: pre-wrap; background: white; color: black; }
+  html[data-style] .syntax-highlight span { color: inherit; }
+}

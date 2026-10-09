@@ -2489,9 +2489,7 @@ textarea {
 [data-theme="dark"] .weakness-row {
   border-color: var(--border);
   color: var(--text);
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--text) 98%, transparent), color-mix(in srgb, var(--text) 96%, transparent)),
-    var(--text);
+  background: var(--surface-soft);
 }
 
 [data-theme="dark"] .flashcards-metric strong,

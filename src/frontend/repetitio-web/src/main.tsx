@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import "./styles.css";
 import "./design.css";
+import "./richContent.css";
 import { applyAppearance, readColorMode, readMotionPreference, readVisualStyle } from "./appearance";
 
 applyAppearance(readColorMode(), readVisualStyle(), readMotionPreference());

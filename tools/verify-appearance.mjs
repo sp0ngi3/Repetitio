@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { strict as assert } from "node:assert";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
-const api = "http://localhost:5190";
+const api = process.env.REPETITIO_VERIFY_API ?? "http://localhost:5190";
 const output = new URL("../.artifacts/appearance-verification/", import.meta.url).pathname.replace(/^\/(\w:)/, "$1");
 await mkdir(output, { recursive: true });
 async function json(path, body) {
@@ -64,7 +64,7 @@ async function snapshot(name) {
   audits.push({ name, contrast });
 }
 try {
-  await page.goto("http://localhost:5174");
+  await page.goto(process.env.REPETITIO_VERIFY_URL ?? "http://localhost:5174");
   for (const style of ["professional", "vaporwave"]) for (const mode of ["light", "dark"]) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await navigate("settings", "Settings");

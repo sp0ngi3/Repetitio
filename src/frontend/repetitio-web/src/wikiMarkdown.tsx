@@ -1,6 +1,8 @@
 import MarkdownIt from "markdown-it";
 import container from "markdown-it-container";
 import { getWikiImageUrl } from "./api";
+import { codeLanguageLabel, highlightCode, normalizeCodeLanguage } from "./codeHighlight";
+import { WikiMarkdownContent } from "./WikiMarkdownContent";
 
 export interface MarkdownHeading {
   id: string;
@@ -43,28 +45,49 @@ markdown.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
 };
 markdown.renderer.rules.table_open = () => '<div class="wiki-table-wrap"><table>\n';
 markdown.renderer.rules.table_close = () => '</table></div>\n';
-const fenceRule = markdown.renderer.rules.fence!;
-markdown.renderer.rules.fence = (tokens, index, options, env, renderer) => {
+markdown.renderer.rules.fence = (tokens, index) => {
   const language = tokens[index].info.trim().split(/\s+/)[0];
-  const label = language ? `<span>${markdown.utils.escapeHtml(language)}</span>` : "";
-  return fenceRule(tokens, index, options, env, renderer).replace("<pre>", `<pre class="wiki-code-block">${label}`);
+  const source = tokens[index].content;
+  const diagram = normalizeCodeLanguage(language) === "mermaid";
+  return `<section class="wiki-code-block${diagram ? " wiki-diagram-block" : ""}">
+    <div class="wiki-code-toolbar"><span class="wiki-code-language">${markdown.utils.escapeHtml(codeLanguageLabel(language))}</span><span class="wiki-code-actions"></span></div>
+    ${diagram ? '<div class="wiki-diagram-preview"></div>' : ""}
+    <pre><code class="syntax-highlight language-${markdown.utils.escapeHtml(normalizeCodeLanguage(language))}">${highlightCode(source, language)}</code></pre>
+  </section>\n`;
 };
 // Add only generated checkbox HTML; arbitrary user HTML remains disabled.
 markdown.core.ruler.after("inline", "wiki_checklists", state => {
+  const headings: string[] = [];
+  const occurrences = new Map<string, number>();
   state.tokens.forEach((token, index) => {
+    if (token.type === "heading_open") {
+      headings.length = Number(token.tag.slice(1));
+      headings[headings.length - 1] = state.tokens[index + 1]?.content ?? "";
+    }
     if (token.type !== "inline" || state.tokens[index - 2]?.type !== "list_item_open") return;
     const first = token.children?.[0];
     const match = first?.type === "text" ? first.content.match(/^\[([ xX])]\s+/) : null;
     if (!first || !match) return;
     first.content = first.content.slice(match[0].length);
+    const label = token.content.slice(match[0].length);
+    const identity = JSON.stringify([headings, label]);
+    const occurrence = occurrences.get(identity) ?? 0;
+    occurrences.set(identity, occurrence + 1);
     const checkbox = new state.Token("html_inline", "", 0);
-    checkbox.content = `<input type="checkbox" disabled${match[1] !== " " ? " checked" : ""} aria-label="Checklist item" /> `;
-    token.children!.unshift(checkbox);
+    checkbox.content = `<input type="checkbox"${state.env?.interactiveChecklists ? "" : " disabled"}${match[1] !== " " ? " checked" : ""} data-checklist-key="${markdown.utils.escapeHtml(JSON.stringify([identity, occurrence]))}" /> `;
+    const open = new state.Token("html_inline", "", 0);
+    open.content = '<label class="wiki-checklist-item">';
+    const close = new state.Token("html_inline", "", 0);
+    close.content = "</span></label>";
+    const textOpen = new state.Token("html_inline", "", 0);
+    textOpen.content = '<span class="wiki-checklist-text">';
+    token.children!.unshift(open, checkbox, textOpen);
+    token.children!.push(close);
   });
 });
 
-export function renderWikiMarkdownHtml(source: string, expandDetails = false) {
-  const env = { expandDetails };
+export function renderWikiMarkdownHtml(source: string, expandDetails = false, interactiveChecklists = false) {
+  const env = { expandDetails, interactiveChecklists };
   const tokens = markdown.parse(source, env);
   const headings: MarkdownHeading[] = [];
   tokens.forEach((token, index) => {
@@ -81,9 +104,9 @@ export function renderWikiMarkdownHtml(source: string, expandDetails = false) {
   return { html: markdown.renderer.render(tokens, markdown.options, env), headings };
 }
 
-export function renderWikiMarkdown(source: string) {
+export function renderWikiMarkdown(source: string, checklistScope?: string, interactive = true) {
   const result = renderWikiMarkdownHtml(source);
-  return { nodes: source.trim() ? [<div key="markdown" dangerouslySetInnerHTML={{ __html: result.html }} />] : [], headings: result.headings };
+  return { nodes: source.trim() ? [<WikiMarkdownContent key={checklistScope ?? "markdown"} source={source} checklistScope={checklistScope} interactive={interactive} />] : [], headings: result.headings };
 }
 
 function headingId(text: string, index: number) {

@@ -1,5 +1,6 @@
 import { ActionIcon } from "./ActionIcon";
-import type { KeyboardEvent, ReactNode } from "react";
+import { useMemo, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { highlightCode, codeLanguageLabel } from "./codeHighlight";
 
 const codeEditorIndent = "    ";
 
@@ -25,6 +26,9 @@ interface CodeEditorEdit {
 
 export function CodeEditor(props: CodeEditorProps) {
   const lineNumbers = createCodeLineNumbers(props.value);
+  const highlighted = useMemo(() => highlightCode(props.value + "\n", props.language), [props.value, props.language]);
+  const highlightRef = useRef<HTMLPreElement>(null);
+  const linesRef = useRef<HTMLPreElement>(null);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Tab") {
@@ -57,7 +61,7 @@ export function CodeEditor(props: CodeEditorProps) {
   return (
     <div className="dsa-code-editor">
       <div className="dsa-code-toolbar">
-        <span>{props.language}</span>
+        <span>{codeLanguageLabel(props.language)}</span>
         <div className="dsa-code-actions">
           {props.toolbarEnd}
           <button className="secondary-button compact-button" type="button" disabled={props.disabled} onClick={() => props.onFormat ? props.onFormat() : props.onChange(formatCode(props.value))}>
@@ -72,18 +76,29 @@ export function CodeEditor(props: CodeEditorProps) {
         </div>
       </div>
       <div className="dsa-code-surface">
-        <pre aria-hidden="true" className="dsa-code-lines">{lineNumbers}</pre>
-        <textarea
-          id={props.id}
-          aria-label={props.label ?? "Source code"}
-          className="code-input dsa-code-input"
-          spellCheck={false}
-          disabled={props.disabled}
-          value={props.value}
-          onChange={(event) => props.onChange(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={props.placeholder ?? "Paste or write your accepted solution."}
-        />
+        <pre ref={linesRef} aria-hidden="true" className="dsa-code-lines">{lineNumbers}</pre>
+        <div className="dsa-code-overlay">
+          <pre ref={highlightRef} aria-hidden="true" className="dsa-code-highlight syntax-highlight" dangerouslySetInnerHTML={{ __html: highlighted }} />
+          <textarea
+            id={props.id}
+            aria-label={props.label ?? "Source code"}
+            className="code-input dsa-code-input"
+            spellCheck={false}
+            wrap="off"
+            disabled={props.disabled}
+            value={props.value}
+            onChange={(event) => props.onChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            onScroll={event => {
+              if (highlightRef.current) {
+                highlightRef.current.scrollTop = event.currentTarget.scrollTop;
+                highlightRef.current.scrollLeft = event.currentTarget.scrollLeft;
+              }
+              if (linesRef.current) linesRef.current.scrollTop = event.currentTarget.scrollTop;
+            }}
+            placeholder={props.placeholder ?? "Paste or write your accepted solution."}
+          />
+        </div>
       </div>
     </div>
   );

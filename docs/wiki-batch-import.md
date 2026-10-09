@@ -91,7 +91,7 @@ These fields can be placed directly in a section. They are also available as blo
 }
 ```
 
-Checklist markers are read-only article content, not scored answers or saved habit checkboxes. To edit them, edit the article source. Quiz/flashcard practice remains the only scored Wiki study activity.
+Article checklist markers can be clicked. Their state is saved locally in the browser per page, not in the database or backups, and does not count as scored study activity. The imported `checked` value is the initial state. Source previews and PDFs remain read-only. Quiz/flashcard practice remains the only scored Wiki study activity.
 
 Definitions support inline Markdown and longer Markdown explanations. Expand abbreviations in the definition instead of replacing the original source explanation with an unexplained acronym.
 
@@ -201,7 +201,37 @@ The answer can include **bold text**, lists, tables and code.
 :::
 ```
 
-Use a longer colon fence for a container that contains another container. Batch import handles this automatically. Raw HTML and unsafe link protocols are not rendered. Standard Markdown nested lists, emphasis, tables, code, local image references and read-only task lists are supported.
+Use a longer colon fence for a container that contains another container. Batch import handles this automatically. Raw HTML and unsafe link protocols are not rendered. Standard Markdown nested lists, emphasis, tables, code, local image references and task lists are supported.
+
+### Code highlighting and text diagrams
+
+Existing `code` and `type: "code"` blocks now support syntax highlighting and copying the exact source. Use `csharp`, `python`, `yaml` (including Docker Compose), `dockerfile`, `json`, `bash`, `javascript`, `typescript`, `sql`, `java`, `cpp`, or `go`. Unknown languages and `text` remain plain text; ASCII diagrams retain their whitespace.
+
+For editable text diagrams, use the existing code block with `language: "mermaid"`. This works in structured batch imports, page JSON edits and fenced Markdown without any schema changes:
+
+```json
+{
+  "heading": "Event delivery",
+  "code": {
+    "language": "mermaid",
+    "content": "flowchart LR\n    Publisher --> Event[Shared delegate contract]\n    Event --> SubscriberA\n    Event --> SubscriberB"
+  }
+}
+```
+
+The editor has a code-language selector and a diagram insert button. Diagrams support source display/copy, zoom and SVG download, follow the current theme, and render in PDF exports. The Markdown source remains the data stored in the database and backups. Invalid diagrams show the original source instead of breaking the article. External images/URLs, initialization directives and embedded HTML are not permitted inside diagram source. Rendering is local; no external diagram service is used.
+
+Docker Compose example using the same existing structure:
+
+```json
+{
+  "heading": "Local deployment",
+  "code": {
+    "language": "yaml",
+    "content": "services:\n  api:\n    image: my-api:latest\n    ports:\n      - \"8080:8080\"\n    volumes:\n      - ./data:/app/data"
+  }
+}
+```
 
 ## Optional Addition to Your Existing AI Prompt
 

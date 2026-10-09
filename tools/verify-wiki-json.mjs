@@ -4,7 +4,7 @@ import { strict as assert } from "node:assert";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
 // These fixed ports belong to the disposable Wiki verification database, never Docker production.
-const api = "http://localhost:5190";
+const api = process.env.REPETITIO_VERIFY_API ?? "http://localhost:5190";
 const output = new URL("../.artifacts/wiki-verification/", import.meta.url).pathname.replace(/^\/(\w:)/, "$1");
 await mkdir(output, { recursive: true });
 async function request(path, body, method = body ? "POST" : "GET") {
@@ -12,6 +12,8 @@ async function request(path, body, method = body ? "POST" : "GET") {
   assert(response.ok, await response.clone().text());
   return response.json();
 }
+const status = await request("/api/backup/status");
+assert(status.databasePath.replaceAll("\\", "/").includes("/.artifacts/wiki-verification/preview.db"), "Never seed production data");
 const imageBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvbkAAAAASUVORK5CYII=", "base64");
 const form = new FormData();
 form.append("file", new Blob([imageBytes], { type: "image/png" }), "existing-diagram.png");
@@ -33,7 +35,7 @@ const page = await context.newPage();
 const errors = [];
 page.on("pageerror", error => errors.push(error.message));
 try {
-  await page.goto("http://localhost:5174");
+  await page.goto(process.env.REPETITIO_VERIFY_URL ?? "http://localhost:5174");
   await page.getByRole("button", { name: "Wiki", exact: true }).click();
   await page.getByRole("textbox", { name: "Search topic tree" }).fill(title);
   await page.getByRole("button", { name: title, exact: true }).first().click();
@@ -51,7 +53,10 @@ try {
   await page.getByRole("button", { name: "Download JSON", exact: true }).click();
   assert((await downloadPromise).suggestedFilename().endsWith("-edit.json"));
   await page.getByRole("checkbox", { name: "Include subpages", exact: true }).check();
-  await page.waitForFunction(() => JSON.parse(document.querySelector('textarea[aria-label="Article JSON"]').value).pages[0].children.length === 1);
+  await page.waitForFunction(() => {
+    const editor = document.querySelector('textarea[aria-label="Article JSON"]');
+    return editor && JSON.parse(editor.value).pages[0].children.length === 1;
+  });
   exported = JSON.parse(await source.inputValue());
   assert.equal(exported.pages[0].children[0].children[0].id, grandchild.id);
   exported.pages[0].appendSections = [{ heading: "Vocabulary", definitions: [{ term: "Affinity", definition: "Keeping related requests on the same instance." }] }];

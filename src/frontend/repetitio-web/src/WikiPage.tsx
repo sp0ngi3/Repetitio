@@ -27,7 +27,9 @@ import type { WikiStudyItem } from "./WikiLearning";
 import { renderWikiMarkdown as renderMarkdown, renderWikiMarkdownHtml, type MarkdownHeading } from "./wikiMarkdown";
 import { parseWikiBatchImport, parseWikiSourcesJson, parseWikiQuizJson, parseWikiFlashcardJson, wikiLearningContainer } from "./wikiImport";
 import { WikiJsonEditor } from "./WikiJsonEditor";
-import { FileJson } from "lucide-react";
+import { FileJson, Workflow } from "lucide-react";
+import { codeLanguages } from "./codeHighlight";
+import { renderPrintableDiagrams } from "./diagramRenderer";
 export { parseWikiBatchImport } from "./wikiImport";
 
 type WikiView = "article" | "explore" | "edit" | "json" | "import" | "study" | "reviews";
@@ -187,6 +189,13 @@ export const sampleImport = JSON.stringify(
             }
           },
           {
+            heading: "Visual walkthrough",
+            code: {
+              language: "mermaid",
+              content: "flowchart LR\n    Input[Non-empty input] --> Initialize[best = first value]\n    Initialize --> Scan[Compare each remaining value]\n    Scan --> Result[Return the maximum]"
+            }
+          },
+          {
             heading: "Study guide",
             definitions: [
               { term: "Invariant", definition: "A property that remains true before and after each step of an algorithm." },
@@ -301,8 +310,8 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
     [editingPageId, treeNodes]
   );
   const renderedMarkdown = useMemo(
-    () => renderMarkdown(selectedPage?.contentMarkdown ?? ""),
-    [selectedPage?.contentMarkdown]
+    () => renderMarkdown(selectedPage?.contentMarkdown ?? "", selectedPage?.id),
+    [selectedPage?.contentMarkdown, selectedPage?.id]
   );
   const articleChildren = useMemo(
     () => selectedPage ? treeNodes.filter((node) => node.parentId === selectedPage.id) : [],
@@ -514,7 +523,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
     try {
       const subtreeIds = collectSubtreeIds(treeNodes, selectedPage.id);
       const pagesToPrint = await Promise.all(subtreeIds.map((id) => id === selectedPage.id ? selectedPage : getWikiPage(id)));
-      openWikiPdfPrintWindow(selectedPage.title, pagesToPrint);
+      await openWikiPdfPrintWindow(selectedPage.title, pagesToPrint);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to prepare wiki PDF.");
     }
@@ -1157,7 +1166,8 @@ function WikiEditor(props: {
   const scrollGuard = useRef<HTMLElement | null>(null);
   const [imageUploadStatus, setImageUploadStatus] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const preview = useMemo(() => renderMarkdown(props.form.contentMarkdown), [props.form.contentMarkdown]);
+  const [snippetLanguage, setSnippetLanguage] = useState("csharp");
+  const preview = useMemo(() => renderMarkdown(props.form.contentMarkdown, undefined, false), [props.form.contentMarkdown]);
 
   function syncScroll(source: HTMLElement, target: HTMLElement | null) {
     if (!target || scrollGuard.current === source) return;
@@ -1346,8 +1356,14 @@ function WikiEditor(props: {
                 <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("> {{selection}}", "Short definition or quote.")}>
                   Quote
                 </button>
-                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("```csharp\n{{selection}}\n```", "// Paste code here")}>
+                <select className="wiki-code-language-picker" aria-label="Code snippet language" value={snippetLanguage} onChange={event => setSnippetLanguage(event.target.value)}>
+                  {codeLanguages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("```" + snippetLanguage + "\n{{selection}}\n```", snippetLanguage === "python" || snippetLanguage === "yaml" || snippetLanguage === "bash" ? "# Paste code here" : "// Paste code here")}>
                   Code
+                </button>
+                <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("```mermaid\nflowchart LR\n    Publisher --> Event[Event / delegate contract]\n    Event --> SubscriberA[Subscriber A]\n    Event --> SubscriberB[Subscriber B]\n```", "")}>
+                  <Workflow size={15} aria-hidden="true" />Diagram
                 </button>
                 <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("| Topic | Notes |\n| --- | --- |\n|  |  |")}>
                   Table
@@ -1709,7 +1725,7 @@ function collectSubtreeIds(nodes: WikiTreeNode[], rootId: string) {
   return [rootId, ...orderedDescendants];
 }
 
-function openWikiPdfPrintWindow(title: string, pages: WikiPageRecord[]) {
+async function openWikiPdfPrintWindow(title: string, pages: WikiPageRecord[]) {
   const printWindow = window.open("", "_blank", "width=1100,height=900");
 
   if (!printWindow) {
@@ -1719,7 +1735,12 @@ function openWikiPdfPrintWindow(title: string, pages: WikiPageRecord[]) {
   printWindow.document.write(buildPrintableWikiDocument(title, pages));
   printWindow.document.close();
   printWindow.focus();
-  printWindow.setTimeout(() => printWindow.print(), 500);
+  await renderPrintableDiagrams(printWindow.document);
+  await printWindow.document.fonts.ready;
+  await Promise.all(Array.from(printWindow.document.images, image => image.complete ? Promise.resolve() : new Promise<void>(resolve => {
+    image.onload = () => resolve(); image.onerror = () => resolve(); setTimeout(resolve, 5000);
+  })));
+  if (!printWindow.closed) printWindow.print();
 }
 
 function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
@@ -1761,7 +1782,9 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
     .wiki-definition { margin: 14px 0; } .wiki-definition dt { font-weight: 700; } .wiki-definition dd { margin: 4px 0 0 16px; }
     .wiki-reveal { margin: 12px 0; border-block: 1px solid #c8cdd3; padding: 10px 0; }
     .wiki-reveal summary { font-weight: 700; margin-bottom: 8px; }
-    .wiki-code-block > span { display: block; font: 9pt Arial, sans-serif; color: #54595d; margin-bottom: 6px; }
+    .wiki-code-toolbar { font: 9pt Arial, sans-serif; color: #54595d; margin-bottom: 6px; }
+    .wiki-code-actions { display: none; }
+    .wiki-diagram-preview svg { max-width: 100%; height: auto; }
     .checks { margin-top: 24px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
     .sources { margin-top: 20px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
     .source-card { break-inside: avoid; border: 1px solid #a2a9b1; margin: 8px 0; padding: 8px 10px; font-family: Arial, sans-serif; font-size: 10pt; }

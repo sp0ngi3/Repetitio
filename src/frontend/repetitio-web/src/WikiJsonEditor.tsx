@@ -126,7 +126,7 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
               {plan.summaries.filter(item => item.id === preview.id && (item.removedChecks || item.removedSources || item.clearedContent || item.missingImages)).map(item => <p className="wiki-review-due" key={item.id}>
                 {item.removedChecks} checks removed · {item.removedSources} sources removed · {item.missingImages} images unlinked{item.clearedContent ? " · Article cleared" : ""}
               </p>)}
-              <div className="official-wiki-content">{renderWikiMarkdown(preview.page.contentMarkdown ?? "").nodes}</div>
+              <div className="official-wiki-content">{renderWikiMarkdown(preview.page.contentMarkdown ?? "", undefined, false).nodes}</div>
             </> : null}
           </> : <div className="wiki-json-preview-idle"><FileJson size={32} /><h2>Change preview</h2><button className="secondary-button" type="button" onClick={review}><Eye size={16} />Review changes</button></div>}
         </section>
