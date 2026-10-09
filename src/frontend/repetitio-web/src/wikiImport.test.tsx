@@ -37,8 +37,9 @@ it("accepts the old prompt's full page schema and preserves normalized Markdown,
   expect(page.children?.[0]).toMatchObject({ title: "Load factor", slug: "load-factor", contentMarkdown: "Entries divided by bucket count." });
   const html = renderWikiMarkdownHtml(page.contentMarkdown!);
   expect(html.headings.map(heading => heading.text)).toEqual(["Collision handling", "Resizing"]);
-  expect(html.html).toContain("<table>");
-  expect(html.html).toContain("<blockquote>");
+  const document = new DOMParser().parseFromString(html.html, "text/html");
+  expect(document.querySelector("table")).not.toBeNull();
+  expect(document.querySelector("blockquote")?.textContent).toContain("Different keys may share a bucket.");
 });
 
 it("retains page-array imports, aliases, Markdown precedence and nested children", () => {

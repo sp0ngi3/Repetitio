@@ -30,6 +30,7 @@ import { WikiJsonEditor } from "./WikiJsonEditor";
 import { FileJson, Workflow } from "lucide-react";
 import { codeLanguages } from "./codeHighlight";
 import { renderPrintableDiagrams } from "./diagramRenderer";
+import { useWikiScrollSync } from "./wikiScrollSync";
 export { parseWikiBatchImport } from "./wikiImport";
 
 type WikiView = "article" | "explore" | "edit" | "json" | "import" | "study" | "reviews";
@@ -1163,20 +1164,12 @@ function WikiEditor(props: {
 }) {
   const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
-  const scrollGuard = useRef<HTMLElement | null>(null);
   const [imageUploadStatus, setImageUploadStatus] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [snippetLanguage, setSnippetLanguage] = useState("csharp");
   const preview = useMemo(() => renderMarkdown(props.form.contentMarkdown, undefined, false), [props.form.contentMarkdown]);
 
-  function syncScroll(source: HTMLElement, target: HTMLElement | null) {
-    if (!target || scrollGuard.current === source) return;
-    const max = source.scrollHeight - source.clientHeight;
-    const targetMax = target.scrollHeight - target.clientHeight;
-    scrollGuard.current = target;
-    target.scrollTop = max > 0 ? (source.scrollTop / max) * targetMax : 0;
-    requestAnimationFrame(() => { scrollGuard.current = null; });
-  }
+  const scrollSync = useWikiScrollSync(sourceTextareaRef, previewRef, props.form.contentMarkdown);
 
   function insertSnippet(snippet: string, fallbackSelection = "") {
     const textarea = sourceTextareaRef.current;
@@ -1395,7 +1388,7 @@ function WikiEditor(props: {
                 value={props.form.contentMarkdown}
                 onChange={(event) => props.onUpdate("contentMarkdown", event.target.value)}
                 onPaste={handleSourcePaste}
-                onScroll={event => syncScroll(event.currentTarget, previewRef.current)}
+                onScroll={scrollSync.onSourceScroll}
                 placeholder="Use headings, bullet points, comparison tables, code snippets and links."
               />
             </section>
@@ -1404,7 +1397,7 @@ function WikiEditor(props: {
                 <span>Live preview</span>
                 <strong>{props.form.title || "Untitled article"}</strong>
               </div>
-              <div className="official-wiki-content wiki-preview-scroll" ref={previewRef} onScroll={event => syncScroll(event.currentTarget, sourceTextareaRef.current)}>
+              <div className="official-wiki-content wiki-preview-scroll" ref={previewRef} onScroll={scrollSync.onPreviewScroll}>
                 {props.form.summary.trim() ? <p className="wiki-lead">{props.form.summary}</p> : null}
                 {preview.nodes.length ? preview.nodes : <p className="empty-state">Nothing to preview yet.</p>}
               </div>
@@ -1785,6 +1778,7 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
     .wiki-code-toolbar { font: 9pt Arial, sans-serif; color: #54595d; margin-bottom: 6px; }
     .wiki-code-actions { display: none; }
     .wiki-diagram-preview svg { max-width: 100%; height: auto; }
+    .wiki-table-toolbar { display: none; }
     .checks { margin-top: 24px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
     .sources { margin-top: 20px; border-top: 1px solid #a2a9b1; padding-top: 12px; }
     .source-card { break-inside: avoid; border: 1px solid #a2a9b1; margin: 8px 0; padding: 8px 10px; font-family: Arial, sans-serif; font-size: 10pt; }

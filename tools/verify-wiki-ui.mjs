@@ -43,14 +43,20 @@ try {
   await page.screenshot({ path: output + "/article-light.png" });
   await page.getByRole("button", { name: "Edit source" }).click();
   const editor = page.getByRole("textbox", { name: "Article source" });
-  await editor.evaluate(element => { element.scrollTop = (element.scrollHeight - element.clientHeight) * 0.5; element.dispatchEvent(new Event("scroll", { bubbles: true })); });
-  await page.waitForTimeout(120);
-  const ratios = await page.evaluate(() => {
-    const source = document.querySelector(".wiki-source-textarea");
-    const preview = document.querySelector(".wiki-preview-scroll");
-    return [source.scrollTop / (source.scrollHeight - source.clientHeight), preview.scrollTop / (preview.scrollHeight - preview.clientHeight)];
+  await page.waitForFunction(() => document.querySelector(".wiki-source-measure")?.firstChild);
+  await editor.evaluate(element => {
+    const text = document.querySelector(".wiki-source-measure").firstChild;
+    const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 1);
+    const origin = range.getBoundingClientRect().top;
+    const offset = element.value.indexOf("## Topic 33\n");
+    range.setStart(text, offset); range.setEnd(text, offset + 1);
+    element.scrollTop = range.getBoundingClientRect().top - origin + parseFloat(getComputedStyle(element).paddingTop);
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
-  assert(Math.abs(ratios[0] - ratios[1]) < 0.02, "Editor and preview scroll together");
+  await page.waitForTimeout(120);
+  const previewError = await page.locator(".wiki-preview-scroll").getByRole("heading", { name: "Topic 33", exact: true })
+    .evaluate(element => element.getBoundingClientRect().top - element.closest(".wiki-preview-scroll").getBoundingClientRect().top);
+  assert(Math.abs(previewError) < 35, "Editor and preview align the same source block");
   await page.screenshot({ path: output + "/editor-light.png" });
   await page.getByRole("button", { name: "Save article", exact: true }).click();
   await page.getByRole("heading", { name: rootTitle, exact: true }).waitFor();

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { CopyCodeButton } from "./CopyCodeButton";
 import { DiagramPreview } from "./DiagramPreview";
 import { renderWikiMarkdownHtml } from "./wikiMarkdown";
+import { WikiTableButton } from "./WikiTableButton";
 
 interface CodeSlot { code: string; actions: HTMLElement; diagram: HTMLElement | null; source: HTMLElement | null; }
 
@@ -17,8 +18,13 @@ export function WikiMarkdownContent({ source, checklistScope, interactive = true
   const root = useRef<HTMLDivElement>(null);
   const html = useMemo(() => renderWikiMarkdownHtml(source, false, interactive).html, [source, interactive]);
   const [slots, setSlots] = useState<CodeSlot[]>([]);
+  const [tables, setTables] = useState<{ table: HTMLTableElement; actions: HTMLElement }[]>([]);
   const storageKey = checklistScope ? `repetitio-wiki-checklists:${checklistScope}` : null;
   useEffect(() => {
+    setTables(Array.from(root.current?.querySelectorAll<HTMLElement>(".wiki-table-wrap") ?? []).flatMap(block => {
+      const table = block.querySelector("table"), actions = block.querySelector<HTMLElement>(".wiki-table-actions");
+      return table && actions ? [{ table, actions }] : [];
+    }));
     setSlots(Array.from(root.current?.querySelectorAll<HTMLElement>(".wiki-code-block") ?? []).flatMap(block => {
       const actions = block.querySelector<HTMLElement>(".wiki-code-actions");
       return actions ? [{ code: block.querySelector("code")?.textContent ?? "", actions,
@@ -48,6 +54,7 @@ export function WikiMarkdownContent({ source, checklistScope, interactive = true
   }, [storageKey]);
   return <>
     <MarkdownHtml root={root} html={html} />
+    {tables.map((table, index) => createPortal(<WikiTableButton table={table.table} />, table.actions, `table-${index}`))}
     {slots.map((slot, index) => <span key={index}>
       {createPortal(<CopyCodeButton source={slot.code} />, slot.actions)}
       {slot.diagram && slot.source ? createPortal(<DiagramPreview source={slot.code} sourceElement={slot.source} />, slot.diagram) : null}

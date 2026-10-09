@@ -1,0 +1,68 @@
+.wiki-source-measure { position: absolute; top: 0; left: -100000px; visibility: hidden; pointer-events: none; box-sizing: border-box; border: 0; height: auto; margin: 0; }
+.wiki-preview-scroll { overflow-anchor: none; }
+
+html[data-style] .official-wiki-content { container-type: inline-size; container-name: wiki-content; }
+html[data-style] .wiki-table-wrap { min-width: 0; max-width: 100%; margin: 24px 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.wiki-table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 4px 10px 4px 14px; background: var(--surface-soft); border-bottom: 1px solid var(--border); color: var(--muted); font: 500 12px/1.5 var(--font-ui); }
+.wiki-table-actions { display: inline-flex; }
+html[data-style] .wiki-table-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-height: 32px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: none; }
+html[data-style] .wiki-table-icon:hover { background: var(--surface-hover); border-color: var(--accent); }
+.wiki-table-viewport { min-width: 0; max-width: 100%; max-height: 75dvh; overflow: auto; overscroll-behavior: contain; }
+html[data-style] :is(.wiki-table-viewport, .wiki-table-dialog-scroll) table { table-layout: auto; width: 100%; min-width: var(--wiki-table-min-width, 100%); margin: 0; border-collapse: separate; border-spacing: 0; font: 400 14px/1.65 var(--font-ui); }
+html[data-style] :is(.wiki-table-viewport, .wiki-table-dialog-scroll) :is(th, td) {
+  min-width: var(--wiki-column-min, 120px);
+  padding: 12px 16px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  text-align: left;
+  color: var(--text);
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  background: var(--surface);
+}
+html[data-style] :is(.wiki-table-viewport, .wiki-table-dialog-scroll) th { position: sticky; top: 0; z-index: 1; font-weight: 600; background: var(--surface-soft); }
+html[data-style] :is(.wiki-table-viewport, .wiki-table-dialog-scroll) :is(th, td):last-child { border-right: 0; }
+html[data-style] :is(.wiki-table-viewport, .wiki-table-dialog-scroll) tbody tr:last-child td { border-bottom: 0; }
+html[data-style] :is(.wiki-table-viewport, .wiki-table-dialog-scroll) tbody tr:hover td { background: var(--surface-hover); }
+html[data-style] :is(.wiki-table-viewport, .wiki-table-dialog-scroll) :is(code, a) { white-space: normal; overflow-wrap: anywhere; word-break: normal; }
+.wiki-table-viewport:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+html[data-style] .wiki-table-dialog { width: min(1440px, calc(100vw - 32px)); max-width: none; max-height: 90dvh; padding: 0; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+.wiki-table-dialog[open] { display: flex; flex-direction: column; }
+.wiki-table-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.wiki-table-dialog > header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.wiki-table-dialog > header h2 { margin: 0; font: 600 18px/1.4 var(--font-ui); }
+.wiki-table-dialog-scroll { min-height: 0; width: 100%; max-width: none; flex: 1; overflow: auto; overscroll-behavior: contain; }
+
+html[data-style] .official-wiki-content :is(.wiki-definition, .wiki-learning-block, .wiki-reveal) { min-width: 0; overflow-wrap: break-word; word-break: normal; }
+html[data-style] .official-wiki-content .wiki-definition { display: grid; grid-template-columns: minmax(120px, 24%) minmax(0, 1fr); gap: 20px; align-items: start; margin: 24px 0; padding: 16px 0; border-top: 1px solid var(--border); }
+html[data-style] .official-wiki-content .wiki-definition + .wiki-definition { margin-top: -8px; }
+html[data-style] .official-wiki-content .wiki-definition dt { min-width: 0; margin: 0; color: var(--text); font: 600 15px/1.65 var(--font-ui); overflow-wrap: anywhere; }
+html[data-style] .official-wiki-content .wiki-definition dd { min-width: 0; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--accent-soft); }
+html[data-style] .official-wiki-content .wiki-learning-block { margin: 24px 0; padding: 16px 20px; border-left-width: 3px; }
+html[data-style] .official-wiki-content .wiki-learning-label { display: block; margin: 0 0 12px; font: 600 14px/1.6 var(--font-ui); }
+html[data-style] .official-wiki-content :is(.wiki-definition dd, .wiki-learning-block, .wiki-reveal) > p { margin: 12px 0; }
+html[data-style] .official-wiki-content :is(.wiki-definition dd, .wiki-learning-block) > :first-child { margin-top: 0; }
+html[data-style] .official-wiki-content :is(.wiki-definition dd, .wiki-learning-block, .wiki-reveal) > :last-child { margin-bottom: 0; }
+html[data-style] .official-wiki-content .wiki-reveal { margin: 16px 0; padding: 0; border-block: 1px solid var(--border); }
+html[data-style] .official-wiki-content .wiki-reveal > summary { padding: 12px 4px; color: var(--accent); font: 600 14px/1.65 var(--font-ui); cursor: pointer; overflow-wrap: anywhere; }
+html[data-style] .official-wiki-content .wiki-reveal[open] > summary { margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+html[data-style] .official-wiki-content .wiki-reveal[open] { padding-bottom: 14px; }
+html[data-style] .official-wiki-content .wiki-reveal > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+html[data-style] .official-wiki-content .wiki-learning-block :is(.wiki-learning-block, .wiki-definition) { background: transparent; }
+@container wiki-content (max-width: 560px) {
+  html[data-style] .official-wiki-content .wiki-definition { display: block; padding: 14px 0; }
+  html[data-style] .official-wiki-content .wiki-definition dd { margin-top: 8px; padding-left: 12px; }
+}
+@media (max-width: 650px) {
+  html[data-style] .wiki-table-dialog { width: calc(100vw - 16px); max-height: 94dvh; }
+  html[data-style] .official-wiki-content .wiki-learning-block { padding: 14px; }
+}
+@media print {
+  .wiki-table-toolbar { display: none; }
+  .wiki-table-viewport { overflow: visible; max-height: none; }
+  html[data-style] .wiki-table-viewport table { min-width: 0; }
+  html[data-style] .wiki-table-viewport :is(th, td) { min-width: 0; position: static; overflow-wrap: anywhere; }
+}
