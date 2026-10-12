@@ -1,5 +1,11 @@
 # Repetitio
 
+## Windows Desktop Mode
+
+Repetitio can also run as a Windows application with the same React UI and existing API, without Docker or runtime package downloads. Double-click `Build-Repetitio-Windows.cmd`, then run `artifacts/Repetitio.exe` or install with `artifacts/Repetitio-Setup.exe`. The Windows application accepts backup uploads without an application size cap and keeps its database and backups in `%LOCALAPPDATA%\Repetitio`, outside the installation folder. It can safely copy existing Docker data or import an existing backup on first launch or through **File > Import Backup**. Docker Compose and the original launcher remain supported.
+
+See [Windows installation, updates, data safety and offline builds](docs/windows-desktop.md).
+
 Repetitio is a local-first personal learning and repetition platform for software engineering fundamentals. It is designed for one developer who wants to practice consistently, keep a record of previous attempts, and know what should be reviewed next.
 
 The first version focuses on four learning areas:

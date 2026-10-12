@@ -1,0 +1,21 @@
+{
+  "name": "repetitio-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Repetitio Windows desktop application",
+  "author": "Repetitio",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "pack": "electron-builder --dir --win --x64",
+    "dist": "electron-builder --win nsis portable --x64"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3"
+  },
+  "overrides": {
+    "global-agent": "4.1.3"
+  }
+}

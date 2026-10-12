@@ -941,10 +941,11 @@ async function postBackupFile<T>(path: string, file: File): Promise<T> {
  * @returns The parsed file name when present.
  */
 function readFileName(value: string | null) {
-  const match = value?.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
-  const fileName = match?.[1] ?? match?.[2];
-
-  return fileName ? decodeURIComponent(fileName) : null;
+  const encoded = value?.match(/(?:^|;)\s*filename\*\s*=\s*UTF-8'[^']*'([^;\r\n]+)/i)?.[1];
+  const plain = value?.match(/(?:^|;)\s*filename\s*=\s*(?:"([^"]*)"|([^;\s]+))/i);
+  let fileName = plain?.[1] ?? plain?.[2];
+  if (encoded) { try { fileName = decodeURIComponent(encoded.trim()); } catch { /* Retain the standard filename for malformed extended headers. */ } }
+  return fileName?.replaceAll("\\", "/").split("/").at(-1)?.replace(/[\x00-\x1f]/g, "").trim() || null;
 }
 
 /**

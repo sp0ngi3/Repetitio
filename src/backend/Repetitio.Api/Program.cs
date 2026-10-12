@@ -7,8 +7,18 @@ using Repetitio.Domain.Notes;
 using Repetitio.Domain.Practice;
 using Repetitio.Infrastructure;
 using Repetitio.Infrastructure.Persistence;
+using Repetitio.Api.Desktop;
+
+var desktopCommand = await DesktopRuntime.RunDataCommandAsync(args);
+if (desktopCommand is not null) { Environment.ExitCode = desktopCommand.Value; return; }
 
 var builder = WebApplication.CreateBuilder(args);
+if (builder.Configuration.GetValue<bool>("Desktop:Enabled"))
+{
+    // This authenticated local desktop API accepts backups without an application size cap.
+    builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = null);
+    builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options => options.MultipartBodyLengthLimit = long.MaxValue);
+}
 
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -30,6 +40,7 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<BasicExerciseExecutionService>();
+builder.Services.AddHostedService<DesktopParentMonitor>();
 builder.Services.AddSingleton<IBasicExerciseHarness, ReverseLinkedListHarness>();
 
 foreach (var harness in BasicExerciseHarnessCatalog.GetAll())
@@ -38,6 +49,12 @@ foreach (var harness in BasicExerciseHarnessCatalog.GetAll())
 }
 
 var app = builder.Build();
+DesktopRuntime.Configure(app);
+if (builder.Configuration.GetValue<bool>("Desktop:Enabled"))
+{
+    var databasePath = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(builder.Configuration.GetConnectionString("Repetitio")).DataSource;
+    if (File.Exists(databasePath)) await DesktopRuntime.ValidateDatabaseAsync(databasePath);
+}
 
 if (app.Environment.IsDevelopment())
 {

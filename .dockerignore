@@ -1,5 +1,9 @@
 .git
 .artifacts
+artifacts
+releases
+**/publish
+tools/Repetitio.Desktop/.stage
 .vs
 .vscode
 **/bin

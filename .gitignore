@@ -1,9 +1,13 @@
 # Build outputs
 .artifacts/
+artifacts/
 bin/
 obj/
 dist/
 publish/
+releases/
+tools/Repetitio.Desktop/.stage/
+tools/Repetitio.Desktop/assets/icon.ico
 node_modules/
 *.tsbuildinfo
 00-REPETITIO.exe
