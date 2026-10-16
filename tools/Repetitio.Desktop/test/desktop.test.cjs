@@ -42,6 +42,10 @@ test("protocol serves local assets with CSP and refuses unknown files and method
     assert.equal((await handler(new Request(ORIGIN + "/", { method: "POST" }))).status, 405);
     assert.equal((await handler(new Request("repetitio://evil/api/health"))).status, 403);
     assert.equal((await handler(new Request(ORIGIN + "/api/health"))).status, 503);
+    const buildHandler = createProtocolHandler(root, path.join(root, "index.html"), () => null, () => ({ version: "0.2.0", id: "current-build" }));
+    const build = await buildHandler(new Request(ORIGIN + "/__desktop/version"));
+    assert.equal(build.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await build.json(), { version: "0.2.0", id: "current-build" });
   } finally { await fs.rm(root, { recursive: true }); }
 });
 

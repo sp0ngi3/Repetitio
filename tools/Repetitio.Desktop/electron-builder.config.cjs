@@ -10,6 +10,7 @@ module.exports = {
   extraResources: [{ from: process.env.REPETITIO_DESKTOP_STAGE || ".stage", to: "runtime", filter: ["**/*"] }],
   win: { icon: path.join(__dirname, "assets/icon.ico"), target: ["nsis", "portable"] },
   nsis: { oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true,
+    include: path.join(__dirname, "installer.nsh"),
     artifactName: "Repetitio-Setup.exe" },
   portable: { artifactName: "Repetitio.exe" }
 };

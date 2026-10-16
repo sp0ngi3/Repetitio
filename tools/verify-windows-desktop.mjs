@@ -20,6 +20,7 @@ const executable = executableArg >= 0 ? path.resolve(process.argv[executableArg 
 const args = executableArg >= 0 ? ["--verify-desktop"] : [desktop, "--verify-desktop"];
 let application;
 const errors = [];
+const screenshots = !process.argv.includes("--large-backup") && !process.argv.includes("--no-screenshots");
 async function launch(root, source, backup) {
   const env = { ...process.env, REPETITIO_DESKTOP_TEST: "1", REPETITIO_DESKTOP_DATA: root,
     // No machine-wide dotnet command: Basics must execute using the private bundled runtime.
@@ -41,6 +42,9 @@ async function launch(root, source, backup) {
   assert.equal(await page.evaluate(() => typeof window.process), "undefined");
   assert(await page.evaluate(() => window.isSecureContext));
   const ready = JSON.parse(await readFile(path.join(root, "test-ready.json"), "utf8"));
+  const loaded = await page.evaluate(async () => (await fetch("/__desktop/version")).json());
+  assert.equal(loaded.id, ready.build.id);
+  assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle()), `Repetitio ${loaded.version}`);
   assert.equal((await fetch(ready.origin + "/api/health")).status, 401, "Local API requires a private credential");
   assert.equal((await fetch(ready.origin + "/api/desktop/shutdown", { method: "POST" })).status, 401);
   return { page, ready, env };
@@ -78,7 +82,7 @@ try {
   await page.getByRole("button", { name: title, exact: true }).first().click();
   await page.locator(".wiki-diagram-svg svg").waitFor({ timeout: 60000 });
   assert(await page.locator(".official-wiki-content img").first().evaluate(img => img.complete && img.naturalWidth > 0));
-  if (!process.argv.includes("--large-backup")) await page.screenshot({ path: path.join(artifacts, "native-wiki.png"), timeout: 60000 });
+  if (screenshots) await page.screenshot({ path: path.join(artifacts, "native-wiki.png"), timeout: 60000 });
   console.log("Wiki image and Mermaid rendered.");
   await page.getByRole("button", { name: "Edit JSON", exact: true }).click();
   await page.getByRole("button", { name: "Copy JSON", exact: true }).click();
@@ -145,7 +149,7 @@ try {
   await copied.page.getByRole("button", { name: "Import Data", exact: true }).click();
   await copied.page.getByText(/Import completed|Imported|successfully/i).first().waitFor();
   assert.equal((await api(copied.page, "/api/wiki/" + wiki.id)).quizQuestions[0].id, wiki.quizQuestions[0].id);
-  if (!process.argv.includes("--large-backup")) await copied.page.screenshot({ path: path.join(artifacts, "native-settings.png"), timeout: 60000 });
+  if (screenshots) await copied.page.screenshot({ path: path.join(artifacts, "native-settings.png"), timeout: 60000 });
   await application.close(); application = null;
   const importedRoot = path.join(artifacts, "first-run-import");
   const backupFile = path.join(artifacts, "export.zip");
@@ -175,6 +179,6 @@ try {
   console.log("Verified native UI, private .NET execution, protected loopback API, image upload, Mermaid, clipboard, PDF window, exports/imports, single instance, automatic backup, fixed-origin preferences and lossless database copy.");
 } catch (error) {
   console.error("Native errors:", errors);
-  if (application) { const page = await application.firstWindow(); await page.screenshot({ path: path.join(artifacts, "failure.png") }).catch(() => {}); }
+  if (application && screenshots) { const page = await application.firstWindow(); await page.screenshot({ path: path.join(artifacts, "failure.png"), timeout: 10000 }).catch(() => {}); }
   throw error;
 } finally { if (application) await application.close(); }

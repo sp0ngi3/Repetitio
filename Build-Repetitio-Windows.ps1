@@ -1,13 +1,26 @@
 param(
-    [string]$Version = "0.1.1",
+    [string]$Version,
     [switch]$Offline,
-    [switch]$UnpackedOnly
+    [switch]$UnpackedOnly,
+    [switch]$Install
 )
 $ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
 $desktop = Join-Path $workspace "tools\Repetitio.Desktop"
 $frontend = Join-Path $workspace "src\frontend\repetitio-web"
-if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Version must look like 0.1.0 or 0.2.0-beta.1." }
+$lockDirectory = Join-Path $workspace ".artifacts\desktop"
+New-Item -ItemType Directory -Path $lockDirectory -Force | Out-Null
+try { $buildLock = [System.IO.File]::Open((Join-Path $lockDirectory "build.lock"), [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None) }
+catch { throw "Another Windows build/update is running, or the build directory is not writable. Existing builds and data were not changed." }
+try {
+if ($Install -and $UnpackedOnly) { throw "Installation needs a full build. Do not combine -Install and -UnpackedOnly." }
+. (Join-Path $workspace "tools\WindowsDeployment.ps1")
+$package = Get-Content -LiteralPath (Join-Path $desktop "package.json") -Raw | ConvertFrom-Json
+$previousManifest = Join-Path $workspace "artifacts\release.json"
+$lastVersion = if (Test-Path -LiteralPath $previousManifest) { (Get-Content -LiteralPath $previousManifest -Raw | ConvertFrom-Json).version } else { $null }
+$installedVersion = Get-InstalledWindowsVersion
+if ($installedVersion -and (!$lastVersion -or [version]($installedVersion -split '-')[0] -gt [version]($lastVersion -split '-')[0])) { $lastVersion = $installedVersion }
+$Version = Get-WindowsBuildVersion -Requested $Version -SourceVersion $package.version -PreviousVersion $lastVersion
 $stamp = (Get-Date -Format "yyyyMMdd-HHmmss-fff") + "-" + [guid]::NewGuid().ToString("N").Substring(0, 6)
 $stage = Join-Path $workspace ".artifacts\desktop\stage-$Version-$stamp"
 $release = Join-Path $workspace ".artifacts\desktop\build-$Version-$stamp"
@@ -104,6 +117,11 @@ try {
     Invoke-Checked "dotnet" $restore
     Invoke-Checked "dotnet" @("publish", $project, "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "false", "--no-restore", "--output", (Join-Path $stage "api"), "-p:UseAppHost=false", "-p:DebugType=None", "-p:DebugSymbols=false")
     $runtimeVersion = Copy-PrivateRuntime
+    $builtAt = (Get-Date).ToUniversalTime().ToString("o")
+    $buildInfo = @{ version = $Version; id = $stamp; builtAt = $builtAt;
+        frontendSha256 = (Get-FileHash -LiteralPath (Join-Path $stage "frontend\index.html") -Algorithm SHA256).Hash;
+        apiSha256 = (Get-FileHash -LiteralPath (Join-Path $stage "api\Repetitio.Api.dll") -Algorithm SHA256).Hash }
+    $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage "build-info.json") -Encoding UTF8
     New-Item -ItemType Directory -Path (Join-Path $desktop "assets") -Force | Out-Null
     . (Join-Path $workspace "tools\LauncherIcon.ps1")
     Write-LauncherIcon -PngPath (Join-Path $frontend "public\icon.ico") -DestinationPath (Join-Path $desktop "assets\icon.ico")
@@ -122,14 +140,16 @@ try {
     Assert-WorkspacePath $windows
     Move-Item -LiteralPath $unpacked -Destination $windows
     $artifacts = @(Get-ChildItem -LiteralPath $release -Filter "*.exe" -File | ForEach-Object { @{ file = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash } })
-    @{ version = $Version; builtAt = (Get-Date).ToUniversalTime().ToString("o"); dotnetRuntime = $runtimeVersion; architecture = "win-x64"; artifacts = $artifacts } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $release "release.json") -Encoding UTF8
+    @{ version = $Version; id = $stamp; builtAt = $builtAt; dotnetRuntime = $runtimeVersion; architecture = "win-x64"; artifacts = $artifacts } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $release "release.json") -Encoding UTF8
     Publish-Artifacts
     Write-Host "Ready: $output" -ForegroundColor Green
     if ($UnpackedOnly) { Write-Host "Run artifacts\windows\Repetitio.exe. Keep the complete windows folder together." }
     else { Write-Host "Run artifacts\Repetitio.exe or install/update with artifacts\Repetitio-Setup.exe. Data stays in LocalAppData\Repetitio." }
+    if ($Install) { Install-WindowsBuild -Directory $output -BuildId $stamp }
 } finally {
     $env:VITE_API_BASE_URL = $previousApi
     $env:REPETITIO_DESKTOP_STAGE = $previousStage
     $env:REPETITIO_RELEASE_DIRECTORY = $previousRelease
     $env:REPETITIO_VERSION = $previousVersion
 }
+} finally { $buildLock.Dispose() }

@@ -21,11 +21,14 @@ function safeAssetPath(root, pathname) {
   return result;
 }
 
-function createProtocolHandler(frontend, startupFile, getBackend) {
+function createProtocolHandler(frontend, startupFile, getBackend, getBuild = () => null) {
   return async request => {
     try {
       if (!isAppUrl(request.url)) return new Response("Unknown application origin", { status: 403 });
       const url = new URL(request.url);
+      if (url.pathname === "/__desktop/version" && request.method === "GET") {
+        return Response.json(getBuild(), { headers: { "Cache-Control": "no-store" } });
+      }
       if (url.pathname.startsWith("/api/")) {
         const backend = getBackend();
         if (!backend?.origin) return new Response("The local API is starting.", { status: 503 });

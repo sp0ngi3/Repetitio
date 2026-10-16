@@ -37,7 +37,17 @@ Desktop backup uploads have no application-level size cap: Kestrel's request lim
 
 ## Updating your own app
 
-Save your work and close Repetitio before installing an update. Build the next version and run its Setup EXE over the existing installation. The stable application ID and the external data directory preserve your database, backups and browser preferences. No online auto-updater is enabled; installing updates is explicit and works with a local installer file.
+**Normal workflow: save your work, double-click `Update-Repetitio-Windows.cmd`, and confirm closing the old app if prompted.** It builds the current source, automatically selects a newer version, starts the installer and verifies that the installed build matches the generated build. Installation starts the new application. There is no need to uninstall first, delete data, clear browser settings, run Docker or remember a version number.
+
+`Build-Repetitio-Windows.cmd` remains available when you only want the finished EXEs without installing. Both workflows use the same build script; `Update-Repetitio-Windows.cmd -Offline` uses cached dependencies. A failed build never starts the installer or replaces the last successful `artifacts` folder. Cancelling installation does not remove your database or backups.
+
+The version is chosen from the source package, last successful output and current installed version. Repeated builds increase the patch number automatically. Explicit `-Version` values must be newer than the last known build. Every build also has a unique ID, even across working directories. The window title shows the running version; **Help > About Repetitio** shows the build ID and actual executable path so an old portable copy is distinguishable from the installed app.
+
+On a changed build, startup clears only HTTP/code caches, service workers and Cache Storage. It does not clear localStorage, IndexedDB, cookies, browser preferences, SQLite or backups. The frontend origin stays `repetitio://app`. Launcher version, frontend entry point and API hashes are checked against the packaged build manifest before opening the app; a mixed/incomplete package is rejected instead of silently showing mismatched code.
+
+The installer asks the existing app to close normally and create its shutdown backup. It waits before replacing files and never uses force-kill as a fallback. If the old app cannot respond (including releases that predate graceful-update support), save and close it manually, wait for the backup, then click **Retry**. If you keep it open or cancel, installation stops. A silent installation returns a failure rather than killing the app. Save unfinished editor changes first: a database backup cannot capture unsaved form text.
+
+The stable application ID and the external data directory preserve your database, backups and browser preferences. No online auto-updater is enabled; installing updates is explicit and works with a local installer file.
 
 The API reuses existing migrations and the pre-migration safety backup. Desktop startup refuses unknown/newer database schemas before applying migrations. An older EXE is not a database rollback tool. To recover older data, use a validated compatible backup and retain the newer data separately.
 
@@ -49,16 +59,16 @@ The build computer needs the .NET 10 SDK, Node/npm, and dependencies. The target
 
 Double-click **Build-Repetitio-Windows.cmd** in the repository. It builds the same frontend, publishes the API for Windows, copies an installed private .NET runtime, and produces `artifacts/Repetitio.exe` and `artifacts/Repetitio-Setup.exe`. The application's icon comes from the existing website icon. Build staging stays in `.artifacts/desktop`. The visible `artifacts` folder is replaced only after a complete successful build; the previous generated folder is retained internally for recovery. Close the Windows app before rebuilding. No build touches your databases or backups. Old `releases/windows` folders are not deleted.
 
-To choose a version:
+You normally do not need to choose a version. To explicitly choose a newer release:
 
 ```powershell
-.\Build-Repetitio-Windows.ps1 -Version 0.2.0
+.\Build-Repetitio-Windows.ps1 -Version 0.3.0
 ```
 
 To use installed/cached dependencies during a NuGet outage:
 
 ```powershell
-.\Build-Repetitio-Windows.ps1 -Version 0.2.0 -Offline
+.\Build-Repetitio-Windows.ps1 -Offline
 ```
 
 `-Offline` uses an empty NuGet feed plus the global package cache and skips npm dependency installation. It requires a previous online dependency setup. Electron/NSIS packaging tools must also already be cached; an entirely fresh build machine cannot manufacture dependencies it has never downloaded. This limitation affects building a new release, not running an existing release.
@@ -66,12 +76,19 @@ To use installed/cached dependencies during a NuGet outage:
 For a faster developer package:
 
 ```powershell
-.\Build-Repetitio-Windows.ps1 -Version 0.2.0 -Offline -UnpackedOnly
+.\Build-Repetitio-Windows.ps1 -Offline -UnpackedOnly
 ```
 
 Run `artifacts\windows\Repetitio.exe` and keep its complete `windows` folder together. Do not copy only that EXE: its accompanying resources contain Chromium, the API and .NET. The standalone `artifacts\Repetitio.exe` and Setup EXE include these resources already. An unpacked-only build replaces `artifacts` with an unpacked distribution and does not create the two standalone EXEs; use the normal build to produce them.
 
 `release.json` records version, build date, runtime version and SHA-256 checksums of generated installers. Builds never publish to a remote release service automatically.
+
+## Deployment verification
+
+- `node --test tools/Repetitio.Desktop/test/*.test.cjs` checks cache refresh, preserved storage boundaries, streaming backup handling, origin security and mismatched-package rejection.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File tools/Test-WindowsDeployment.ps1` checks automatic version increases and rejection of old/invalid explicit versions.
+- `tools/verify-windows-update.mjs` uses Playwright/Electron to open a retained previous EXE and the newly built EXE against the same disposable profile under `.artifacts/update-verification`. It verifies retained Wiki content, flashcard IDs, study history, backups, localStorage and IndexedDB, removal of stale UI caches, the current build identity and graceful update shutdown. It never uses the real Windows or Docker database.
+- `tools/verify-windows-desktop.mjs` and `tools/verify-windows-portable.mjs` cover the native UI and standalone EXE. The Playwright module must be available to Node when running these developer scripts.
 
 ## Security and troubleshooting
 

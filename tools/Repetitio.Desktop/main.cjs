@@ -8,6 +8,7 @@ const { randomUUID } = require("node:crypto");
 const { Backend, dataPaths, runtimePaths, runCopy } = require("./runtime.cjs");
 const { ORIGIN, isAppUrl, createProtocolHandler } = require("./protocol.cjs");
 const { importBackupFile } = require("./backup.cjs");
+const { readBuildInfo, refreshRendererCache, recordLoadedBuild } = require("./deployment.cjs");
 
 protocol.registerSchemesAsPrivileged([{ scheme: "repetitio", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 app.setName("Repetitio");
@@ -16,14 +17,23 @@ fs.mkdirSync(data.browser, { recursive: true });
 app.setPath("userData", data.browser);
 const developmentRuntime = path.join(__dirname, "..", "..", "artifacts", "windows", "resources", "runtime");
 const runtime = runtimePaths(process.env.REPETITIO_DESKTOP_RUNTIME || (app.isPackaged ? path.join(process.resourcesPath, "runtime") : developmentRuntime));
-let backend, window, allowQuit = false, shuttingDown = false, logFile;
+let backend, window, build, allowQuit = false, shuttingDown = false, logFile;
 const testMode = process.env.REPETITIO_DESKTOP_TEST === "1" && process.argv.includes("--verify-desktop");
 const log = value => { try { if (logFile) fs.appendFileSync(logFile, String(value)); } catch { /* A logging failure must not abort database operations. */ } };
 const preferences = { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false };
 
-if (!app.requestSingleInstanceLock()) app.exit(0);
+if (!app.requestSingleInstanceLock({ version: app.getVersion() })) app.exit(0);
+else if (process.argv.includes("--prepare-update")) app.exit(0);
 else {
-  app.on("second-instance", () => { if (window?.isMinimized()) window.restore(); window?.focus(); });
+  app.on("second-instance", (_event, args, _directory, openedCopy) => {
+    if (window?.isMinimized()) window.restore();
+    window?.focus();
+    if (args.includes("--prepare-update")) void prepareUpdate().catch(failOperation);
+    else if (!testMode && build && openedCopy?.version && openedCopy.version !== build.version) {
+      void dialog.showMessageBox(window, { type: "info", title: "Another Repetitio version is open", message: `Repetitio ${build.version} is still running.`,
+        detail: `You opened version ${openedCopy.version}, but the existing window has not been replaced. Save your work, close this window normally, then open the version you want to use. Your data stays in the same folder.` });
+    }
+  });
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", event => {
     if (allowQuit) return;
@@ -57,11 +67,16 @@ async function start() {
   for (const folder of [data.root, path.dirname(data.database), data.backups, data.logs, data.browser]) await fsp.mkdir(folder, { recursive: true });
   logFile = path.join(data.logs, `desktop-${new Date().toISOString().replaceAll(/[:.]/g, "-")}.log`);
   log(`Repetitio ${app.getVersion()}\nData: ${data.database}\n`);
-  session.defaultSession.protocol.handle("repetitio", createProtocolHandler(runtime.frontend, path.join(__dirname, "ui", "startup.html"), () => backend));
+  build = await readBuildInfo(runtime, app.getVersion(), app.isPackaged);
+  log(`Build: ${build.id}\n`);
+  const loadedBuild = path.join(data.root, "loaded-build.json");
+  await refreshRendererCache(session.defaultSession, build, loadedBuild, log);
+  session.defaultSession.protocol.handle("repetitio", createProtocolHandler(runtime.frontend, path.join(__dirname, "ui", "startup.html"), () => backend, () => build));
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => callback(isAppUrl(contents.getURL()) && ["clipboard-read", "clipboard-sanitized-write"].includes(permission)));
   session.defaultSession.setPermissionCheckHandler((contents, permission, origin) => isAppUrl(origin) && ["clipboard-read", "clipboard-sanitized-write"].includes(permission));
   window = new BrowserWindow({ width: 1440, height: 1000, minWidth: 800, minHeight: 600, show: false,
-    icon: path.join(__dirname, "assets", "icon.ico"), title: "Repetitio", backgroundColor: "#121718", webPreferences: preferences });
+    icon: path.join(__dirname, "assets", "icon.ico"), title: `Repetitio ${build.version}`, backgroundColor: "#121718", webPreferences: preferences });
+  window.on("page-title-updated", event => event.preventDefault());
   secureWindow(window);
   window.on("close", event => { if (!allowQuit) { event.preventDefault(); app.quit(); } });
   if (testMode) session.defaultSession.on("will-download", (_event, item) => {
@@ -81,10 +96,11 @@ async function start() {
     await fsp.rm(path.join(data.root, "pending-import.json"), { force: true });
   }
   installMenu();
-  await window.loadURL(ORIGIN + "/");
+  await window.loadURL(ORIGIN + "/?desktopBuild=" + encodeURIComponent(build.id));
+  await recordLoadedBuild(build, loadedBuild);
   window.setProgressBar(-1);
   if (testMode) {
-    await fsp.writeFile(path.join(data.root, "test-ready.json"), JSON.stringify({ origin: backend.origin, pid: backend.child.pid, database: data.database }));
+    await fsp.writeFile(path.join(data.root, "test-ready.json"), JSON.stringify({ origin: backend.origin, pid: backend.child.pid, database: data.database, build }));
   }
 }
 
@@ -140,9 +156,20 @@ function installMenu() {
       { type: "separator" }, { role: "quit" }] },
     { label: "Edit", submenu: [{ role: "undo" }, { role: "redo" }, { type: "separator" }, { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "selectAll" }] },
     { label: "View", submenu: [{ role: "reload" }, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { role: "togglefullscreen" }] },
-    { label: "Help", submenu: [{ label: "About Repetitio", click: () => void dialog.showMessageBox(window, { title: "Repetitio", message: `Repetitio ${app.getVersion()}`,
-      detail: `Windows desktop mode\nDatabase: ${data.database}\nBackups: ${data.backups}\nInstall a newer Setup EXE to update; data stays outside the application folder.` }) }] }
+    { label: "Help", submenu: [{ label: "About Repetitio", click: () => void dialog.showMessageBox(window, { title: "Repetitio", message: `Repetitio ${build.version}`,
+      detail: `Build: ${build.id}\nBuilt: ${build.builtAt || "Development"}\nApplication: ${process.execPath}\nDatabase: ${data.database}\nBackups: ${data.backups}\nRun Update-Repetitio-Windows.cmd to build and install the latest source.` }) }] }
   ]));
+}
+
+async function prepareUpdate() {
+  if (shuttingDown || !backend?.origin) return;
+  if (!testMode) {
+    const choice = await dialog.showMessageBox(window, { type: "question", title: "Update Repetitio", message: "Close Repetitio to install the update?",
+      detail: "Save any unfinished edits before continuing. A safety backup will be created and the local API will be stopped before installation can proceed.",
+      buttons: ["Back up and close", "Keep app open"], defaultId: 1, cancelId: 1 });
+    if (choice.response !== 0) return;
+  }
+  app.quit();
 }
 
 async function importData() {
