@@ -86,6 +86,26 @@ public static class DesktopRuntime
 
     public static async Task<int?> RunDataCommandAsync(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--health-check")
+        {
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                using var response = await client.GetAsync("http://127.0.0.1:8080/api/health");
+                return response.IsSuccessStatusCode ? 0 : 1;
+            }
+            catch { return 1; }
+        }
+        if (args.Contains("--desktop-restore-backup"))
+        {
+            try
+            {
+                if (args.Length != 4 || args[0] != "--desktop-restore-backup" || args[2] != "--desktop-copy-output")
+                    throw new ArgumentException("Usage: --desktop-restore-backup BACKUP.zip --desktop-copy-output DESTINATION");
+                await DesktopRecovery.RestoreAsync(args[1], args[3]); return 0;
+            }
+            catch (Exception exception) { Console.Error.WriteLine(exception.Message); return 1; }
+        }
         if (!args.Contains("--desktop-copy-database")) return null;
         try
         {

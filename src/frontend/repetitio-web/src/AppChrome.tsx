@@ -63,6 +63,7 @@ export function AppFooter({ mode, style }: { mode: ColorMode; style: VisualStyle
         <StyleIcon size={20} aria-hidden="true" /><strong>Repetitio</strong><span>Keep learning. Keep building.</span>
       </div>
       <div className="footer-meta">
+        <span className="app-version" title={`Build: ${__BUILD_ID__}`} data-testid="app-version">v{__APP_VERSION__}</span>
         <span><ShieldCheck size={15} aria-hidden="true" />Local-first</span>
         <span>{style === "vaporwave" ? "Vaporwave" : "Professional"} / {mode === "dark" ? "Dark" : "Light"}</span>
         <button className="shell-icon-button" type="button" title="Back to top" aria-label="Back to top" onClick={backToTop}>

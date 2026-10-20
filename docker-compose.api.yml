@@ -16,3 +16,9 @@ services:
     volumes:
       - ./data:/data
       - ./backups:/backups
+    healthcheck:
+      test: ["CMD", "dotnet", "Repetitio.Api.dll", "--health-check"]
+      interval: 5s
+      timeout: 5s
+      start_period: 60s
+      retries: 60

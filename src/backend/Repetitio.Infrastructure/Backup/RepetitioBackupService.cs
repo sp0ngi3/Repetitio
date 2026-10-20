@@ -59,6 +59,15 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
     /// <inheritdoc />
     public async Task<BackupExport> ExportAsync(CancellationToken cancellationToken = default)
     {
+        await using var file = await ExportFileAsync(cancellationToken);
+        using var memory = new MemoryStream();
+        await file.Contents.CopyToAsync(memory, cancellationToken);
+        return new BackupExport { FileName = file.FileName, Contents = memory.ToArray(), Manifest = file.Manifest };
+    }
+
+    /// <inheritdoc />
+    public async Task<BackupFileExport> ExportFileAsync(CancellationToken cancellationToken = default)
+    {
         var schemaVersion = await GetCurrentDatabaseSchemaVersionAsync(cancellationToken);
         var createdAt = DateTimeOffset.UtcNow;
         var manifest = CreateManifest(createdAt, schemaVersion);
@@ -79,14 +88,8 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
                 throw new InvalidOperationException(databaseValidation.Message);
             }
 
-            var contents = await CreateArchiveAsync(tempDatabasePath, manifest, cancellationToken);
-
-            return new BackupExport
-            {
-                FileName = CreateBackupFileName("repetitio-backup", createdAt),
-                Contents = contents,
-                Manifest = manifest
-            };
+            var contents = await CreateArchiveFileAsync(tempDatabasePath, manifest, cancellationToken);
+            return new BackupFileExport(CreateBackupFileName("repetitio-backup", createdAt), contents, manifest);
         }
         finally
         {
@@ -97,14 +100,14 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
     /// <inheritdoc />
     public async Task<AutomaticBackupResult> CreateAutomaticShutdownBackupAsync(CancellationToken cancellationToken = default)
     {
-        var backup = await ExportAsync(cancellationToken);
+        await using var backup = await ExportFileAsync(cancellationToken);
         var backupDirectory = GetBackupDirectoryPath();
         Directory.CreateDirectory(backupDirectory);
 
         var createdAt = DateTimeOffset.UtcNow;
         var fileName = CreateBackupFileName(AutomaticShutdownBackupPrefix, createdAt);
         var filePath = Path.Combine(backupDirectory, fileName);
-        await File.WriteAllBytesAsync(filePath, backup.Contents, cancellationToken);
+        await PersistArchiveAsync(backup.Contents, filePath, cancellationToken);
         File.SetLastWriteTimeUtc(filePath, createdAt.UtcDateTime);
 
         var retainedCount = PruneAutomaticShutdownBackups(backupDirectory, createdAt.UtcDateTime);
@@ -166,7 +169,7 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
                 Validation = BackupValidationResult.Invalid("Backup migration failed: " + exception.Message) };
         }
 
-        var preImportBackup = await ExportAsync(cancellationToken);
+        await using var preImportBackup = await ExportFileAsync(cancellationToken);
         var backupDirectory = GetBackupDirectoryPath();
         Directory.CreateDirectory(backupDirectory);
 
@@ -174,7 +177,7 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
             backupDirectory,
             CreateBackupFileName("repetitio-pre-import", DateTimeOffset.UtcNow));
 
-        await File.WriteAllBytesAsync(preImportPath, preImportBackup.Contents, cancellationToken);
+        await PersistArchiveAsync(preImportBackup.Contents, preImportPath, cancellationToken);
 
         RestoreDatabaseFromFile(validatedBackup.DatabasePath);
 
@@ -212,7 +215,7 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
     /// <returns>The backup file name.</returns>
     private static string CreateBackupFileName(string prefix, DateTimeOffset createdAt)
     {
-        return $"{prefix}-{createdAt.UtcDateTime:yyyy-MM-dd-HHmmss}.zip";
+        return $"{prefix}-{createdAt.UtcDateTime:yyyy-MM-dd-HHmmss-fff}-{Guid.NewGuid():N}.zip";
     }
 
     /// <summary>
@@ -271,29 +274,56 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
     /// <param name="databasePath">The SQLite backup database path.</param>
     /// <param name="manifest">The backup manifest.</param>
     /// <param name="cancellationToken">A token used to cancel the operation.</param>
-    /// <returns>The zip archive bytes.</returns>
-    private static async Task<byte[]> CreateArchiveAsync(
+    /// <returns>A disk-backed archive stream owned by its caller.</returns>
+    private static async Task<FileStream> CreateArchiveFileAsync(
         string databasePath,
         BackupManifest manifest,
         CancellationToken cancellationToken)
     {
-        using var memoryStream = new MemoryStream();
-        using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+        var zip = new FileStream(Path.Combine(Path.GetTempPath(), $"repetitio-export-{Guid.NewGuid():N}.zip"),
+            FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read, 81920,
+            FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
+        try
         {
-            var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
-            await using (var manifestStream = manifestEntry.Open())
+            using (var archive = new ZipArchive(zip, ZipArchiveMode.Create, leaveOpen: true))
             {
-                await JsonSerializer.SerializeAsync(
-                    manifestStream,
-                    manifest,
-                    ManifestJsonOptions,
-                    cancellationToken);
+                var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
+                await using (var manifestStream = manifestEntry.Open())
+                {
+                    await JsonSerializer.SerializeAsync(
+                        manifestStream,
+                        manifest,
+                        ManifestJsonOptions,
+                        cancellationToken);
+                }
+
+                var databaseEntry = archive.CreateEntry("repetitio.db", CompressionLevel.Optimal);
+                await using var input = new FileStream(databasePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                await using var output = databaseEntry.Open();
+                await input.CopyToAsync(output, cancellationToken);
             }
-
-            archive.CreateEntryFromFile(databasePath, "repetitio.db", CompressionLevel.Optimal);
+            await zip.FlushAsync(cancellationToken);
+            zip.Position = 0;
+            return zip;
         }
+        catch { await zip.DisposeAsync(); throw; }
+    }
 
-        return memoryStream.ToArray();
+    /// <summary>Publish a complete, flushed ZIP without overwriting an existing backup.</summary>
+    public static async Task PersistArchiveAsync(Stream source, string destination, CancellationToken cancellationToken = default)
+    {
+        var temporary = destination + ".pending-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+            {
+                await source.CopyToAsync(output, cancellationToken);
+                await output.FlushAsync(cancellationToken);
+                output.Flush(flushToDisk: true);
+            }
+            File.Move(temporary, destination, overwrite: false);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     /// <summary>

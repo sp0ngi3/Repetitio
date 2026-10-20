@@ -19,6 +19,9 @@ public interface IRepetitioBackupService
     /// <returns>The backup archive bytes and file name.</returns>
     Task<BackupExport> ExportAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Creates a disk-backed archive; the caller must dispose its stream.</summary>
+    Task<BackupFileExport> ExportFileAsync(CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Creates a retained automatic shutdown backup on disk.
     /// </summary>
@@ -88,6 +91,12 @@ public sealed record BackupExport
     /// Gets the backup manifest.
     /// </summary>
     public required BackupManifest Manifest { get; init; }
+}
+
+/// <summary>A temporary, disk-backed ZIP deleted when its owned stream is disposed.</summary>
+public sealed record BackupFileExport(string FileName, FileStream Contents, BackupManifest Manifest) : IAsyncDisposable
+{
+    public ValueTask DisposeAsync() => Contents.DisposeAsync();
 }
 
 /// <summary>

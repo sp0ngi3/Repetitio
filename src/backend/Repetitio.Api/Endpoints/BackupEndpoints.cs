@@ -22,8 +22,8 @@ public static class BackupEndpoints
         group.MapGet("/status", GetStatusAsync).WithName("GetBackupStatus");
         group.MapGet("/export", ExportAsync).WithName("ExportBackup");
         group.MapPost("/automatic-shutdown", CreateAutomaticShutdownBackupAsync).WithName("CreateAutomaticShutdownBackup");
-        group.MapPost("/validate", ValidateAsync).WithName("ValidateBackup").DisableAntiforgery();
-        group.MapPost("/import", ImportAsync).WithName("ImportBackup").DisableAntiforgery();
+        group.MapPost("/validate", ValidateAsync).WithName("ValidateBackup").DisableAntiforgery().WithFormOptions(multipartBodyLengthLimit: long.MaxValue);
+        group.MapPost("/import", ImportAsync).WithName("ImportBackup").DisableAntiforgery().WithFormOptions(multipartBodyLengthLimit: long.MaxValue);
 
         return app;
     }
@@ -59,7 +59,7 @@ public static class BackupEndpoints
         IRepetitioBackupService backupService,
         CancellationToken cancellationToken)
     {
-        var backup = await backupService.ExportAsync(cancellationToken);
+        var backup = await backupService.ExportFileAsync(cancellationToken);
 
         return Results.File(backup.Contents, "application/zip", backup.FileName);
     }

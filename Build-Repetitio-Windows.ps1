@@ -29,6 +29,8 @@ $previousApi = $env:VITE_API_BASE_URL
 $previousStage = $env:REPETITIO_DESKTOP_STAGE
 $previousRelease = $env:REPETITIO_RELEASE_DIRECTORY
 $previousVersion = $env:REPETITIO_VERSION
+$previousFrontendVersion = $env:VITE_APP_VERSION
+$previousBuildId = $env:VITE_BUILD_ID
 
 function Invoke-Checked {
     param([string]$Command, [string[]]$Arguments)
@@ -104,6 +106,8 @@ try {
         try { Invoke-Checked "node" @("node_modules\electron\install.js") } finally { Pop-Location }
     }
     $env:VITE_API_BASE_URL = "repetitio://app"
+    $env:VITE_APP_VERSION = $Version
+    $env:VITE_BUILD_ID = $stamp
     Push-Location $frontend
     try { Invoke-Checked "npm.cmd" @("run", "build") } finally { Pop-Location }
     Copy-Item -LiteralPath (Join-Path $frontend "dist") -Destination (Join-Path $stage "frontend") -Recurse
@@ -151,5 +155,7 @@ try {
     $env:REPETITIO_DESKTOP_STAGE = $previousStage
     $env:REPETITIO_RELEASE_DIRECTORY = $previousRelease
     $env:REPETITIO_VERSION = $previousVersion
+    $env:VITE_APP_VERSION = $previousFrontendVersion
+    $env:VITE_BUILD_ID = $previousBuildId
 }
 } finally { $buildLock.Dispose() }

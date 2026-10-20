@@ -8,6 +8,10 @@ For everyday updates, save your work and double-click **`Update-Repetitio-Window
 
 See [Windows installation, updates, data safety and offline builds](docs/windows-desktop.md).
 
+The footer displays the running version (including Docker/web builds); hover over it for the build ID. Wiki articles, previews and PDF output support `$inline math$`, `$$display math$$`, `\(inline math\)`, `\[display math\]`, and fenced `math`/`latex`/`tex` blocks. KaTeX and its fonts are bundled locally. This is rendering-only: existing Markdown, JSON imports, images and database contents are not rewritten. Use normal LaTeX `\\` row separators in aligned equations; common copied `\_{...}` and broken aligned-row formatting is normalized only for display.
+
+Backup exports and safety copies are disk-backed instead of constructing the entire ZIP in RAM. The ZIP format remains `manifest.json` + `repetitio.db`; backup upload routes in Windows and Docker have no application-level size cap. A failed Windows startup offers **Restore backup...**, which works without the API and retains original database/WAL files before restoring. Free disk space and valid compatible backups are still required. Docker now waits for API/database health before starting the frontend; failed startup reads recover without replaying writes.
+
 Repetitio is a local-first personal learning and repetition platform for software engineering fundamentals. It is designed for one developer who wants to practice consistently, keep a record of previous attempts, and know what should be reviewed next.
 
 The first version focuses on four learning areas:

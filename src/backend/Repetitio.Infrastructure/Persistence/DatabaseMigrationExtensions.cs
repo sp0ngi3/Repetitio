@@ -26,11 +26,11 @@ public static class DatabaseMigrationExtensions
         if (applied.Any() && pending.Any())
         {
             var backupService = scope.ServiceProvider.GetRequiredService<Repetitio.Infrastructure.Backup.IRepetitioBackupService>();
-            var backup = await backupService.ExportAsync();
+            await using var backup = await backupService.ExportFileAsync();
             var status = await backupService.GetStatusAsync();
             Directory.CreateDirectory(status.BackupDirectory);
             var path = Path.Combine(status.BackupDirectory, $"repetitio-pre-migration-{DateTime.UtcNow:yyyy-MM-dd-HHmmss}-{Guid.NewGuid():N}.zip");
-            await File.WriteAllBytesAsync(path, backup.Contents);
+            await Repetitio.Infrastructure.Backup.RepetitioBackupService.PersistArchiveAsync(backup.Contents, path);
         }
         await dbContext.Database.MigrateAsync();
     }

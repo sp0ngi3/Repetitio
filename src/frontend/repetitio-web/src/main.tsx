@@ -5,6 +5,8 @@ import "./styles.css";
 import "./design.css";
 import "./richContent.css";
 import "./wikiReadability.css";
+import "katex/dist/katex.min.css";
+import "./math.css";
 import { applyAppearance, readColorMode, readMotionPreference, readVisualStyle } from "./appearance";
 
 applyAppearance(readColorMode(), readVisualStyle(), readMotionPreference());

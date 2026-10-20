@@ -44,6 +44,7 @@ async function launch(root, source, backup) {
   const ready = JSON.parse(await readFile(path.join(root, "test-ready.json"), "utf8"));
   const loaded = await page.evaluate(async () => (await fetch("/__desktop/version")).json());
   assert.equal(loaded.id, ready.build.id);
+  assert.equal(await page.getByTestId("app-version").textContent(), `v${loaded.version}`);
   assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle()), `Repetitio ${loaded.version}`);
   assert.equal((await fetch(ready.origin + "/api/health")).status, 401, "Local API requires a private credential");
   assert.equal((await fetch(ready.origin + "/api/desktop/shutdown", { method: "POST" })).status, 401);
@@ -66,7 +67,7 @@ try {
     if (!response.ok) throw new Error(await response.text()); return response.json();
   });
   const title = "Desktop verification: Events";
-  const wiki = await api(page, "/api/wiki/", { title, contentMarkdown: `## Contract\n\n:::definition Delegate\n\nA shared signature.\n\n:::\n\n![Existing image](wiki-image:${image.id})\n\n## Flow\n\n\`\`\`mermaid\nflowchart LR\n    Publisher --> Event\n    Event --> Subscriber\n\`\`\``,
+  const wiki = await api(page, "/api/wiki/", { title, contentMarkdown: `## Contract\n\n:::definition Delegate\n\nA shared signature.\n\n:::\n\n![Existing image](wiki-image:${image.id})\n\n## Flow\n\n\`\`\`mermaid\nflowchart LR\n    Publisher --> Event\n    Event --> Subscriber\n\`\`\`` + "\n\n## Math\n\n" + String.raw`Before2$$ SORT(N)=O\left(\frac{N}{B}\log\_{\frac{M}{B}}\frac{N}{M}\right) $$After.`,
     quizQuestions: [{ prompt: "What decouples subscribers?", options: [{ text: "The contract", isCorrect: true }, { text: "Their concrete classes", isCorrect: false }] }],
     flashcards: [{ front: "What is a delegate?", back: "A shared method signature." }], sources: [{ title: "Desktop source", type: "Book" }] });
   await api(page, "/api/wiki/study", { id: crypto.randomUUID(), answers: [{ pageId: wiki.id, itemId: wiki.quizQuestions[0].id, kind: "quiz", optionId: wiki.quizQuestions[0].options.find(option => option.isCorrect).id }] });
@@ -82,6 +83,8 @@ try {
   await page.getByRole("button", { name: title, exact: true }).first().click();
   await page.locator(".wiki-diagram-svg svg").waitFor({ timeout: 60000 });
   assert(await page.locator(".official-wiki-content img").first().evaluate(img => img.complete && img.naturalWidth > 0));
+  await page.locator(".official-wiki-content .katex").first().waitFor();
+  assert.equal(await page.locator(".wiki-math-error").count(), 0);
   if (screenshots) await page.screenshot({ path: path.join(artifacts, "native-wiki.png"), timeout: 60000 });
   console.log("Wiki image and Mermaid rendered.");
   await page.getByRole("button", { name: "Edit JSON", exact: true }).click();
@@ -93,6 +96,7 @@ try {
   await page.getByRole("button", { name: /Download PDF/ }).click();
   const popup = await popupPromise;
   await popup.locator(".print-article").waitFor();
+  assert(await popup.locator(".print-article .katex").count() > 0);
   assert((await popup.locator(".print-article").textContent()).includes(title));
   await popup.close();
   console.log("PDF popup passed.");

@@ -1,5 +1,8 @@
 import MarkdownIt from "markdown-it";
 import container from "markdown-it-container";
+import texmath from "markdown-it-texmath";
+import katex from "katex";
+import { renderMathHtml } from "./math";
 import { getWikiImageUrl } from "./api";
 import { codeLanguageLabel, highlightCode, normalizeCodeLanguage } from "./codeHighlight";
 import { WikiMarkdownContent } from "./WikiMarkdownContent";
@@ -11,6 +14,19 @@ export interface MarkdownHeading {
 }
 
 const markdown = new MarkdownIt({ html: false, linkify: false, typographer: false });
+// Display equations can touch footnote digits in pasted articles; single-dollar currency guards stay intact.
+texmath.rules.repetitioDollars = {
+  block: texmath.rules.dollars.block,
+  inline: texmath.rules.dollars.inline.map(rule => rule.name === "math_inline_double"
+    ? { ...rule, pre: (source, _outer, position) => source[position - 1] !== "\\", post: () => true } : rule)
+};
+markdown.use(texmath, { engine: katex, delimiters: ["repetitioDollars", "brackets"], katexOptions: { trust: false } });
+for (const name of ["math_inline", "math_inline_double", "math_block", "math_block_eqno"]) {
+  markdown.renderer.rules[name] = (tokens, index) => {
+    const token = tokens[index], display = name !== "math_inline", tag = token.block ? "div" : "span";
+    return `<${tag} class="wiki-math${display ? " wiki-math-display" : ""}"${sourceAttributes(token.map)}>${renderMathHtml(token.content, display)}${name === "math_block_eqno" && token.info ? `<span class="wiki-equation-number">(${markdown.utils.escapeHtml(token.info)})</span>` : ""}</${tag}>`;
+  };
+}
 const names = ["note", "tip", "important", "warning", "pitfall", "example", "takeaways", "details", "definition"];
 
 for (const name of names) {
@@ -55,6 +71,9 @@ markdown.renderer.rules.table_close = () => '</table></div></div>\n';
 markdown.renderer.rules.fence = (tokens, index) => {
   const language = tokens[index].info.trim().split(/\s+/)[0];
   const source = tokens[index].content;
+  if (["math", "latex", "tex"].includes(language.toLowerCase())) {
+    return `<div class="wiki-math wiki-math-display"${sourceAttributes(tokens[index].map)}>${renderMathHtml(source, true)}</div>`;
+  }
   const diagram = normalizeCodeLanguage(language) === "mermaid";
   return `<section class="wiki-code-block${diagram ? " wiki-diagram-block" : ""}"${sourceAttributes(tokens[index].map)}>
     <div class="wiki-code-toolbar"><span class="wiki-code-language">${markdown.utils.escapeHtml(codeLanguageLabel(language))}</span><span class="wiki-code-actions"></span></div>

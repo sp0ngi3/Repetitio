@@ -50,6 +50,7 @@ import type {
   WikiTreeNode
 } from "./types";
 import type { WikiStudyOverview, WikiStudyAnswerRequest, WikiJsonDocument, WikiJsonUpdateRequest } from "./types";
+import { fetchRead } from "./readRequest";
 
 /**
  * Base URL used for backend API requests.
@@ -64,7 +65,8 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5182";
  * @returns Parsed JSON response.
  */
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const send = !init?.method || init.method.toUpperCase() === "GET" ? fetchRead : fetch;
+  const response = await send(`${apiBaseUrl}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...init?.headers

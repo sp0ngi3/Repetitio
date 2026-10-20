@@ -1,0 +1,10 @@
+.wiki-math { color: inherit; min-width: 0; }
+.wiki-math-display { display: block; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 12px 4px; margin: 16px 0; }
+.wiki-math .katex { color: inherit; font-size: 1.08em; }
+.wiki-math .katex-display { margin: 0; text-align: left; }
+.wiki-math .katex-display > .katex { text-align: left; }
+.wiki-math-error code { white-space: pre-wrap; overflow-wrap: anywhere; color: inherit; }
+@media print {
+  .wiki-math-display { overflow: visible; break-inside: avoid; }
+  .wiki-math .katex { font-size: 1em; }
+}

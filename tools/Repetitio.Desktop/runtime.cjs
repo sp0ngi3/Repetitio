@@ -2,6 +2,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { spawn } = require("node:child_process");
 const { randomBytes } = require("node:crypto");
+const { streamRequest } = require("./streamRequest.cjs");
 
 const TOKEN_HEADER = "X-Repetitio-Desktop-Token";
 const copyProcesses = new Set();
@@ -26,8 +27,16 @@ function backendEnvironment(runtime, data, token, parentId = process.pid) {
 }
 
 function runCopy(runtime, source, destination, log) {
+  return runDataCommand(runtime, "--desktop-copy-database", source, destination, log);
+}
+
+function runRestore(runtime, source, destination, log) {
+  return runDataCommand(runtime, "--desktop-restore-backup", source, destination, log);
+}
+
+function runDataCommand(runtime, command, source, destination, log) {
   return new Promise((resolve, reject) => {
-    const child = spawn(runtime.dotnet, [runtime.api, "--desktop-copy-database", source, "--desktop-copy-output", destination],
+    const child = spawn(runtime.dotnet, [runtime.api, command, source, "--desktop-copy-output", destination],
       { cwd: path.dirname(runtime.api), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     copyProcesses.add(child);
     let output = "";
@@ -39,7 +48,7 @@ function runCopy(runtime, source, destination, log) {
 }
 
 class Backend {
-  constructor(runtime, data, log) { this.runtime = runtime; this.data = data; this.log = log; this.token = randomBytes(32).toString("hex"); this.child = null; this.origin = null; }
+  constructor(runtime, data, log) { this.runtime = runtime; this.data = data; this.log = log; this.token = randomBytes(32).toString("hex"); this.child = null; this.origin = null; this.pendingBackups = new Set(); }
   async start() {
     for (const file of [this.runtime.dotnet, this.runtime.api, path.join(this.runtime.frontend, "index.html")])
       if (!fs.existsSync(file)) throw new Error(`The Windows package is incomplete: ${file}. Reinstall the complete release.`);
@@ -47,8 +56,7 @@ class Backend {
       env: backendEnvironment(this.runtime, this.data, this.token), stdio: ["ignore", "pipe", "pipe"] });
     const address = await new Promise((resolve, reject) => {
       let tail = "", settled = false;
-      const finish = (error, url) => { if (settled) return; settled = true; clearTimeout(timeout); error ? reject(error) : resolve(url); };
-      const timeout = setTimeout(() => finish(new Error("The local API did not become ready within two minutes. See the API log.")), 120000);
+      const finish = (error, url) => { if (settled) return; settled = true; error ? reject(error) : resolve(url); };
       const receive = chunk => {
         const text = chunk.toString(); this.log(text); tail = (tail + text).slice(-16000);
         const match = tail.match(/Now listening on:\s*(http:\/\/127\.0\.0\.1:\d+)/);
@@ -66,8 +74,14 @@ class Backend {
   request(route, options = {}) {
     if (!this.origin || !route.startsWith("/") || route.startsWith("//")) throw new Error("Invalid local API request.");
     const headers = new Headers(options.headers); headers.set(TOKEN_HEADER, this.token);
-    return fetch(this.origin + route, { ...options, headers, redirect: "error" });
+    if (!route.startsWith("/api/backup/")) return fetch(this.origin + route, { ...options, headers, redirect: "error" });
+    const request = streamRequest(this.origin + route, { ...options, headers });
+    this.pendingBackups.add(request);
+    const remove = () => this.pendingBackups.delete(request);
+    request.then(remove, remove);
+    return request;
   }
+  async waitForPendingBackups() { await Promise.allSettled([...this.pendingBackups]); }
   async stop() {
     const child = this.child;
     if (!child || child.exitCode !== null) return;
@@ -80,4 +94,4 @@ class Backend {
   }
 }
 
-module.exports = { TOKEN_HEADER, dataPaths, runtimePaths, backendEnvironment, runCopy, Backend };
+module.exports = { TOKEN_HEADER, dataPaths, runtimePaths, backendEnvironment, runCopy, runRestore, Backend };

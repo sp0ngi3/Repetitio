@@ -25,6 +25,7 @@ import type { WikiStudyOverview, WikiStudyPageProgress, WikiStudyModeProgress } 
 import { WikiLearningPlayer, WikiProgressSummary, WikiReviewDashboard, WikiBranchProgress, studyItems } from "./WikiLearning";
 import type { WikiStudyItem } from "./WikiLearning";
 import { renderWikiMarkdown as renderMarkdown, renderWikiMarkdownHtml, type MarkdownHeading } from "./wikiMarkdown";
+import { printableMathStyles } from "./math";
 import { parseWikiBatchImport, parseWikiSourcesJson, parseWikiQuizJson, parseWikiFlashcardJson, wikiLearningContainer } from "./wikiImport";
 import { WikiJsonEditor } from "./WikiJsonEditor";
 import { FileJson, Workflow } from "lucide-react";
@@ -1754,6 +1755,7 @@ function buildPrintableWikiDocument(title: string, pages: WikiPageRecord[]) {
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)} - Repetitio Wiki</title>
+  <style>${printableMathStyles}</style>
   <style>
     body { margin: 0; color: #202122; background: #fff; font: 12pt/1.55 Georgia, 'Times New Roman', serif; }
     main { max-width: 860px; margin: 0 auto; padding: 32px 42px; }

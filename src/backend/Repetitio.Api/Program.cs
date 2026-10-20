@@ -49,10 +49,21 @@ foreach (var harness in BasicExerciseHarnessCatalog.GetAll())
 }
 
 var app = builder.Build();
+app.Use((context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api/backup"))
+    {
+        var limit = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+        if (limit is { IsReadOnly: false }) limit.MaxRequestBodySize = null;
+    }
+    return next(context);
+});
 DesktopRuntime.Configure(app);
 if (builder.Configuration.GetValue<bool>("Desktop:Enabled"))
 {
     var databasePath = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(builder.Configuration.GetConnectionString("Repetitio")).DataSource;
+    if (File.Exists(databasePath + ".restore-pending.json"))
+        throw new InvalidOperationException("A previous backup recovery was interrupted. Original files were retained under backups. Choose Restore backup to finish recovery; a new empty database will not be created.");
     if (File.Exists(databasePath)) await DesktopRuntime.ValidateDatabaseAsync(databasePath);
 }
 

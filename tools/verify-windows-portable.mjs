@@ -33,10 +33,14 @@ try {
   const page = browser.contexts()[0].pages()[0];
   await page.getByRole("navigation", { name: "Primary navigation" }).waitFor();
   await page.getByText("DB online", { exact: true }).waitFor();
+  assert.equal(await page.getByTestId("app-version").innerText(), `v${JSON.parse(ready).build.version}`);
   assert.equal(await page.evaluate(() => location.origin), "repetitio://app");
   assert.equal((await fetch(JSON.parse(ready).origin + "/api/health")).status, 401);
   await page.evaluate(() => window.close());
-  assert.equal(await Promise.race([exited, new Promise(resolve => setTimeout(() => resolve("timeout"), 30000))]), 0);
+  let closeTimer;
+  try {
+    assert.equal(await Promise.race([exited, new Promise(resolve => { closeTimer = setTimeout(() => resolve("timeout"), 30000); })]), 0);
+  } finally { clearTimeout(closeTimer); }
   assert((await readdir(path.join(data, "backups"))).some(name => name.includes("auto-shutdown")));
   console.log("Verified Portable EXE self-extraction, native UI, private runtime startup, protected API, graceful close and automatic backup.");
 } finally { await browser?.close(); if (launcher.exitCode === null) launcher.kill(); }

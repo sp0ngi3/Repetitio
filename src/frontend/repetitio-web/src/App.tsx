@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getBasicExercises, getDashboard, getHealthStatus, getLearningItems } from "./api";
 import { BackupPage } from "./BackupPage";
 import { BasicsPage } from "./BasicsPage";
@@ -75,6 +75,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [databaseConnection, setDatabaseConnection] = useState<DatabaseConnectionState>("checking");
   const [databaseCheckedAt, setDatabaseCheckedAt] = useState<string | null>(null);
+  const reloadAfterReconnect = useRef(false);
 
   /**
    * Reloads dashboard metrics and learning items from the API.
@@ -91,7 +92,9 @@ export function App() {
       setDashboard(nextDashboard);
       setBasicExercises(nextBasics);
       setItems(nextItems);
+      reloadAfterReconnect.current = false;
     } catch (requestError) {
+      reloadAfterReconnect.current = true;
       setError(requestError instanceof Error ? requestError.message : "Unable to load data.");
     } finally {
       setIsLoading(false);
@@ -118,6 +121,10 @@ export function App() {
 
         setDatabaseConnection(health.databaseConnected ? "connected" : "disconnected");
         setDatabaseCheckedAt(health.checkedAt ?? new Date().toISOString());
+        if (health.databaseConnected && reloadAfterReconnect.current) {
+          reloadAfterReconnect.current = false;
+          void refreshData();
+        }
       } catch {
         if (!isActive) {
           return;
@@ -187,7 +194,8 @@ export function App() {
       <main id="workspace" className="app-workspace" data-page={activePage} tabIndex={-1}>
       <div className="workspace-location"><span>Workspace</span><span aria-hidden="true">/</span><strong>{appPages.find(page => page.id === activePage)?.label}</strong><time dateTime={new Date().toISOString().slice(0, 10)}>{new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</time></div>
 
-      {error ? <p className="error-banner">{error}</p> : null}
+      {databaseConnection !== "connected" ? <p role="status">Waiting for the local API. Saved data has not been changed.</p> : null}
+      {error ? <div className="error-banner">{error} <button type="button" onClick={() => { setIsLoading(true); void refreshData(); }}>Retry loading</button></div> : null}
 
       {activePage === "overview" ? (
         <OverviewPage
