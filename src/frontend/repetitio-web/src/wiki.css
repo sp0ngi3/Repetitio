@@ -33,6 +33,51 @@
 .wiki-wikipedia-page .tree-node-button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .wiki-wikipedia-page .wiki-tree-row.active { border-left: 3px solid var(--wiki-link); background: var(--wiki-selected); }
 .wiki-wikipedia-page .wiki-tree-row.active .tree-node-button span { font-weight: 700; }
+.wiki-wikipedia-page .wiki-tree-row.studied { background: var(--success-soft); }
+.wiki-wikipedia-page .wiki-tree-row.studied.active { background: var(--success-soft); border-left-color: var(--wiki-link); box-shadow: inset 0 0 0 1px var(--success-border); }
+.wiki-wikipedia-page .wiki-tree-row.studied .tree-node-button { display: flex; align-items: center; gap: 8px; }
+.wiki-wikipedia-page .wiki-tree-row .wiki-tree-studied { flex-shrink: 0; margin-left: auto; color: var(--success); }
+.wiki-studied-toggle { gap: 8px; margin: 0; cursor: pointer; }
+.wiki-studied-toggle input { width: auto; margin: 0; accent-color: var(--success); }
+.wiki-wikipedia-page .wiki-studied-toggle.studied { color: var(--success); background: var(--success-soft); border-color: var(--success-border); }
+.wiki-studied-toggle:has(input:disabled) { cursor: wait; opacity: .7; }
+
+.wiki-practice-editor-dialog { width: min(900px, calc(100vw - 32px)); max-width: none; max-height: 92dvh; padding: 0; border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--text); background: var(--surface); }
+.wiki-practice-editor-dialog::backdrop { background: rgb(0 0 0 / .55); }
+.wiki-practice-editor-dialog form { display: flex; flex-direction: column; max-height: 90dvh; }
+.wiki-practice-editor-heading, .wiki-practice-editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; }
+.wiki-practice-editor-heading { border-bottom: 1px solid var(--border); }
+.wiki-practice-editor-heading h2, .wiki-practice-editor-section-heading h3 { margin: 0; }
+.wiki-practice-editor-heading p { margin: 4px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.wiki-practice-editor-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding: 20px 24px; }
+.wiki-practice-editor-fields { min-width: 0; border: 0; padding: 0; margin: 0; }
+.wiki-practice-editor-fields section + section { margin-top: 28px; }
+.wiki-practice-editor-section-heading, .wiki-check-edit-option-actions, .wiki-practice-editor-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.wiki-practice-editor-undo { padding: 10px 12px; margin-bottom: 16px; background: var(--surface-soft); border: 1px solid var(--border); }
+.wiki-check-edit-card { min-width: 0; margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); }
+.wiki-check-edit-card legend { padding: 0 6px; font-weight: 600; }
+.wiki-check-edit-card textarea { resize: vertical; min-height: 64px; }
+.wiki-check-edit-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.wiki-check-edit-option > label { margin: 0; }
+.wiki-check-edit-options { display: grid; gap: 12px; }
+.wiki-practice-editor-dialog .wiki-check-edit-correct { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.wiki-check-edit-correct input { width: auto; margin: 0; }
+.wiki-check-edit-option-actions { justify-content: flex-start; margin: 12px 0 18px; color: var(--muted); }
+.wiki-practice-editor-footer { border-top: 1px solid var(--border); }
+.wiki-practice-editor-footer > span { color: var(--muted); font-size: 13px; }
+.wiki-practice-editor-footer > div { display: flex; gap: 8px; flex-shrink: 0; }
+.wiki-practice-editor-dialog button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.wiki-practice-inserts .wiki-practice-header { align-items: center; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .wiki-practice-editor-heading, .wiki-practice-editor-footer { padding: 14px 16px; }
+  .wiki-practice-editor-heading h2 { font-size: 18px; }
+  .wiki-practice-editor-body { padding: 16px; }
+  .wiki-check-edit-card { padding: 12px; }
+  .wiki-check-edit-option { grid-template-columns: minmax(0, 1fr) auto; }
+  .wiki-check-edit-option .wiki-check-edit-correct { grid-column: 1 / -1; }
+  .wiki-practice-editor-footer { align-items: stretch; flex-direction: column; gap: 10px; }
+  .wiki-practice-editor-footer > div { justify-content: flex-end; }
+}
 .wiki-wikipedia-page .wiki-article-body-grid { grid-template-columns: 190px minmax(0, 1fr); gap: 24px; }
 .wiki-wikipedia-page .wiki-article-content { min-width: 0; }
 .wiki-wikipedia-page .wiki-infobox { grid-column: 2; width: 100%; margin-top: 12px; }

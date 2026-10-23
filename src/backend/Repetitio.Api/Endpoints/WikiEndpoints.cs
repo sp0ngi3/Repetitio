@@ -43,6 +43,8 @@ public static partial class WikiEndpoints
         group.MapPost("/images", UploadWikiImageAsync).DisableAntiforgery().WithName("UploadWikiImage");
         group.MapPost("/images/remote", ImportRemoteImageAsync);
         group.MapPut("/{id:guid}", UpdateWikiPageAsync).WithName("UpdateWikiPage");
+        group.MapPatch("/{id:guid}/studied", SetWikiStudiedAsync).WithName("SetWikiStudied");
+        group.MapPut("/{id:guid}/practice", UpdateWikiPracticeAsync).WithName("UpdateWikiPractice");
         group.MapGet("/{id:guid}/json", GetWikiJsonAsync);
         group.MapPut("/{id:guid}/json", UpdateWikiJsonAsync);
         group.MapDelete("/{id:guid}", DeleteWikiPageAsync).WithName("DeleteWikiPage");
@@ -172,6 +174,15 @@ public static partial class WikiEndpoints
         var childCount = await dbContext.WikiPages.CountAsync(page => page.ParentId == id);
 
         return Results.Ok(ToResponse(wikiPage, childCount));
+    }
+
+    private static async Task<IResult> SetWikiStudiedAsync(
+        RepetitioDbContext dbContext, Guid id, WikiStudiedRequest request)
+    {
+        // Update only the marker, preserving article content, edit versions and practice history.
+        var updated = await dbContext.WikiPages.Where(page => page.Id == id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(page => page.IsStudied, request.IsStudied));
+        return updated == 0 ? Results.NotFound() : Results.Ok(request);
     }
 
     /// <summary>
@@ -1024,6 +1035,7 @@ public static partial class WikiEndpoints
             Summary = wikiPage.Summary,
             ContentMarkdown = wikiPage.ContentMarkdown,
             IsArchived = wikiPage.IsArchived,
+            IsStudied = wikiPage.IsStudied,
             ChildCount = childCount,
             CreatedAt = wikiPage.CreatedAt,
             UpdatedAt = wikiPage.UpdatedAt,
@@ -1119,7 +1131,8 @@ public static partial class WikiEndpoints
             Path = wikiPage.Path,
             Depth = wikiPage.Depth,
             SortOrder = wikiPage.SortOrder,
-            UpdatedAt = wikiPage.UpdatedAt
+            UpdatedAt = wikiPage.UpdatedAt,
+            IsStudied = wikiPage.IsStudied
         };
     }
 

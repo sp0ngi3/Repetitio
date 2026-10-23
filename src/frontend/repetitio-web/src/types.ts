@@ -1089,6 +1089,8 @@ export interface UpdateNotePageRequest extends CreateNotePageRequest {
  * Represents one wiki page returned by the API.
  */
 export interface WikiPage {
+  /** Whether the user has manually marked this page as studied. */
+  isStudied: boolean;
   reviewEnabled?: boolean;
   reviewIntervalDays?: number | null;
   /** Unique wiki page identifier. */
@@ -1169,6 +1171,12 @@ export interface WikiJsonPage extends WikiPage {
 export interface WikiJsonDocument { pages: WikiJsonPage[]; }
 export interface WikiJsonPageUpdate { id: string; expectedUpdatedAt: string; page: UpdateWikiPageRequest; }
 export interface WikiJsonUpdateRequest { updates: WikiJsonPageUpdate[]; allowImageRemoval: boolean; }
+
+export interface UpdateWikiPracticeRequest {
+  expectedUpdatedAt: string;
+  quizQuestions: WikiQuizQuestionRequest[];
+  flashcards: WikiFlashcardRequest[];
+}
 
 /**
  * Represents one loose source attached to a wiki page.
@@ -1262,6 +1270,8 @@ export interface WikiImage {
  * Represents one wiki page in the navigation tree.
  */
 export interface WikiTreeNode {
+  /** Whether the user has manually marked this page as studied. */
+  isStudied: boolean;
   /** Unique wiki page identifier. */
   id: string;
   /** Optional parent wiki page identifier. */

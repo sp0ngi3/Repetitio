@@ -652,6 +652,11 @@ namespace Repetitio.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsStudied")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("TEXT");
 

@@ -1,5 +1,14 @@
 namespace Repetitio.Application.Wiki;
 
+/// <summary>Sets the manual studied marker for a single wiki page.</summary>
+public sealed record WikiStudiedRequest(bool IsStudied);
+
+/// <summary>Updates only a page's practice material, checking the version opened by the editor.</summary>
+public sealed record UpdateWikiPracticeRequest(
+    DateTime ExpectedUpdatedAt,
+    IReadOnlyCollection<WikiQuizQuestionRequest> QuizQuestions,
+    IReadOnlyCollection<WikiFlashcardRequest> Flashcards);
+
 /// <summary>
 /// Represents the request payload for creating a wiki page.
 /// </summary>
@@ -320,6 +329,9 @@ public sealed record WikiImageResponse
 /// </summary>
 public sealed record WikiPageResponse
 {
+    /// <summary>Gets whether the user has manually marked this page as studied.</summary>
+    public bool IsStudied { get; init; }
+
     /// <summary>
     /// Gets the wiki page identifier.
     /// </summary>
@@ -535,6 +547,9 @@ public sealed record WikiFlashcardResponse
 /// </summary>
 public sealed record WikiTreeNodeResponse
 {
+    /// <summary>Gets whether the user has manually marked this page as studied.</summary>
+    public bool IsStudied { get; init; }
+
     /// <summary>
     /// Gets the wiki page identifier.
     /// </summary>

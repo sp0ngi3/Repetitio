@@ -368,6 +368,7 @@ public sealed class RepetitioDbContext : DbContext
             entity.Property(wikiPage => wikiPage.Summary).HasMaxLength(2000);
             entity.Property(wikiPage => wikiPage.ContentMarkdown).HasMaxLength(200000).IsRequired();
             entity.Property(wikiPage => wikiPage.IsArchived).IsRequired();
+            entity.Property(wikiPage => wikiPage.IsStudied).HasDefaultValue(false);
             entity.Property(wikiPage => wikiPage.CreatedAt).IsRequired();
             entity.Property(wikiPage => wikiPage.UpdatedAt).IsRequired();
             entity.HasIndex(wikiPage => wikiPage.ParentId);

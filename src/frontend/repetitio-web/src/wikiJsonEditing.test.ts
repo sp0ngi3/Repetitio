@@ -5,6 +5,7 @@ import { flattenWikiJson, planWikiJsonEdit, wikiImageCounts } from "./wikiJsonEd
 const imageId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 function page(id: string, parentId: string | null = null): WikiJsonPage {
   return {
+    isStudied: false,
     id, parentId, title: id, slug: id, path: parentId ? `${parentId}/${id}` : id, depth: parentId ? 1 : 0,
     sortOrder: 0, summary: "Original summary", contentMarkdown: `## Topic\n\nBefore.\n\n![Diagram](wiki-image:${imageId})\n\nAfter.`,
     isArchived: false, childCount: 0, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z",

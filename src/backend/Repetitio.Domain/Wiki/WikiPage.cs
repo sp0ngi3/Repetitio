@@ -80,6 +80,11 @@ public sealed class WikiPage
     /// </summary>
     public bool IsArchived { get; set; }
 
+    /// <summary>
+    /// Gets or sets whether the user has manually marked this page as studied.
+    /// </summary>
+    public bool IsStudied { get; set; }
+
     public bool ReviewEnabled { get; set; } = true;
     public int? ReviewIntervalDays { get; set; }
 

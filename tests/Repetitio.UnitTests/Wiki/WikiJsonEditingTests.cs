@@ -15,6 +15,108 @@ namespace Repetitio.UnitTests.Wiki;
 public sealed class WikiJsonEditingTests
 {
     [Fact]
+    public async Task PracticeEditorAddsChecksWithoutChangingArticleImagesSourcesChildrenOrExistingProgress()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var db = fixture.Db;
+        var root = fixture.Root;
+        root.IsStudied = true;
+        root.ReviewIntervalDays = 14;
+        await db.SaveChangesAsync();
+        var question = root.QuizQuestions.Single();
+        var originalCard = root.Flashcards.Single();
+        var sourceId = root.Sources.Single().Id;
+        var optionIds = question.Options.OrderBy(option => option.SortOrder).Select(option => option.Id).ToArray();
+        Assert.Null(await new WikiStudyService(db).SaveAsync(new(Guid.NewGuid(), [
+            new(root.Id, question.Id, "quiz", question.Options.Single(option => option.IsCorrect).Id, null),
+            new(root.Id, originalCard.Id, "flashcard", null, true)
+        ])));
+        var before = Current(root);
+        var childDate = fixture.Child.UpdatedAt;
+        var request = new UpdateWikiPracticeRequest(root.UpdatedAt,
+            [.. before.QuizQuestions!, new() { Prompt = "New question", Explanation = "New explanation", Options = [
+                new() { Text = "Yes", IsCorrect = true }, new() { Text = "No", IsCorrect = false }
+            ] }], [.. before.Flashcards!, new() { Front = "New front", Back = "New back" }]);
+        var result = await Invoke("UpdateWikiPracticeAsync", db, root.Id, request);
+        Assert.Equal(200, ((IStatusCodeHttpResult)result).StatusCode);
+        var response = Assert.IsType<WikiPageResponse>(((IValueHttpResult)result).Value);
+        Assert.Equal(2, response.QuizQuestions.Count);
+        Assert.Equal(2, response.Flashcards.Count);
+        Assert.Equal(before.ContentMarkdown, response.ContentMarkdown);
+        Assert.True(response.IsStudied);
+        Assert.NotEqual(request.ExpectedUpdatedAt, response.UpdatedAt);
+        db.ChangeTracker.Clear();
+        var saved = await db.WikiPages.Include(page => page.QuizQuestions).ThenInclude(q => q.Options)
+            .Include(page => page.Flashcards).SingleAsync(page => page.Id == root.Id);
+        Assert.Equal(14, saved.ReviewIntervalDays);
+        Assert.Equal(before.Title, saved.Title);
+        Assert.Equal(before.Slug, saved.Slug);
+        Assert.Equal(before.ParentId, saved.ParentId);
+        Assert.Equal(before.ContentMarkdown, saved.ContentMarkdown);
+        Assert.Equal(sourceId, (await db.WikiSources.SingleAsync()).Id);
+        Assert.Equal(fixture.Image.Data, (await db.WikiImages.SingleAsync()).Data);
+        Assert.Equal(childDate, (await db.WikiPages.SingleAsync(page => page.Id == fixture.Child.Id)).UpdatedAt);
+        Assert.Equal(optionIds, saved.QuizQuestions.Single(q => q.Id == question.Id).Options.OrderBy(option => option.SortOrder).Select(option => option.Id));
+        Assert.Contains(saved.Flashcards, card => card.Id == originalCard.Id);
+        var overview = await new WikiStudyService(db).GetOverviewAsync();
+        Assert.Equal(2, Assert.Single(overview.History).Answered);
+        Assert.All(overview.Pages.Single(page => page.Id == root.Id).Modes, mode => { Assert.Equal(2, mode.Total); Assert.Equal(1, mode.Covered); });
+    }
+
+    [Fact]
+    public async Task PracticeEditorRejectsStaleOrIncompleteDraftsBeforeChangingSavedChecks()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var before = Current(fixture.Root);
+        var request = new UpdateWikiPracticeRequest(fixture.Root.UpdatedAt, before.QuizQuestions!, before.Flashcards!);
+        var stale = await Invoke("UpdateWikiPracticeAsync", fixture.Db, fixture.Root.Id, request with { ExpectedUpdatedAt = request.ExpectedUpdatedAt.AddSeconds(-1) });
+        Assert.Equal(409, ((IStatusCodeHttpResult)stale).StatusCode);
+        var missing = await Invoke("UpdateWikiPracticeAsync", fixture.Db, fixture.Root.Id, request with { Flashcards = null! });
+        Assert.Equal(400, ((IStatusCodeHttpResult)missing).StatusCode);
+        var invalid = await Invoke("UpdateWikiPracticeAsync", fixture.Db, fixture.Root.Id, request with { QuizQuestions = [new() {
+            Prompt = "Invalid", Options = [new() { Text = "A" }, new() { Text = "B" }]
+        }] });
+        Assert.Equal(400, ((IStatusCodeHttpResult)invalid).StatusCode);
+        Assert.Equal(404, ((IStatusCodeHttpResult)await Invoke("UpdateWikiPracticeAsync", fixture.Db, Guid.NewGuid(), request)).StatusCode);
+        fixture.Db.ChangeTracker.Clear();
+        Assert.Equal(fixture.Root.QuizQuestions.Single().Id, (await fixture.Db.WikiQuizQuestions.SingleAsync()).Id);
+        Assert.Equal(fixture.Root.Flashcards.Single().Id, (await fixture.Db.WikiFlashcards.SingleAsync()).Id);
+        Assert.Equal(request.ExpectedUpdatedAt, (await fixture.Db.WikiPages.SingleAsync(page => page.Id == fixture.Root.Id)).UpdatedAt);
+    }
+
+    [Fact]
+    public async Task EditingAndRemovingPracticeChecksKeepsEarlierSessionHistory()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var root = fixture.Root;
+        var question = root.QuizQuestions.Single();
+        var card = root.Flashcards.Single();
+        Assert.Null(await new WikiStudyService(fixture.Db).SaveAsync(new(Guid.NewGuid(), [
+            new(root.Id, question.Id, "quiz", question.Options.Single(option => option.IsCorrect).Id, null),
+            new(root.Id, card.Id, "flashcard", null, true)
+        ])));
+        var current = Current(root);
+        var update = new UpdateWikiPracticeRequest(root.UpdatedAt,
+            [current.QuizQuestions!.Single() with { Prompt = "Edited question", Explanation = "Edited explanation" }],
+            [new() { Front = "Edited front", Back = "Edited back" }]);
+        var result = await Invoke("UpdateWikiPracticeAsync", fixture.Db, root.Id, update);
+        var response = Assert.IsType<WikiPageResponse>(((IValueHttpResult)result).Value);
+        Assert.Equal("Edited question", Assert.Single(response.QuizQuestions).Prompt);
+        Assert.NotEqual(question.Id, Assert.Single(response.QuizQuestions).Id);
+        Assert.Equal("Edited back", Assert.Single(response.Flashcards).Back);
+        Assert.NotEqual(card.Id, Assert.Single(response.Flashcards).Id);
+        var cleared = await Invoke("UpdateWikiPracticeAsync", fixture.Db, root.Id, new UpdateWikiPracticeRequest(response.UpdatedAt, [], []));
+        Assert.Equal(200, ((IStatusCodeHttpResult)cleared).StatusCode);
+        Assert.Empty(await fixture.Db.WikiQuizQuestions.ToListAsync());
+        Assert.Empty(await fixture.Db.WikiFlashcards.ToListAsync());
+        Assert.Equal(2, await fixture.Db.WikiStudyAnswers.CountAsync());
+        var session = Assert.Single((await new WikiStudyService(fixture.Db).GetOverviewAsync()).History);
+        Assert.Equal(2, session.Answered);
+        Assert.Equal(2, session.Correct);
+        Assert.Equal(root.ContentMarkdown, (await fixture.Db.WikiPages.SingleAsync(page => page.Id == root.Id)).ContentMarkdown);
+    }
+
+    [Fact]
     public async Task ExportPreservesTreeBodyAndImageLocationsWithoutEmbeddingBinaryData()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -37,6 +139,8 @@ public sealed class WikiJsonEditingTests
         await using var fixture = await Fixture.CreateAsync();
         var db = fixture.Db;
         var root = fixture.Root;
+        root.IsStudied = true;
+        await db.SaveChangesAsync();
         var question = root.QuizQuestions.Single();
         var cardId = root.Flashcards.Single().Id;
         var sourceId = root.Sources.Single().Id;
@@ -52,6 +156,7 @@ public sealed class WikiJsonEditingTests
         Assert.Equal(sourceId, (await db.WikiSources.SingleAsync()).Id);
         Assert.Equal("Child body", (await db.WikiPages.SingleAsync(page => page.Id == fixture.Child.Id)).ContentMarkdown);
         Assert.Single(await db.WikiStudyAnswers.ToListAsync());
+        Assert.True((await db.WikiPages.SingleAsync(page => page.Id == root.Id)).IsStudied);
         var after = (await new WikiStudyService(db).GetOverviewAsync()).Pages.Single(page => page.Id == root.Id).Modes.Single(mode => mode.Kind == "quiz");
         Assert.Equal(before, after);
     }

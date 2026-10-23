@@ -232,6 +232,7 @@ const learningItems: LearningItem[] = [
  */
 const wikiPages: WikiPageRecord[] = [
   {
+    isStudied: false,
     id: "wiki-1",
     parentId: null,
     title: "Algorithm",
@@ -285,6 +286,7 @@ const wikiPages: WikiPageRecord[] = [
  */
 const wikiTreeNodes: WikiTreeNode[] = [
   {
+    isStudied: false,
     id: "wiki-1",
     parentId: null,
     title: "Algorithm",

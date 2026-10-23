@@ -45,6 +45,7 @@ import type {
   UpdateSystemDesignProblemRequest,
   CreateWikiPageRequest,
   UpdateWikiPageRequest,
+  UpdateWikiPracticeRequest,
   WikiImage,
   WikiPage,
   WikiTreeNode
@@ -740,6 +741,22 @@ export function importWikiPages(request: ImportWikiPagesRequest): Promise<Import
  */
 export function updateWikiPage(id: string, request: UpdateWikiPageRequest): Promise<WikiPage> {
   return requestJson<WikiPage>(`/api/wiki/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(request)
+  });
+}
+
+/** Updates only the manual studied marker, leaving the article and practice history intact. */
+export function setWikiStudied(id: string, isStudied: boolean): Promise<{ isStudied: boolean }> {
+  return requestJson(`/api/wiki/${id}/studied`, {
+    method: "PATCH",
+    body: JSON.stringify({ isStudied })
+  });
+}
+
+/** Saves only quiz questions and flashcards, checking that the article has not changed. */
+export function updateWikiPractice(id: string, request: UpdateWikiPracticeRequest): Promise<WikiPage> {
+  return requestJson(`/api/wiki/${id}/practice`, {
     method: "PUT",
     body: JSON.stringify(request)
   });

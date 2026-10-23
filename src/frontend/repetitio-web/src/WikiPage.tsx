@@ -10,7 +10,8 @@ import {
   importWikiImageUrl,
   importWikiPages,
   uploadWikiImage,
-  updateWikiPage
+  updateWikiPage,
+  setWikiStudied
 } from "./api";
 import { confirmDelete } from "./confirmDelete";
 import type {
@@ -28,7 +29,8 @@ import { renderWikiMarkdown as renderMarkdown, renderWikiMarkdownHtml, type Mark
 import { printableMathStyles } from "./math";
 import { parseWikiBatchImport, parseWikiSourcesJson, parseWikiQuizJson, parseWikiFlashcardJson, wikiLearningContainer } from "./wikiImport";
 import { WikiJsonEditor } from "./WikiJsonEditor";
-import { FileJson, Workflow } from "lucide-react";
+import { WikiPracticeEditor } from "./WikiPracticeEditor";
+import { FileJson, ListChecks, Workflow } from "lucide-react";
 import { codeLanguages } from "./codeHighlight";
 import { renderPrintableDiagrams } from "./diagramRenderer";
 import { useWikiScrollSync } from "./wikiScrollSync";
@@ -301,6 +303,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
   const [batchResult, setBatchResult] = useState<string | null>(null);
   const [showImportStructure, setShowImportStructure] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingStudiedId, setSavingStudiedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -379,6 +382,23 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
       expandAncestors(pageRecord, treeNodes);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to load wiki page.");
+    }
+  }
+
+  async function toggleStudied() {
+    if (!selectedPage || savingStudiedId) return;
+    const { id, isStudied } = selectedPage;
+    setSavingStudiedId(id);
+    setError(null);
+    try {
+      const status = await setWikiStudied(id, !isStudied);
+      setSelectedPage(current => current?.id === id ? { ...current, ...status } : current);
+      setTreeNodes(current => current.map(node => node.id === id ? { ...node, ...status } : node));
+      setPages(current => current.map(page => page.id === id ? { ...page, ...status } : page));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to save studied status.");
+    } finally {
+      setSavingStudiedId(null);
     }
   }
 
@@ -585,7 +605,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
         </nav>
       </header>
 
-      {error ? <p className="error-banner">{error}</p> : null}
+      {error ? <p className="error-banner" role="alert">{error}</p> : null}
       {batchResult ? <p className="success-banner">{batchResult}</p> : null}
 
       {selectedPage ? <nav className="wiki-breadcrumbs" aria-label="Current topic location">
@@ -625,6 +645,8 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
 
         {view === "article" ? (
           <WikiArticle
+            isSavingStudied={savingStudiedId !== null}
+            onToggleStudied={() => void toggleStudied()}
             key={selectedPage?.id}
             progress={studyOverview?.pages.find(p => p.id === selectedPage?.id)}
             branchProgress={studyOverview?.pages ?? []}
@@ -638,6 +660,13 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
             onDownloadPdf={handleDownloadPdf}
             onEdit={startEditPage}
             onEditJson={() => setView("json")}
+            onPracticeSaved={updated => {
+              setSelectedPage(current => current?.id === updated.id ? updated : current);
+              setPages(current => current.map(page => page.id === updated.id ? updated : page));
+              setTreeNodes(current => current.map(node => node.id === updated.id ? { ...node, updatedAt: updated.updatedAt } : node));
+              setForm(createWikiForm(updated));
+              window.dispatchEvent(new Event("wiki-study-updated"));
+            }}
             onOpenChild={selectPage}
           />
         ) : null}
@@ -723,6 +752,8 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
 }
 
 function WikiArticle(props: {
+  isSavingStudied: boolean;
+  onToggleStudied: () => void;
   progress?: WikiStudyPageProgress;
   branchProgress: WikiStudyPageProgress[];
   onStudy: () => void;
@@ -733,12 +764,14 @@ function WikiArticle(props: {
   isLoading: boolean;
   onEdit: () => void;
   onEditJson: () => void;
+  onPracticeSaved: (page: WikiPageRecord) => void;
   onCreateChild: () => void;
   onDownloadPdf: () => void;
   onOpenChild: (id: string) => void;
 }) {
   const hasKnowledgeChecks = Boolean(props.page && props.treeNodes.length > 0);
   const [activeHeading, setActiveHeading] = useState("");
+  const [editingPractice, setEditingPractice] = useState(false);
   useEffect(() => {
     setActiveHeading(props.renderedMarkdown.headings[0]?.id ?? "");
     if (typeof IntersectionObserver === "undefined") return;
@@ -778,6 +811,12 @@ function WikiArticle(props: {
             <h1>{props.page.title}</h1>
           </div>
           <div className="wiki-article-actions">
+            <label className={`secondary-button compact-button wiki-studied-toggle${props.page.isStudied ? " studied" : ""}`}>
+              <input type="checkbox" checked={!!props.page.isStudied} disabled={props.isSavingStudied}
+                onChange={props.onToggleStudied} />
+              Studied
+              {props.isSavingStudied ? <small role="status">Saving...</small> : null}
+            </label>
             {hasKnowledgeChecks ? (
               <button type="button" className="secondary-button compact-button wiki-study-link" onClick={props.onStudy}>
                 <ActionIcon label="Study builder" />Study builder
@@ -793,6 +832,7 @@ function WikiArticle(props: {
               <ActionIcon label="Edit source" />Edit source
             </button>
             <button className="secondary-button compact-button" type="button" onClick={props.onEditJson}><FileJson size={16} /> Edit JSON</button>
+            <button className="secondary-button compact-button" type="button" onClick={() => setEditingPractice(true)}><ListChecks size={16} /> Edit quizzes &amp; flashcards</button>
           </div>
         </header>
 
@@ -821,7 +861,7 @@ function WikiArticle(props: {
             <WikiSourceList sources={props.page.sources} />
             <WikiProgressSummary progress={props.progress} />
             <WikiBranchProgress topics={props.branchProgress} rootId={props.page.id} />
-            <WikiPracticeInserts page={props.page} />
+            <WikiPracticeInserts page={props.page} onEdit={() => setEditingPractice(true)} />
 
             {props.childNodes.length ? (
               <section className="wiki-related-pages" aria-labelledby="subtopics-title">
@@ -868,6 +908,7 @@ function WikiArticle(props: {
           </aside>
         </div>
       </article>
+      {editingPractice ? <WikiPracticeEditor page={props.page} onSaved={props.onPracticeSaved} onClose={() => setEditingPractice(false)} /> : null}
     </main>
   );
 }
@@ -1136,12 +1177,14 @@ function WikiExplore(props: {
   );
 }
 
-function WikiPracticeInserts(props: { page: WikiPageRecord }) {
+function WikiPracticeInserts(props: { page: WikiPageRecord; onEdit: () => void }) {
   const [mode, setMode] = useState<"quiz" | "flashcards" | "both" | null>(null);
   useEffect(() => { setMode(null); }, [props.page.id]);
-  if (!props.page.quizQuestions.length && !props.page.flashcards.length) return null;
   return <section className="wiki-practice-inserts" id="wiki-knowledge-checks" aria-label="Knowledge checks">
-    <header className="wiki-practice-header"><div><span className="wiki-practice-kicker">Practice</span><h2>Knowledge checks</h2></div></header>
+    <header className="wiki-practice-header"><div><span className="wiki-practice-kicker">Practice</span><h2>Knowledge checks</h2></div>
+      <button className="secondary-button compact-button" type="button" onClick={props.onEdit}>Edit quizzes &amp; flashcards</button>
+    </header>
+    {!props.page.quizQuestions.length && !props.page.flashcards.length ? <p className="empty-state">Add quiz questions or flashcards to practice this article.</p> : null}
     {mode ? <WikiLearningPlayer key={props.page.id + mode} items={studyItems([props.page], mode)} onClose={() => setMode(null)} /> :
       <div className="wiki-study-menu">
         {props.page.quizQuestions.length ? <button type="button" className="wiki-study-mode-card" onClick={() => setMode("quiz")}><span>Quiz</span><strong>{props.page.quizQuestions.length} questions</strong></button> : null}
@@ -1588,7 +1631,7 @@ function WikiTreeNodeView(props: {
 
   return (
     <li>
-      <div className={props.selectedPageId === props.node.id ? "wiki-tree-row active" : "wiki-tree-row"}>
+      <div className={`wiki-tree-row${props.selectedPageId === props.node.id ? " active" : ""}${props.node.isStudied ? " studied" : ""}`}>
         <button
           aria-label={isExpanded ? "Collapse topic" : "Expand topic"}
           className="tree-toggle"
@@ -1600,6 +1643,7 @@ function WikiTreeNodeView(props: {
         </button>
         <button className="tree-node-button" type="button" onClick={() => props.onSelect(props.node.id)}>
           <span>{props.node.title}</span>
+          {props.node.isStudied ? <span className="wiki-tree-studied" aria-label="Studied" title="Studied">✓</span> : null}
         </button>
       </div>
 

@@ -1,5 +1,7 @@
 using System.IO.Compression;
+using System.Reflection;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -7,6 +9,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Repetitio.Application.Wiki;
+using Repetitio.Api.Endpoints;
 using Repetitio.Domain.Wiki;
 using Repetitio.Infrastructure.Backup;
 using Repetitio.Infrastructure.Persistence;
@@ -16,6 +19,48 @@ namespace Repetitio.UnitTests.Wiki;
 
 public sealed class WikiStudyTests
 {
+    [Fact]
+    public async Task ManualStudiedMarkerPersistsWithoutChangingChildrenContentOrPracticeHistory()
+    {
+        await using var fixture = await DatabaseFixture.CreateAsync();
+        var db = fixture.Db;
+        var root = CreatePage("Root", "root", 1);
+        var child = CreatePage("Child", "root/child", 0, root.Id);
+        root.ContentMarkdown = "## Keep this article";
+        db.WikiPages.AddRange(root, child);
+        await db.SaveChangesAsync();
+        Assert.Null(await new WikiStudyService(db).SaveAsync(new(Guid.NewGuid(), [Answer(root, root.QuizQuestions.Single(), true)])));
+        var history = await new WikiStudyService(db).GetOverviewAsync();
+        var updatedAt = root.UpdatedAt;
+
+        foreach (var studied in new[] { true, true, false, true })
+        {
+            var result = await InvokeWiki("SetWikiStudiedAsync", db, root.Id, new WikiStudiedRequest(studied));
+            Assert.Equal(200, ((IStatusCodeHttpResult)result).StatusCode);
+            db.ChangeTracker.Clear();
+            var saved = await db.WikiPages.AsNoTracking().SingleAsync(page => page.Id == root.Id);
+            Assert.Equal(studied, saved.IsStudied);
+            Assert.Equal(root.ContentMarkdown, saved.ContentMarkdown);
+            Assert.Equal(updatedAt, saved.UpdatedAt);
+            Assert.False((await db.WikiPages.AsNoTracking().SingleAsync(page => page.Id == child.Id)).IsStudied);
+            var detail = await InvokeWiki("GetWikiPageAsync", db, root.Id);
+            Assert.Equal(studied, Assert.IsType<WikiPageResponse>(((IValueHttpResult)detail).Value).IsStudied);
+            var tree = await InvokeWiki("GetWikiTreeAsync", db, false);
+            Assert.Equal(studied, Assert.IsType<WikiTreeNodeResponse[]>(((IValueHttpResult)tree).Value).Single(page => page.Id == root.Id).IsStudied);
+        }
+        var after = await new WikiStudyService(db).GetOverviewAsync();
+        Assert.Equal(history.History, after.History);
+        Assert.Equal(history.Pages.Single(p => p.Id == root.Id).Modes, after.Pages.Single(p => p.Id == root.Id).Modes);
+        var missing = await InvokeWiki("SetWikiStudiedAsync", db, Guid.NewGuid(), new WikiStudiedRequest(true));
+        Assert.Equal(404, ((IStatusCodeHttpResult)missing).StatusCode);
+        // Pages without knowledge checks can also be marked independently.
+        await InvokeWiki("SetWikiStudiedAsync", db, child.Id, new WikiStudiedRequest(true));
+        Assert.True((await db.WikiPages.AsNoTracking().SingleAsync(page => page.Id == child.Id)).IsStudied);
+    }
+
+    private static async Task<IResult> InvokeWiki(string name, params object[] arguments) =>
+        await (Task<IResult>)typeof(WikiEndpoints).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, arguments)!;
+
     [Fact]
     public async Task PartialSessionsCreditOnlyAnsweredPagesAndCompleteAcrossSessions()
     {
@@ -90,13 +135,15 @@ public sealed class WikiStudyTests
         Assert.Equal(mode.LastCompletedAt!.Value.AddDays(14), mode.NextReviewAt);
     }
 
-    [Fact]
-    public async Task MigrationAndOldBackupRestorePreserveExistingWikiTextAndImages()
+    [Theory]
+    [InlineData("_AddWikiSources")]
+    [InlineData("_AddWikiStudyTracking")]
+    public async Task MigrationAndOldBackupRestorePreserveExistingWikiTextAndImages(string schemaSuffix)
     {
         await using var fixture = await DatabaseFixture.CreateAsync(migrate: false);
         var db = fixture.Db;
         var migrations = db.Database.GetMigrations().ToArray();
-        var oldSchema = migrations[^2];
+        var oldSchema = migrations.Single(migration => migration.EndsWith(schemaSuffix));
         await db.GetService<IMigrator>().MigrateAsync(oldSchema);
         var id = Guid.NewGuid();
         var imageId = Guid.NewGuid();
@@ -104,6 +151,36 @@ public sealed class WikiStudyTests
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiPages (Id,Title,Slug,Path,Depth,SortOrder,Summary,ContentMarkdown,IsArchived,CreatedAt,UpdatedAt) VALUES ({id},{"Original"},{"original"},{"original"},{0},{0},{"Existing summary"},{"## Original text\n\nNever lose this."},{false},{now},{now})");
         byte[] imageBytes = [1, 2, 3, 4];
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiImages (Id,FileName,ContentType,Sha256,SizeBytes,Data,CreatedAt) VALUES ({imageId},{"original.png"},{"image/png"},{new string('a',64)},{4L},{imageBytes},{now})");
+        if (schemaSuffix == "_AddWikiStudyTracking")
+        {
+            var questionId = Guid.NewGuid();
+            var sessionId = Guid.NewGuid();
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiQuizQuestions (Id,WikiPageId,Prompt,SortOrder,CreatedAt,UpdatedAt) VALUES ({questionId},{id},{"Existing question"},{0},{now},{now})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiQuizOptions (Id,WikiQuizQuestionId,Text,IsCorrect,SortOrder) VALUES ({Guid.NewGuid()},{questionId},{"Correct"},{true},{0})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiStudySessions (Id,CompletedAt) VALUES ({sessionId},{now})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiStudyAnswers (Id,SessionId,WikiPageId,ItemId,Kind,IsCorrect) VALUES ({Guid.NewGuid()},{sessionId},{id},{questionId},{"quiz"},{true})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiStudyProgress (WikiPageId,Kind,LastPracticedAt,LastCompletedAt) VALUES ({id},{"quiz"},{now},{now})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO WikiStudySettings (Id,IntervalDays) VALUES ({1},{7})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE WikiPages SET ReviewIntervalDays = {14} WHERE Id = {id}");
+        }
+
+        async Task AssertOriginalStudyAsync()
+        {
+            if (schemaSuffix != "_AddWikiStudyTracking") return;
+            var overview = await new WikiStudyService(db).GetOverviewAsync();
+            Assert.Equal(7, overview.IntervalDays);
+            var session = Assert.Single(overview.History);
+            Assert.Equal(1, session.Answered);
+            Assert.Equal(1, session.Correct);
+            Assert.Equal(now, session.CompletedAt);
+            var topic = Assert.Single(overview.Pages);
+            Assert.Equal(14, topic.IntervalDays);
+            var quiz = topic.Modes.Single(mode => mode.Kind == "quiz");
+            Assert.Equal(1, quiz.Total);
+            Assert.Equal(1, quiz.Correct);
+            Assert.Equal(now.AddDays(14), quiz.NextReviewAt);
+        }
+
         var archive = await CreateArchiveAsync(fixture.Path, oldSchema);
         using (var services = new ServiceCollection()
             .AddDbContext<RepetitioDbContext>(options => options.UseSqlite($"Data Source={fixture.Path};Pooling=False"))
@@ -115,7 +192,9 @@ public sealed class WikiStudyTests
         var page = await db.WikiPages.SingleAsync();
         Assert.Equal("## Original text\n\nNever lose this.", page.ContentMarkdown);
         Assert.True(page.ReviewEnabled);
+        Assert.False(page.IsStudied);
         Assert.Equal(imageBytes, (await db.WikiImages.SingleAsync()).Data);
+        await AssertOriginalStudyAsync();
         db.ChangeTracker.Clear();
 
         var service = new RepetitioBackupService(db, new BackupArchiveValidator(), Options.Create(new BackupOptions { Directory = fixture.Backups }));
@@ -129,6 +208,8 @@ public sealed class WikiStudyTests
         Assert.True(File.Exists(System.IO.Path.Combine(fixture.Backups, import.PreImportBackupFileName)));
         Assert.Equal(imageBytes, (await db.WikiImages.AsNoTracking().SingleAsync()).Data);
         Assert.Equal("## Original text\n\nNever lose this.", (await db.WikiPages.AsNoTracking().SingleAsync()).ContentMarkdown);
+        Assert.False((await db.WikiPages.AsNoTracking().SingleAsync()).IsStudied);
+        await AssertOriginalStudyAsync();
         var exported = await service.ExportAsync();
         using var stream = new MemoryStream(exported.Contents);
         Assert.True((await service.ValidateAsync(stream)).IsValid);
@@ -168,17 +249,30 @@ public sealed class WikiStudyTests
         await using var source = await DatabaseFixture.CreateAsync();
         var page = CreatePage("Tracked", "tracked", 1);
         page.ReviewIntervalDays = 14;
+        page.IsStudied = true;
         source.Db.WikiPages.Add(page);
         source.Db.WikiStudySettings.Add(new() { IntervalDays = 7 });
         await source.Db.SaveChangesAsync();
         var study = new WikiStudyService(source.Db);
         Assert.Null(await study.SaveAsync(new(Guid.NewGuid(), [Answer(page, page.QuizQuestions.Single(), true)])));
+        var question = page.QuizQuestions.Single();
+        var savedPractice = await InvokeWiki("UpdateWikiPracticeAsync", source.Db, page.Id, new UpdateWikiPracticeRequest(
+            page.UpdatedAt,
+            [new() { Prompt = question.Prompt, Explanation = question.Explanation, Options = question.Options.OrderBy(option => option.SortOrder)
+                .Select(option => new WikiQuizOptionRequest { Text = option.Text, IsCorrect = option.IsCorrect }).ToArray() }],
+            [new() { Front = "Added in the form", Back = "Must survive backup restore" }]));
+        Assert.Equal(200, ((IStatusCodeHttpResult)savedPractice).StatusCode);
         var backup = new RepetitioBackupService(source.Db, new BackupArchiveValidator(), Options.Create(new BackupOptions { Directory = source.Backups }));
         var export = await backup.ExportAsync();
         await using var target = await DatabaseFixture.CreateAsync();
         var restore = new RepetitioBackupService(target.Db, new BackupArchiveValidator(), Options.Create(new BackupOptions { Directory = target.Backups }));
         using var archive = new MemoryStream(export.Contents);
         Assert.True((await restore.ImportAsync(archive)).Imported);
+        Assert.True((await target.Db.WikiPages.AsNoTracking().SingleAsync()).IsStudied);
+        var restoredCard = await target.Db.WikiFlashcards.AsNoTracking().SingleAsync();
+        Assert.Equal("Added in the form", restoredCard.Front);
+        Assert.Equal("Must survive backup restore", restoredCard.Back);
+        Assert.Equal(question.Id, (await target.Db.WikiQuizQuestions.AsNoTracking().SingleAsync()).Id);
         var overview = await new WikiStudyService(target.Db).GetOverviewAsync();
         Assert.Equal(7, overview.IntervalDays);
         Assert.Single(overview.History);
