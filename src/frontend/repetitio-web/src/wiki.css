@@ -259,6 +259,17 @@
 .wiki-json-review-summary { display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 12px 0; border-bottom: 1px solid var(--wiki-border); font-size: .85rem; }
 .wiki-json-counts { display: flex; flex-wrap: wrap; gap: 12px; color: var(--wiki-muted); font-size: .83rem; margin-bottom: 16px; }
 .wiki-json-preview-idle { display: grid; justify-items: start; gap: 16px; padding: 24px 0; }
+.wiki-player-management { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+.wiki-player-management > div { display: flex; gap: 6px; }
+.wiki-player-management button { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding: 8px; }
+.wiki-player-notice { margin: 0; padding: 10px 18px; background: var(--success-soft); color: var(--success); font: 13px var(--font-ui); }
+.wiki-single-check-dialog { width: min(720px, calc(100vw - 24px)); }
+.wiki-single-check-dialog .wiki-practice-editor-fields { display: grid; gap: 16px; }
+.wiki-delete-check-preview { margin: 18px 0; padding: 16px; border-left: 3px solid var(--danger-border); background: var(--surface-soft); overflow-wrap: anywhere; white-space: pre-wrap; }
+.wiki-json-workspace .code-workbench .cm-editor { height: 68dvh; }
+@media (pointer: coarse) {
+  .wiki-player-management button { min-width: 44px; min-height: 44px; }
+}
 @media (max-width: 760px) {
   .wiki-json-workspace { grid-template-columns: minmax(0, 1fr); }
   .wiki-json-workspace .dsa-code-surface { max-height: 50dvh; }

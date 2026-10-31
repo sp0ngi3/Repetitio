@@ -1,5 +1,10 @@
 namespace Repetitio.Application.Wiki;
 
+public sealed record ChangeWikiPracticeItemRequest(
+    DateTime ExpectedUpdatedAt, bool Delete, WikiQuizQuestionRequest? Question = null, WikiFlashcardRequest? Flashcard = null);
+
+public sealed record WikiPracticeItemChangeResponse(WikiPageResponse Page, Guid? ReplacementItemId);
+
 /// <summary>Sets the manual studied marker for a single wiki page.</summary>
 public sealed record WikiStudiedRequest(bool IsStudied);
 

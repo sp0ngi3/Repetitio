@@ -20,6 +20,97 @@ namespace Repetitio.UnitTests.Wiki;
 public sealed class WikiStudyTests
 {
     [Fact]
+    public async Task SingleCheckEditAndDeletionKeepUnrelatedIdentitiesHistoryAndBackupCompatibility()
+    {
+        await using var fixture = await DatabaseFixture.CreateAsync();
+        var db = fixture.Db;
+        var root = CreatePage("Root", "root", 2);
+        var child = CreatePage("Child", "root/child", 1, root.Id);
+        root.ContentMarkdown = "## Keep article\n![Keep image](/api/wiki/images/existing)";
+        root.IsStudied = true;
+        root.ReviewIntervalDays = 14;
+        var card = new WikiFlashcard { Id = Guid.NewGuid(), Front = "Keep front", Back = "Keep back" };
+        root.Flashcards.Add(card);
+        root.Sources.Add(new() { Id = Guid.NewGuid(), Title = "Keep source" });
+        db.WikiPages.AddRange(root, child);
+        await db.SaveChangesAsync();
+        var checks = root.QuizQuestions.OrderBy(question => question.SortOrder).ToArray();
+        var optionIds = checks[1].Options.Select(option => option.Id).Order().ToArray();
+        var study = new WikiStudyService(db);
+        Assert.Null(await study.SaveAsync(new(Guid.NewGuid(), checks.Select(question => Answer(root, question, true)).ToArray())));
+        var history = (await study.GetOverviewAsync()).History;
+
+        var request = new ChangeWikiPracticeItemRequest(root.UpdatedAt, false, new() {
+            Prompt = "Revised prompt", Explanation = "Revised explanation", Options = [new() { Text = "Right", IsCorrect = true }, new() { Text = "Wrong" }]
+        });
+        var edited = await InvokeWiki("ChangeWikiPracticeItemAsync", db, root.Id, "quiz", checks[0].Id, request);
+        Assert.Equal(200, ((IStatusCodeHttpResult)edited).StatusCode);
+        var response = Assert.IsType<WikiPracticeItemChangeResponse>(((IValueHttpResult)edited).Value);
+        Assert.NotNull(response.ReplacementItemId);
+        Assert.NotEqual(checks[0].Id, response.ReplacementItemId);
+        Assert.Equal(checks[1].Id, response.Page.QuizQuestions.Single(question => question.Prompt == checks[1].Prompt).Id);
+        Assert.Equal(optionIds, (await db.WikiQuizOptions.AsNoTracking().Where(option => option.WikiQuizQuestionId == checks[1].Id).Select(option => option.Id).ToArrayAsync()).Order().ToArray());
+        Assert.Equal(history, (await study.GetOverviewAsync()).History);
+        Assert.Equal(1, (await study.GetOverviewAsync()).Pages.Single(page => page.Id == root.Id).Modes.Single(mode => mode.Kind == "quiz").Covered);
+
+        db.ChangeTracker.Clear();
+        var deleted = await InvokeWiki("ChangeWikiPracticeItemAsync", db, root.Id, "flashcard", card.Id,
+            new ChangeWikiPracticeItemRequest(response.Page.UpdatedAt, true));
+        Assert.Equal(200, ((IStatusCodeHttpResult)deleted).StatusCode);
+        var updated = Assert.IsType<WikiPracticeItemChangeResponse>(((IValueHttpResult)deleted).Value);
+        Assert.Null(updated.ReplacementItemId);
+        Assert.Empty(updated.Page.Flashcards);
+        Assert.Equal(root.ContentMarkdown, updated.Page.ContentMarkdown);
+        Assert.True(updated.Page.IsStudied);
+        Assert.Single(updated.Page.Sources);
+        Assert.Equal(14, (await db.WikiPages.AsNoTracking().SingleAsync(page => page.Id == root.Id)).ReviewIntervalDays);
+        Assert.Single(await db.WikiQuizQuestions.AsNoTracking().Where(question => question.WikiPageId == child.Id).ToArrayAsync());
+        Assert.Equal(history, (await study.GetOverviewAsync()).History);
+
+        var backup = new RepetitioBackupService(db, new BackupArchiveValidator(), Options.Create(new BackupOptions { Directory = fixture.Backups }));
+        var exported = await backup.ExportAsync();
+        await using var target = await DatabaseFixture.CreateAsync();
+        var restore = new RepetitioBackupService(target.Db, new BackupArchiveValidator(), Options.Create(new BackupOptions { Directory = target.Backups }));
+        using var archive = new MemoryStream(exported.Contents);
+        Assert.True((await restore.ImportAsync(archive)).Imported);
+        Assert.True(await target.Db.WikiQuizQuestions.AnyAsync(question => question.Id == response.ReplacementItemId));
+        Assert.False(await target.Db.WikiFlashcards.AnyAsync(flashcard => flashcard.Id == card.Id));
+        Assert.Equal(history, (await new WikiStudyService(target.Db).GetOverviewAsync()).History);
+    }
+
+    [Fact]
+    public async Task SingleCheckMutationRejectsStaleWrongPageAndInvalidRequestsWithoutChanges()
+    {
+        await using var fixture = await DatabaseFixture.CreateAsync();
+        var db = fixture.Db;
+        var root = CreatePage("Root", "root", 1);
+        var other = CreatePage("Other", "other", 1);
+        db.WikiPages.AddRange(root, other);
+        await db.SaveChangesAsync();
+        var question = root.QuizQuestions.Single();
+        async Task AssertRejected(int status, Guid page, string kind, ChangeWikiPracticeItemRequest request)
+        {
+            var result = await InvokeWiki("ChangeWikiPracticeItemAsync", db, page, kind, question.Id, request);
+            Assert.Equal(status, ((IStatusCodeHttpResult)result).StatusCode);
+            Assert.Equal(2, await db.WikiQuizQuestions.CountAsync());
+            Assert.Equal(4, await db.WikiQuizOptions.CountAsync());
+            Assert.Equal(root.UpdatedAt, (await db.WikiPages.AsNoTracking().SingleAsync(page => page.Id == root.Id)).UpdatedAt);
+        }
+        await AssertRejected(409, root.Id, "quiz", new(root.UpdatedAt.AddSeconds(-1), true));
+        await AssertRejected(404, other.Id, "quiz", new(other.UpdatedAt, true));
+        await AssertRejected(400, root.Id, "unknown", new(root.UpdatedAt, true));
+        await AssertRejected(400, root.Id, "quiz", new(root.UpdatedAt, false));
+        await AssertRejected(400, root.Id, "quiz", new(root.UpdatedAt, false, new() { Prompt = "Empty answers", Options = [] }));
+        await AssertRejected(400, root.Id, "quiz", new(root.UpdatedAt, true, new() { Prompt = "Not a delete", Options = [] }));
+
+        var unchanged = await InvokeWiki("ChangeWikiPracticeItemAsync", db, root.Id, "quiz", question.Id, new ChangeWikiPracticeItemRequest(root.UpdatedAt, false,
+            new() { Prompt = question.Prompt, Explanation = question.Explanation,
+                Options = question.Options.OrderBy(option => option.SortOrder).Select(option => new WikiQuizOptionRequest { Text = option.Text, IsCorrect = option.IsCorrect }).ToArray() }));
+        Assert.Equal(question.Id, Assert.IsType<WikiPracticeItemChangeResponse>(((IValueHttpResult)unchanged).Value).ReplacementItemId);
+        Assert.Equal(root.UpdatedAt, (await db.WikiPages.AsNoTracking().SingleAsync(page => page.Id == root.Id)).UpdatedAt);
+    }
+
+    [Fact]
     public async Task ManualStudiedMarkerPersistsWithoutChangingChildrenContentOrPracticeHistory()
     {
         await using var fixture = await DatabaseFixture.CreateAsync();

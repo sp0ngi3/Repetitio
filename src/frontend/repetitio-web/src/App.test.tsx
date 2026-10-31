@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { EditorView } from "@codemirror/view";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
@@ -816,20 +817,15 @@ beforeEach(() => {
 });
 
 describe("App", () => {
-  it.each(["quiz", "flashcard"] as const)("opens the exact Wiki %s player from Overview", async (kind) => {
-    vi.mocked(getWikiStudy).mockResolvedValue({ intervalDays: 30, history: [], pages: [{
-      id: "wiki-1", parentId: null, title: "Algorithm", path: "algorithm", isArchived: false,
-      reviewEnabled: true, effectiveReviewEnabled: true, intervalDays: null, modes: [{
-        kind, total: 1, covered: 0, correct: 0, lastPracticedAt: null, lastCompletedAt: null, nextReviewAt: null
-      }]
-    }] });
+  it("keeps Wiki study out of Overview without removing the Wiki workspace", async () => {
     render(<App />);
-    const label = kind === "quiz" ? "Quiz" : "Flashcards";
-    fireEvent.click(await screen.findByRole("button", { name: `Practice Algorithm ${label}` }));
-    const player = await screen.findByRole("region", { name: "Wiki practice player" });
-    expect(within(player).getByText(kind === "quiz" ? "What is an algorithm?" : "Algorithm", kind === "flashcard" ? { selector: "strong" } : {})).toBeInTheDocument();
-    expect(getWikiPage).toHaveBeenCalledWith("wiki-1");
-    expect(within(player).queryByText(kind === "quiz" ? "Finite procedure for solving a class of problems." : "What is an algorithm?")).not.toBeInTheDocument();
+    await screen.findByText("Learning areas");
+    expect(screen.queryByRole("heading", { name: "Wiki study" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Knowledge practice")).not.toBeInTheDocument();
+    expect(getWikiStudy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Wiki" }));
+    await waitFor(() => expect(getWikiStudy).toHaveBeenCalled());
+    expect(await screen.findByRole("textbox", { name: "Search topic tree" })).toBeInTheDocument();
   });
   /**
    * Verifies that backup settings expose export and import controls.
@@ -1297,7 +1293,8 @@ describe("App", () => {
 
     fireEvent.change(screen.getByLabelText("Approach"), { target: { value: "Scan and push open brackets." } });
     fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Fresh repeat notes." } });
-    fireEvent.change(screen.getByLabelText("Source code"), { target: { value: "public bool IsValid(string s) => false;" } });
+    const codeView = EditorView.findFromDOM(screen.getByRole("textbox", { name: "Source code" }))!;
+    act(() => codeView.dispatch({ changes: { from: 0, to: codeView.state.doc.length, insert: "public bool IsValid(string s) => false;" } }));
     fireEvent.click(screen.getByRole("button", { name: "Save attempt" }));
 
     await waitFor(() => {
@@ -1941,11 +1938,12 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Basics" }));
     fireEvent.click(await screen.findByText("Reverse Linked List"));
 
-    const editor = screen.getByLabelText("Code") as HTMLTextAreaElement;
-    fireEvent.change(editor, { target: { value: "public static class Solution\n{\n}" } });
-    editor.setSelectionRange("public static class Solution\n{\n".length, "public static class Solution\n{\n".length);
+    const editor = screen.getByRole("textbox", { name: "Code" });
+    const view = EditorView.findFromDOM(editor)!;
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "public static class Solution\n{\n}" },
+      selection: { anchor: "public static class Solution\n{\n".length } }));
     fireEvent.keyDown(editor, { key: "Tab" });
 
-    expect(editor.value).toContain("{\n    }");
+    expect(view.state.doc.toString()).toContain("{\n    }");
   });
 });

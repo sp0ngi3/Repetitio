@@ -4,6 +4,8 @@ import { codeLanguageLabel, highlightCode } from "./codeHighlight";
 import { WikiMarkdownContent } from "./WikiMarkdownContent";
 import { renderWikiMarkdownHtml } from "./wikiMarkdown";
 import { CodeEditor } from "./CodeEditor";
+import { EditorView } from "@codemirror/view";
+import { act } from "@testing-library/react";
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -72,16 +74,16 @@ it("copies the original code rather than HTML tokens or the language label", asy
   vi.unstubAllGlobals();
 });
 
-it("preserves highlighted editor typing, scroll alignment and accessible source", () => {
+it("uses a single accessible CodeMirror surface with native syntax and undo support", () => {
   const onChange = vi.fn();
   const { container } = render(<CodeEditor language="C#" value="public int value = 42;" onChange={onChange} />);
   const source = screen.getByRole("textbox", { name: "Source code" });
-  expect(source).toHaveValue("public int value = 42;");
-  expect(container.querySelector(".dsa-code-highlight .hljs-keyword")).not.toBeNull();
-  fireEvent.change(source, { target: { value: "public int value = 43;" } });
+  expect(source).toHaveTextContent("public int value = 42;");
+  expect(source).toHaveAttribute("contenteditable", "true");
+  expect(container.querySelector(".dsa-code-highlight")).toBeNull();
+  const view = EditorView.findFromDOM(container.querySelector(".cm-editor")!)!;
+  act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "public int value = 43;" } }));
   expect(onChange).toHaveBeenCalledWith("public int value = 43;");
-  fireEvent.scroll(source, { target: { scrollTop: 64, scrollLeft: 90 } });
-  expect(container.querySelector(".dsa-code-highlight")?.scrollTop).toBe(64);
-  expect(container.querySelector(".dsa-code-highlight")?.scrollLeft).toBe(90);
-  expect(container.querySelector(".dsa-code-lines")?.scrollTop).toBe(64);
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(onChange).toHaveBeenLastCalledWith("public int value = 42;");
 });

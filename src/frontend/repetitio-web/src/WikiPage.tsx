@@ -369,6 +369,12 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
     return () => window.removeEventListener("wiki-study-updated", refresh);
   }, []);
 
+  function practicePageUpdated(updated: WikiPageRecord) {
+    setSelectedPage(current => current?.id === updated.id ? updated : current);
+    setPages(current => current.map(page => page.id === updated.id ? updated : page));
+    setTreeNodes(current => current.map(node => node.id === updated.id ? { ...node, updatedAt: updated.updatedAt } : node));
+  }
+
   async function selectPage(id: string) {
     setError(null);
     setFocusedPractice(false);
@@ -661,9 +667,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
             onEdit={startEditPage}
             onEditJson={() => setView("json")}
             onPracticeSaved={updated => {
-              setSelectedPage(current => current?.id === updated.id ? updated : current);
-              setPages(current => current.map(page => page.id === updated.id ? updated : page));
-              setTreeNodes(current => current.map(node => node.id === updated.id ? { ...node, updatedAt: updated.updatedAt } : node));
+              practicePageUpdated(updated);
               setForm(createWikiForm(updated));
               window.dispatchEvent(new Event("wiki-study-updated"));
             }}
@@ -704,8 +708,8 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
           <WikiProgressSummary progress={studyOverview?.pages.find(p => p.id === selectedPage.id)} />
           <WikiBranchProgress topics={studyOverview?.pages ?? []} rootId={selectedPage.id} />
           {focusedPractice && selectedPage.id === focusPageId && studyItems([selectedPage], focusStudyKind === "quiz" ? "quiz" : "flashcards").length
-            ? <WikiLearningPlayer items={studyItems([selectedPage], focusStudyKind === "quiz" ? "quiz" : "flashcards")} onClose={() => setFocusedPractice(false)} />
-            : <WikiStudyBuilder key={selectedPage.id} currentPage={selectedPage} treeNodes={treeNodes.filter(node => !studyOverview?.pages.find(p => p.id === node.id)?.isArchived)} />}
+            ? <WikiLearningPlayer items={studyItems([selectedPage], focusStudyKind === "quiz" ? "quiz" : "flashcards")} onPageUpdated={practicePageUpdated} onClose={() => setFocusedPractice(false)} />
+            : <WikiStudyBuilder key={selectedPage.id} currentPage={selectedPage} onPageUpdated={practicePageUpdated} treeNodes={treeNodes.filter(node => !studyOverview?.pages.find(p => p.id === node.id)?.isArchived)} />}
           {studyOverview?.history.length ? <details className="wiki-session-history"><summary>Recent study sessions</summary>
             {studyOverview.history.map(session => <div key={session.id}><time>{formatDateTime(session.completedAt)}</time><span>{session.correct} / {session.answered} correct</span></div>)}
           </details> : null}
@@ -861,7 +865,7 @@ function WikiArticle(props: {
             <WikiSourceList sources={props.page.sources} />
             <WikiProgressSummary progress={props.progress} />
             <WikiBranchProgress topics={props.branchProgress} rootId={props.page.id} />
-            <WikiPracticeInserts page={props.page} onEdit={() => setEditingPractice(true)} />
+            <WikiPracticeInserts page={props.page} onPageUpdated={props.onPracticeSaved} onEdit={() => setEditingPractice(true)} />
 
             {props.childNodes.length ? (
               <section className="wiki-related-pages" aria-labelledby="subtopics-title">
@@ -962,7 +966,7 @@ function WikiSourceList(props: { sources: WikiPageRecord["sources"] }) {
   );
 }
 
-function WikiStudyBuilder(props: { currentPage: WikiPageRecord; treeNodes: WikiTreeNode[] }) {
+function WikiStudyBuilder(props: { currentPage: WikiPageRecord; treeNodes: WikiTreeNode[]; onPageUpdated: (page: WikiPageRecord) => void }) {
   const nestedTree = useMemo(() => buildNestedTree(props.treeNodes), [props.treeNodes]);
   const orderedTopicIds = useMemo(() => flattenNestedWikiTree(nestedTree).map(node => node.id), [nestedTree]);
   const [scope, setScope] = useState<WikiStudyScope>("branch");
@@ -1016,7 +1020,7 @@ function WikiStudyBuilder(props: { currentPage: WikiPageRecord; treeNodes: WikiT
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to prepare this session."); }
     finally { setLoading(false); }
   }
-  if (items.length) return <WikiLearningPlayer key={items.map(i => i.id).join("-")} items={items} onClose={() => setItems([])} />;
+  if (items.length) return <WikiLearningPlayer key={items.map(i => i.id).join("-")} items={items} onPageUpdated={props.onPageUpdated} onClose={() => setItems([])} />;
   return <section className="wiki-study-builder" id="wiki-study-builder" aria-label="Wiki study builder">
     <header className="wiki-study-builder-header"><div><span className="wiki-practice-kicker">Study builder</span><h2>Choose your topics</h2></div><span>{selectedIds.size} selected</span></header>
     <div className="wiki-study-presets">
@@ -1177,7 +1181,7 @@ function WikiExplore(props: {
   );
 }
 
-function WikiPracticeInserts(props: { page: WikiPageRecord; onEdit: () => void }) {
+function WikiPracticeInserts(props: { page: WikiPageRecord; onEdit: () => void; onPageUpdated: (page: WikiPageRecord) => void }) {
   const [mode, setMode] = useState<"quiz" | "flashcards" | "both" | null>(null);
   useEffect(() => { setMode(null); }, [props.page.id]);
   return <section className="wiki-practice-inserts" id="wiki-knowledge-checks" aria-label="Knowledge checks">
@@ -1185,7 +1189,7 @@ function WikiPracticeInserts(props: { page: WikiPageRecord; onEdit: () => void }
       <button className="secondary-button compact-button" type="button" onClick={props.onEdit}>Edit quizzes &amp; flashcards</button>
     </header>
     {!props.page.quizQuestions.length && !props.page.flashcards.length ? <p className="empty-state">Add quiz questions or flashcards to practice this article.</p> : null}
-    {mode ? <WikiLearningPlayer key={props.page.id + mode} items={studyItems([props.page], mode)} onClose={() => setMode(null)} /> :
+    {mode ? <WikiLearningPlayer key={props.page.id + mode} items={studyItems([props.page], mode)} onPageUpdated={props.onPageUpdated} onClose={() => setMode(null)} /> :
       <div className="wiki-study-menu">
         {props.page.quizQuestions.length ? <button type="button" className="wiki-study-mode-card" onClick={() => setMode("quiz")}><span>Quiz</span><strong>{props.page.quizQuestions.length} questions</strong></button> : null}
         {props.page.flashcards.length ? <button type="button" className="wiki-study-mode-card" onClick={() => setMode("flashcards")}><span>Flashcards</span><strong>{props.page.flashcards.length} cards</strong></button> : null}

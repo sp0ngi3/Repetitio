@@ -7,7 +7,6 @@ import { FlashcardsPage } from "./FlashcardsPage";
 import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
 import { WikiReviewSettings } from "./WikiLearning";
-import { WikiOverview } from "./WikiOverview";
 import { AppFooter, AppHeader, appPages, type AppPage } from "./AppChrome";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { applyAppearance, readColorMode, readMotionPreference, readVisualStyle, type ColorMode, type MotionPreference, type VisualStyle } from "./appearance";
@@ -202,7 +201,6 @@ export function App() {
           dashboard={dashboard}
           groupedCounts={groupedCounts}
           onOpenItem={openLearningTarget}
-          onPracticeWiki={(id, kind) => { setFocusedWikiTarget({ id, kind, nonce: Date.now() }); setActivePage("wiki"); }}
         />
       ) : null}
 
@@ -323,7 +321,6 @@ interface OverviewPageProps {
   groupedCounts: Record<LearningItemType, number>;
   /** Opens a concrete learning item in its owning module. */
   onOpenItem: (target: LearningNavigationTarget) => void;
-  onPracticeWiki: (pageId: string, kind: WikiStudyModeProgress["kind"]) => void;
 }
 
 /**
@@ -432,8 +429,6 @@ function OverviewPage(props: OverviewPageProps) {
           )}
         </section>
       </section>
-
-      <WikiOverview onPractice={props.onPracticeWiki} />
 
       <section className="panel data-panel" aria-labelledby="overview-title">
         <div className="section-heading">

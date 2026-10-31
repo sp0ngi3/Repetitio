@@ -331,7 +331,9 @@ export function BasicsPage(props: BasicsPageProps) {
               <div className="editor-field">
                 <label htmlFor="basics-code-editor">Code</label>
                 <CodeEditor
+                  key={selectedExercise.slug}
                   id="basics-code-editor"
+                  label="Code"
                   language={selectedExercise.language}
                   value={attemptForm.codeDraft}
                   onChange={(value) => updateAttemptForm("codeDraft", value)}

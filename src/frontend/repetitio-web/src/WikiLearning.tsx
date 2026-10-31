@@ -4,6 +4,8 @@ import { getWikiStudy, saveWikiStudy, saveWikiStudySettings, saveWikiReviewPrefe
 import type { WikiPage, WikiStudyAnswerRequest, WikiStudyOverview, WikiStudyPageProgress } from "./types";
 import "./wiki.css";
 import { wikiStudyRows } from "./wikiStudyProgress";
+import { Pencil, Trash2 } from "lucide-react";
+import { WikiStudyItemEditor } from "./WikiStudyItemEditor";
 
 export type WikiStudyItem =
   | { id: string; type: "quiz"; pageId: string; pageTitle: string; pagePath: string; question: WikiPage["quizQuestions"][number] }
@@ -18,7 +20,13 @@ export function studyItems(pages: WikiPage[], mode: "quiz" | "flashcards" | "bot
   ]);
 }
 
-export function WikiLearningPlayer({ items, onClose }: { items: WikiStudyItem[]; onClose: () => void }) {
+export function WikiLearningPlayer({ items: initialItems, onClose, onPageUpdated }: {
+  items: WikiStudyItem[]; onClose: () => void; onPageUpdated?: (page: WikiPage) => void;
+}) {
+  const [items, setItems] = useState(initialItems);
+  const initialIds = useRef(initialItems.map(item => item.id).join(","));
+  const [editing, setEditing] = useState<{ item: WikiStudyItem; deleting: boolean } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, WikiStudyAnswerRequest>>({});
   const [revealed, setRevealed] = useState(false);
@@ -30,8 +38,18 @@ export function WikiLearningPlayer({ items, onClose }: { items: WikiStudyItem[];
   const sessionId = useRef(crypto.randomUUID());
   const frameRef = useRef<HTMLElement>(null);
   useEffect(() => { frameRef.current?.scrollIntoView?.({ block: "start" }); }, []);
+  useEffect(() => {
+    const ids = initialItems.map(item => item.id).join(",");
+    if (ids === initialIds.current) return;
+    initialIds.current = ids;
+    setItems(initialItems);
+    setIndex(current => Math.max(0, Math.min(current, initialItems.length - 1)));
+    const liveIds = new Set(initialItems.map(item => item.id));
+    setAnswers(current => Object.fromEntries(Object.entries(current).filter(([id]) => liveIds.has(id))));
+    setRevealed(false);
+  }, [initialItems]);
   const item = items[index];
-  const result = answers[item.id];
+  const result = item ? answers[item.id] : undefined;
   const values = Object.values(answers);
   const correct = values.filter(answer => {
     if (answer.kind === "flashcard") return answer.knew;
@@ -44,6 +62,21 @@ export function WikiLearningPlayer({ items, onClose }: { items: WikiStudyItem[];
     setRevealed(false);
     const body = frameRef.current?.querySelector(".wiki-player-body");
     if (body) body.scrollTop = 0;
+  }
+
+  function changed(page: WikiPage, replacementItemId: string | null) {
+    if (!editing) return;
+    const oldId = editing.item.id;
+    const replacement = replacementItemId ? studyItems([page], "both").find(check => check.id === replacementItemId) : undefined;
+    setItems(current => current.flatMap(check => check.id !== oldId ? [check] : replacement ? [replacement] : []));
+    if (replacementItemId !== oldId) setAnswers(current => {
+      const next = { ...current }; delete next[oldId]; return next;
+    });
+    if (!replacement) setIndex(current => Math.max(0, Math.min(current, items.length - 2)));
+    setRevealed(false);
+    setNotice(replacement ? "Check updated. Answer the revised check again; your other answers were kept." : "Check permanently deleted. Your other answers were kept.");
+    onPageUpdated?.(page);
+    window.dispatchEvent(new Event("wiki-study-updated"));
   }
 
   async function finish() {
@@ -60,8 +93,13 @@ export function WikiLearningPlayer({ items, onClose }: { items: WikiStudyItem[];
     finally { setSaving(false); }
   }
 
+  if (!item) return <section className="wiki-learning-player" aria-label="Wiki practice player">
+    <div className="wiki-player-body"><h3>No checks remaining</h3><p role="status">All checks in this selection have been removed. The article and your past study history are unchanged.</p>
+      <button className="primary-button" type="button" onClick={onClose}>Back to topics</button></div>
+  </section>;
+
   return <section className="wiki-learning-player" ref={frameRef} aria-label="Wiki practice player" onKeyDown={event => {
-    if ((event.target as HTMLElement).matches("input,textarea,select")) return;
+    if (editing || (event.target as HTMLElement).closest("input,textarea,select,button,[contenteditable='true']")) return;
     if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); }
     if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
   }}>
@@ -69,9 +107,17 @@ export function WikiLearningPlayer({ items, onClose }: { items: WikiStudyItem[];
       <div><span className="wiki-practice-kicker">{summary ? "Session results" : item.type === "quiz" ? "Quiz" : "Flashcards"}</span>
         <h3>{summary ? `${correct} / ${values.length} correct` : item.pageTitle}</h3>
         <small>{item.pagePath}</small></div>
-      <span>{values.length} / {items.length} answered</span>
+      <div className="wiki-player-management"><span>{values.length} / {items.length} answered</span>
+        {!summary ? <div>
+          <button className="secondary-button compact-button" type="button" disabled={saving} title="Edit this check" aria-label="Edit this check"
+            onClick={() => { setNotice(null); setEditing({ item, deleting: false }); }}><Pencil size={17} /></button>
+          <button className="danger-button compact-button" type="button" disabled={saving} title="Delete this check" aria-label="Delete this check"
+            onClick={() => { setNotice(null); setEditing({ item, deleting: true }); }}><Trash2 size={17} /></button>
+        </div> : null}
+      </div>
     </header>
     <progress max={items.length} value={values.length} aria-label="Answered checks" />
+    {notice ? <p className="wiki-player-notice" role="status">{notice}</p> : null}
     <div className="wiki-player-body">
       {summary ? <div className="wiki-player-results">
         <h3>{trackedCount ? "Results saved" : "Practice complete"}</h3>
@@ -117,6 +163,8 @@ export function WikiLearningPlayer({ items, onClose }: { items: WikiStudyItem[];
         }}><ActionIcon label="Close" />Close</button>
       </>}
     </footer>
+    {editing ? <WikiStudyItemEditor key={editing.item.id + String(editing.deleting)} item={editing.item} deleting={editing.deleting}
+      onSaved={changed} onClose={() => setEditing(null)} /> : null}
   </section>;
 }
 

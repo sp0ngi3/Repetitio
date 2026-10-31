@@ -1158,14 +1158,16 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
                   onChange={(event) => props.onSolutionChange("language", event.target.value)}
                 />
               </label>
-              <label>
-                Source code
+              <div className="editor-field">
+                <label htmlFor="dsa-code-editor">Source code</label>
                 <CodeEditor
+                  key={props.problem.id}
+                  id="dsa-code-editor"
                   language={props.solutionForm.language || "C#"}
                   value={props.solutionForm.sourceCode}
                   onChange={(value) => props.onSolutionChange("sourceCode", value)}
                 />
-              </label>
+              </div>
               <div className="form-grid two-columns">
                 <label>
                   Time

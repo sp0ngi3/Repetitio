@@ -762,6 +762,21 @@ export function updateWikiPractice(id: string, request: UpdateWikiPracticeReques
   });
 }
 
+export function formatCSharp(sourceCode: string): Promise<{ sourceCode: string }> {
+  return requestJson("/api/code/format-csharp", { method: "POST", body: JSON.stringify({ sourceCode }) });
+}
+
+export interface WikiPracticeItemChange {
+  expectedUpdatedAt: string;
+  delete: boolean;
+  question?: WikiPage["quizQuestions"][number] | { prompt: string; explanation: string; options: { text: string; isCorrect: boolean }[] };
+  flashcard?: { front: string; back: string };
+}
+
+export function changeWikiPracticeItem(pageId: string, kind: "quiz" | "flashcard", itemId: string, request: WikiPracticeItemChange): Promise<{ page: WikiPage; replacementItemId: string | null }> {
+  return requestJson(`/api/wiki/${pageId}/practice/${kind}/${itemId}/change`, { method: "POST", body: JSON.stringify(request) });
+}
+
 /**
  * Deletes a wiki page and its descendants.
  *

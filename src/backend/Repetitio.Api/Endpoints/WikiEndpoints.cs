@@ -45,6 +45,7 @@ public static partial class WikiEndpoints
         group.MapPut("/{id:guid}", UpdateWikiPageAsync).WithName("UpdateWikiPage");
         group.MapPatch("/{id:guid}/studied", SetWikiStudiedAsync).WithName("SetWikiStudied");
         group.MapPut("/{id:guid}/practice", UpdateWikiPracticeAsync).WithName("UpdateWikiPractice");
+        group.MapPost("/{id:guid}/practice/{kind}/{itemId:guid}/change", ChangeWikiPracticeItemAsync);
         group.MapGet("/{id:guid}/json", GetWikiJsonAsync);
         group.MapPut("/{id:guid}/json", UpdateWikiJsonAsync);
         group.MapDelete("/{id:guid}", DeleteWikiPageAsync).WithName("DeleteWikiPage");

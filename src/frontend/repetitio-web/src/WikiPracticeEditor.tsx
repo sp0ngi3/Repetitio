@@ -3,12 +3,8 @@ import { createPortal } from "react-dom";
 import { Plus, Save, Trash2, Undo2, X } from "lucide-react";
 import { updateWikiPractice } from "./api";
 import type { WikiPage } from "./types";
-
-interface DraftOption { key: string; text: string; isCorrect: boolean; }
-interface DraftQuestion { key: string; prompt: string; explanation: string; options: DraftOption[]; }
-interface DraftCard { key: string; front: string; back: string; }
+import { WikiQuestionFields, WikiFlashcardFields, blankOption, type DraftQuestion, type DraftCard } from "./WikiCheckFields";
 type RemovedCheck = { kind: "quiz"; item: DraftQuestion; index: number } | { kind: "flashcard"; item: DraftCard; index: number };
-const blankOption = (): DraftOption => ({ key: crypto.randomUUID(), text: "", isCorrect: false });
 
 export function WikiPracticeEditor({ page, onSaved, onClose }: {
   page: WikiPage; onSaved: (page: WikiPage) => void; onClose: () => void;
@@ -99,23 +95,7 @@ export function WikiPracticeEditor({ page, onSaved, onClose }: {
             {!questions.length ? <p className="empty-state">No quiz questions yet. Add your first question.</p> : null}
             {questions.map((question, index) => <fieldset className="wiki-check-edit-card" key={question.key}>
               <legend>Question {index + 1}</legend>
-              <label>Question<textarea required maxLength={4000} rows={2} value={question.prompt} onChange={event => changeQuestion(question.key, { prompt: event.target.value })} /></label>
-              <div className="wiki-check-edit-options">
-                {question.options.map((option, optionIndex) => <div className="wiki-check-edit-option" key={option.key}>
-                  <label className="wiki-check-edit-correct"><input type="checkbox" aria-label={`Correct answer ${optionIndex + 1}`} checked={option.isCorrect}
-                    onChange={event => changeQuestion(question.key, { options: question.options.map(candidate => candidate.key === option.key ? { ...candidate, isCorrect: event.target.checked } : candidate) })} />
-                    Correct
-                  </label>
-                  <label>Answer {optionIndex + 1}<textarea required maxLength={2000} rows={2} value={option.text}
-                    onChange={event => changeQuestion(question.key, { options: question.options.map(candidate => candidate.key === option.key ? { ...candidate, text: event.target.value } : candidate) })} /></label>
-                  <button className="secondary-button compact-button" type="button" aria-label={`Remove answer ${optionIndex + 1}`} disabled={question.options.length <= 2}
-                    onClick={() => changeQuestion(question.key, { options: question.options.filter(candidate => candidate.key !== option.key) })}><Trash2 size={16} /></button>
-                </div>)}
-              </div>
-              <div className="wiki-check-edit-option-actions"><button className="secondary-button compact-button" type="button" disabled={question.options.length >= 8}
-                onClick={() => changeQuestion(question.key, { options: [...question.options, blankOption()] })}><Plus size={16} /> Add answer</button>
-                <small>2–8 answers. Mark each correct answer.</small></div>
-              <label>Explanation (optional)<textarea maxLength={4000} rows={2} value={question.explanation} onChange={event => changeQuestion(question.key, { explanation: event.target.value })} /></label>
+              <WikiQuestionFields question={question} onChange={change => changeQuestion(question.key, change)} />
               <button className="danger-button compact-button" type="button" onClick={() => {
                 setRemoved({ kind: "quiz", item: question, index }); setQuestions(current => current.filter(candidate => candidate.key !== question.key));
               }}><Trash2 size={16} /> Remove question {index + 1}</button>
@@ -128,8 +108,7 @@ export function WikiPracticeEditor({ page, onSaved, onClose }: {
             {!cards.length ? <p className="empty-state">No flashcards yet. Add your first flashcard.</p> : null}
             {cards.map((card, index) => <fieldset className="wiki-check-edit-card" key={card.key}>
               <legend>Flashcard {index + 1}</legend>
-              <label>Front<textarea required maxLength={4000} rows={2} value={card.front} onChange={event => changeCard(card.key, { front: event.target.value })} /></label>
-              <label>Back<textarea required maxLength={8000} rows={3} value={card.back} onChange={event => changeCard(card.key, { back: event.target.value })} /></label>
+              <WikiFlashcardFields card={card} onChange={change => changeCard(card.key, change)} />
               <button className="danger-button compact-button" type="button" onClick={() => {
                 setRemoved({ kind: "flashcard", item: card, index }); setCards(current => current.filter(candidate => candidate.key !== card.key));
               }}><Trash2 size={16} /> Remove flashcard {index + 1}</button>
