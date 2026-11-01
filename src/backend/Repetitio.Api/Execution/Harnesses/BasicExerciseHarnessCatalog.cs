@@ -13,6 +13,7 @@ public static class BasicExerciseHarnessCatalog
     {
         return
         [
+            .. MatrixExerciseHarnesses.GetAll(),
             new BasicExerciseHarness("kadane-maximum-subarray", """
         results.Add(RunInt("example mixed", 8, () => Solution.MaxSubArray([2, -3, 4, -2, 2, 1, -1, 4])));
         results.Add(RunInt("single negative", -1, () => Solution.MaxSubArray([-1])));

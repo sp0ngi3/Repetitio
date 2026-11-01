@@ -13,6 +13,9 @@ namespace Repetitio.Api.Endpoints;
 /// </summary>
 public static class BasicExerciseEndpoints
 {
+    // Startup, navigation and refresh requests may arrive together when a catalog grows.
+    private static readonly SemaphoreSlim CatalogInitialization = new(1, 1);
+
     /// <summary>
     /// Adds Basics exercise endpoints to the application.
     /// </summary>
@@ -101,6 +104,19 @@ public static class BasicExerciseEndpoints
     /// <param name="dbContext">The database context.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     private static async Task EnsureBasicLearningItemsAsync(RepetitioDbContext dbContext)
+    {
+        await CatalogInitialization.WaitAsync();
+        try
+        {
+            await SynchronizeBasicLearningItemsAsync(dbContext);
+        }
+        finally
+        {
+            CatalogInitialization.Release();
+        }
+    }
+
+    private static async Task SynchronizeBasicLearningItemsAsync(RepetitioDbContext dbContext)
     {
         var now = DateTime.UtcNow;
 

@@ -30,7 +30,9 @@ import { printableMathStyles } from "./math";
 import { parseWikiBatchImport, parseWikiSourcesJson, parseWikiQuizJson, parseWikiFlashcardJson, wikiLearningContainer } from "./wikiImport";
 import { WikiJsonEditor } from "./WikiJsonEditor";
 import { WikiPracticeEditor } from "./WikiPracticeEditor";
-import { FileJson, ListChecks, Workflow } from "lucide-react";
+import { FileJson, ListChecks, Workflow, ListTree, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { CompactDisclosure, MobileSheet, useCompactLayout, useTabletLandscape } from "./responsive";
+import "./wikiTree.css";
 import { codeLanguages } from "./codeHighlight";
 import { renderPrintableDiagrams } from "./diagramRenderer";
 import { useWikiScrollSync } from "./wikiScrollSync";
@@ -282,6 +284,10 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
   focusPageId?: string;
   focusStudyKind?: WikiStudyModeProgress["kind"];
 } = {}) {
+  const compact = useCompactLayout();
+  const tabletLandscape = useTabletLandscape();
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  useEffect(() => { if (!compact || tabletLandscape) setTopicsOpen(false); }, [compact, tabletLandscape]);
   const [focusedPractice, setFocusedPractice] = useState(!!focusPageId && !!focusStudyKind);
   const [studyOverview, setStudyOverview] = useState<WikiStudyOverview | null>(null);
   const [treeSearch, setTreeSearch] = useState("");
@@ -290,6 +296,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
   const [selectedPage, setSelectedPage] = useState<WikiPageRecord | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<WikiView>(focusPageId ? "study" : "article");
+  const inlineTree = !compact || tabletLandscape && (view === "article" || view === "explore" || view === "reviews");
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<WikiSort>("updated-newest");
@@ -586,8 +593,22 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
     setExpandedIds(nextExpanded);
   }
 
+  const topicLibrary = <>
+    <div className="wiki-rail-heading">
+      <strong>Topic library</strong>
+      <button className="text-button" type="button" onClick={() => { setTopicsOpen(false); startNewRootPage(); }}>
+        <ActionIcon label="Add topic" />Add topic
+      </button>
+    </div>
+    <label className="wiki-tree-search">Find a topic<input aria-label="Search topic tree" autoFocus={compact && !inlineTree} value={treeSearch} onChange={event => setTreeSearch(event.target.value)} placeholder="Topic or path..." /></label>
+    {nestedTree.length ? <ul className="wiki-tree wiki-topic-tree">{visibleTree.map(node => <WikiTreeNodeView
+      expandedIds={treeSearch ? new Set(treeNodes.map(n => n.id)) : expandedIds} key={node.id} node={node}
+      selectedPageId={selectedPage?.id ?? null} onSelect={id => { setTopicsOpen(false); void selectPage(id); }} onToggle={toggleExpanded} />)}</ul>
+      : <p className="empty-state">No pages yet.</p>}
+  </>;
+
   return (
-    <section className="wiki-page wiki-wikipedia-page" data-view={view} aria-labelledby="wiki-title">
+    <section className="wiki-page wiki-wikipedia-page" data-view={view} data-tablet-layout={tabletLandscape ? inlineTree ? "reading" : "workspace" : undefined} aria-labelledby="wiki-title">
       <header className="wiki-shell-header">
         <div>
           <p className="eyebrow">Repositorium</p>
@@ -622,32 +643,19 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
           </span>)}
       </nav> : null}
 
+      {compact && !inlineTree ? <div className="wiki-mobile-tools">
+        <button className="secondary-button" type="button" aria-expanded={topicsOpen} aria-haspopup="dialog" onClick={() => setTopicsOpen(true)}><ListTree size={18} />Topics</button>
+        <span>{selectedPage?.title ?? "Topic library"}</span>
+        {view === "article" && selectedPage && (selectedPage.quizQuestions.length > 0 || selectedPage.flashcards.length > 0)
+          ? <a className="secondary-button" href="#wiki-knowledge-checks"><ListChecks size={18} />Practice</a> : null}
+      </div> : null}
+
+      {compact && !inlineTree && topicsOpen ? <MobileSheet title="Wiki topics" onClose={() => setTopicsOpen(false)}>
+        <aside className="wiki-left-rail" aria-label="Wiki topic tree">{topicLibrary}</aside>
+      </MobileSheet> : null}
+
       <div className="wiki-reading-layout">
-        <aside className="wiki-left-rail" aria-label="Wiki topic tree">
-          <div className="wiki-rail-heading">
-            <strong>Topic library</strong>
-            <button className="text-button" type="button" onClick={startNewRootPage}>
-              <ActionIcon label="Add topic" />Add topic
-            </button>
-          </div>
-          <label className="wiki-tree-search">Find a topic<input aria-label="Search topic tree" value={treeSearch} onChange={event => setTreeSearch(event.target.value)} placeholder="Topic or path..." /></label>
-          {nestedTree.length ? (
-            <ul className="wiki-tree">
-              {visibleTree.map((node) => (
-                <WikiTreeNodeView
-                  expandedIds={treeSearch ? new Set(treeNodes.map(n => n.id)) : expandedIds}
-                  key={node.id}
-                  node={node}
-                  selectedPageId={selectedPage?.id ?? null}
-                  onSelect={selectPage}
-                  onToggle={toggleExpanded}
-                />
-              ))}
-            </ul>
-          ) : (
-            <p className="empty-state">No pages yet.</p>
-          )}
-        </aside>
+        {inlineTree ? <aside className="wiki-left-rail" aria-label="Wiki topic tree">{topicLibrary}</aside> : null}
 
         {view === "article" ? (
           <WikiArticle
@@ -773,6 +781,7 @@ function WikiArticle(props: {
   onDownloadPdf: () => void;
   onOpenChild: (id: string) => void;
 }) {
+  const compact = useCompactLayout();
   const hasKnowledgeChecks = Boolean(props.page && props.treeNodes.length > 0);
   const [activeHeading, setActiveHeading] = useState("");
   const [editingPractice, setEditingPractice] = useState(false);
@@ -814,7 +823,7 @@ function WikiArticle(props: {
             <span className="wiki-path">{props.page.path}</span>
             <h1>{props.page.title}</h1>
           </div>
-          <div className="wiki-article-actions">
+          <CompactDisclosure compact={compact} label="Article actions"><div className="wiki-article-actions">
             <label className={`secondary-button compact-button wiki-studied-toggle${props.page.isStudied ? " studied" : ""}`}>
               <input type="checkbox" checked={!!props.page.isStudied} disabled={props.isSavingStudied}
                 onChange={props.onToggleStudied} />
@@ -837,11 +846,12 @@ function WikiArticle(props: {
             </button>
             <button className="secondary-button compact-button" type="button" onClick={props.onEditJson}><FileJson size={16} /> Edit JSON</button>
             <button className="secondary-button compact-button" type="button" onClick={() => setEditingPractice(true)}><ListChecks size={16} /> Edit quizzes &amp; flashcards</button>
-          </div>
+          </div></CompactDisclosure>
         </header>
 
         <div className="wiki-article-body-grid">
           <aside className="wiki-page-contents" aria-label="Article contents">
+            <CompactDisclosure compact={compact} label="On this page">
             <strong>On this page</strong>
             {props.renderedMarkdown.headings.length ? (
               <nav tabIndex={0}>
@@ -856,6 +866,7 @@ function WikiArticle(props: {
             )}
             <a href="#wiki-knowledge-checks">Knowledge checks</a>
             <button className="text-button" type="button" onClick={props.onStudy}><ActionIcon label="Study this topic tree" />Study this topic tree</button>
+            </CompactDisclosure>
           </aside>
 
           <div className="wiki-article-content official-wiki-content">
@@ -1210,6 +1221,8 @@ function WikiEditor(props: {
   onDelete: () => void;
   onCancel: () => void;
 }) {
+  const compact = useCompactLayout();
+  const [mobilePane, setMobilePane] = useState<"source" | "preview" | "split">(() => window.matchMedia?.("(min-width: 768px)").matches ? "split" : "source");
   const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [imageUploadStatus, setImageUploadStatus] = useState<string | null>(null);
@@ -1379,8 +1392,12 @@ function WikiEditor(props: {
 
         <section className="wiki-editor-section">
           <h2>Article source</h2>
-          <div className="wiki-editor-workspace">
-            <section className="wiki-source-panel" aria-label="Markdown source editor">
+          {compact ? <div className="mobile-editor-tabs" role="group" aria-label="Editor layout">
+            {(["source", "preview", "split"] as const).map(pane => <button type="button" key={pane} aria-pressed={mobilePane === pane}
+              onClick={() => setMobilePane(pane)}>{pane === "source" ? "Source" : pane === "preview" ? "Preview" : "Split"}</button>)}
+          </div> : null}
+          <div className="wiki-editor-workspace" data-mobile-pane={compact ? mobilePane : undefined}>
+            <section className="wiki-source-panel" aria-label="Markdown source editor" inert={compact && mobilePane === "preview"} aria-hidden={compact && mobilePane === "preview" || undefined}>
               <div className="wiki-markdown-toolbar" aria-label="Markdown helpers">
                 <button className="secondary-button compact-button" type="button" onClick={() => insertSnippet("## {{selection}}\n\nWrite the core idea here.", "New section")}>
                   Heading
@@ -1440,7 +1457,7 @@ function WikiEditor(props: {
                 placeholder="Use headings, bullet points, comparison tables, code snippets and links."
               />
             </section>
-            <aside className="wiki-editor-preview" aria-label="Markdown preview">
+            <aside className="wiki-editor-preview" aria-label="Markdown preview" inert={compact && mobilePane === "source"} aria-hidden={compact && mobilePane === "source" || undefined}>
               <div className="wiki-preview-heading">
                 <span>Live preview</span>
                 <strong>{props.form.title || "Untitled article"}</strong>
@@ -1636,18 +1653,21 @@ function WikiTreeNodeView(props: {
   return (
     <li>
       <div className={`wiki-tree-row${props.selectedPageId === props.node.id ? " active" : ""}${props.node.isStudied ? " studied" : ""}`}>
-        <button
+        {hasChildren ? <button
           aria-label={isExpanded ? "Collapse topic" : "Expand topic"}
+          aria-expanded={isExpanded}
           className="tree-toggle"
-          disabled={!hasChildren}
           type="button"
           onClick={() => props.onToggle(props.node.id)}
         >
-          {hasChildren ? (isExpanded ? "v" : ">") : ""}
-        </button>
-        <button className="tree-node-button" type="button" onClick={() => props.onSelect(props.node.id)}>
-          <span>{props.node.title}</span>
-          {props.node.isStudied ? <span className="wiki-tree-studied" aria-label="Studied" title="Studied">✓</span> : null}
+          {isExpanded ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+        </button> : <span className="tree-toggle-placeholder" aria-hidden="true" />}
+        <button className="tree-node-button" type="button" aria-label={props.node.title} aria-current={props.selectedPageId === props.node.id ? "page" : undefined} onClick={() => props.onSelect(props.node.id)}>
+          <span className="wiki-tree-title">{props.node.title}</span>
+          <span className="wiki-tree-studied" role={props.node.isStudied ? "img" : undefined} aria-label={props.node.isStudied ? "Studied" : undefined}
+            aria-hidden={!props.node.isStudied || undefined} title={props.node.isStudied ? "Studied" : undefined}>
+            {props.node.isStudied ? <Check size={16} strokeWidth={2.5} aria-hidden="true" /> : null}
+          </span>
         </button>
       </div>
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { getWikiPage, getWikiPages, getWikiStudy, getWikiTree, setWikiStudied } from "./api";
 import { WikiPage } from "./WikiPage";
 import type { WikiPage as WikiPageRecord } from "./types";
+import { compactLayoutQuery, tabletLandscapeQuery } from "./responsive";
 
 vi.mock("./api", async importOriginal => ({
   ...await importOriginal<typeof import("./api")>(),
@@ -33,7 +34,46 @@ beforeEach(() => {
     return { isStudied };
   });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+it("keeps studied markers in the portalled phone tree with an SVG check in a fixed status slot", async () => {
+  pages[0].isStudied = true;
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === compactLayoutQuery, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  const original = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal");
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function (this: HTMLDialogElement) { this.setAttribute("open", ""); } });
+  try {
+    render(<WikiPage />);
+    await screen.findByRole("heading", { name: "Root" });
+    fireEvent.click(screen.getByRole("button", { name: "Topics" }));
+    const sheet = screen.getByRole("dialog", { name: "Wiki topics" });
+    const button = within(sheet).getByRole("button", { name: "Root" });
+    expect(button.closest(".wiki-topic-tree")).not.toBeNull();
+    expect(button.closest(".wiki-tree-row")).toHaveClass("studied");
+    expect(within(button).getByRole("img", { name: "Studied" }).querySelector("svg")).not.toBeNull();
+    expect(button.querySelector(".wiki-tree-title")).toHaveTextContent("Root");
+    expect(button).not.toHaveTextContent("✓");
+    expect(setWikiStudied).not.toHaveBeenCalled();
+  } finally {
+    if (original) Object.defineProperty(HTMLDialogElement.prototype, "showModal", original);
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
+  }
+});
+
+it("pins the tree on landscape tablets, but gives the full workspace to editing and study", async () => {
+  pages[0].isStudied = true;
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === compactLayoutQuery || query === tabletLandscapeQuery,
+    addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  const { container } = render(<WikiPage />);
+  await screen.findByRole("heading", { name: "Root" });
+  expect(container.querySelector("[data-tablet-layout='reading']")).not.toBeNull();
+  expect(screen.getByRole("complementary", { name: "Wiki topic tree" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Topics" })).not.toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole("navigation", { name: "Wiki navigation" })).getByRole("button", { name: "Edit" }));
+  expect(container.querySelector("[data-tablet-layout='workspace']")).not.toBeNull();
+  expect(screen.getByRole("button", { name: "Topics" })).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Article source" })).toBeInTheDocument();
+  expect(setWikiStudied).not.toHaveBeenCalled();
+});
 
 it("marks only the selected article, keeps the marker through navigation/search/reload, and can unmark it", async () => {
   const view = render(<WikiPage />);

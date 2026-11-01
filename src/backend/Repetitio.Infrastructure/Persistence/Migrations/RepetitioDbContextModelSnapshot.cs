@@ -390,6 +390,9 @@ namespace Repetitio.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("InterviewReview")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("LearningItemId")
                         .HasColumnType("TEXT");
 

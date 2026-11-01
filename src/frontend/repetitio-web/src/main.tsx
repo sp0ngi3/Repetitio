@@ -7,6 +7,9 @@ import "./richContent.css";
 import "./wikiReadability.css";
 import "katex/dist/katex.min.css";
 import "./math.css";
+import "./mobile.css";
+import "./tablet.css";
+import "./practiceExperience.css";
 import { applyAppearance, readColorMode, readMotionPreference, readVisualStyle } from "./appearance";
 
 applyAppearance(readColorMode(), readVisualStyle(), readMotionPreference());

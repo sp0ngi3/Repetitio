@@ -1,11 +1,10 @@
 import { ActionIcon } from "./ActionIcon";
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
-  AttemptScorecard,
   AttemptScorecardSummary,
-  emptyAttemptScorecard,
-  type AttemptScorecardValue
 } from "./AttemptScorecard";
+import { DsaInterviewScorecard, emptyDsaInterviewReview } from "./DsaInterviewScorecard";
+import type { DsaInterviewReview } from "./types";
 import { CodeEditor } from "./CodeEditor";
 import { confirmDelete } from "./confirmDelete";
 import {
@@ -101,7 +100,8 @@ interface DsaProblemForm {
 /**
  * Represents the local editable DSA attempt form state.
  */
-interface DsaAttemptForm extends AttemptScorecardValue {
+interface DsaAttemptForm {
+  interviewReview: DsaInterviewReview;
   /** Attempt outcome. */
   outcome: PracticeOutcome;
   /** Confidence value as form text. */
@@ -1091,9 +1091,9 @@ function DsaProblemDetailPage(props: DsaProblemDetailPageProps) {
               />
             </label>
 
-            <AttemptScorecard
-              value={props.attemptForm}
-              onChange={(key, value) => props.onAttemptChange(key, value)}
+            <DsaInterviewScorecard
+              value={props.attemptForm.interviewReview}
+              onChange={value => props.onAttemptChange("interviewReview", value)}
             />
 
             <label>
@@ -1510,7 +1510,7 @@ function AttemptHistory(props: AttemptHistoryProps) {
                 </span>
                 <span>{formatAttemptMeta(session)}</span>
               </summary>
-              <AttemptScorecardSummary value={session} />
+              {session.interviewReview ? <DsaInterviewScorecard value={session.interviewReview} /> : <AttemptScorecardSummary value={session} />}
               {hasAnyText(session.approach, session.notes, session.whatHelped, session.whatWasDifficult, session.improveNext) ? (
                 <div className="attempt-history-grid">
                   <HistoryField label="Approach" value={session.approach} />
@@ -1688,11 +1688,7 @@ function toPracticeRequest(problemId: string, form: DsaAttemptForm, sourceCode?:
     confidence: form.confidence ? Number(form.confidence) : null,
     durationMs,
     nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
-    clarifiedRequirements: form.clarifiedRequirements,
-    foundEdgeCases: form.foundEdgeCases,
-    explainedComplexity: form.explainedComplexity,
-    testedSolution: form.testedSolution,
-    communicatedTradeoffs: form.communicatedTradeoffs,
+    interviewReview: form.interviewReview,
     approach: form.approach.trim(),
     notes: form.notes.trim(),
     sourceCode: sourceCode?.trim() || undefined,
@@ -1714,7 +1710,7 @@ function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): Dsa
     confidence: "",
     durationMinutes: "",
     nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
-    ...emptyAttemptScorecard,
+    interviewReview: { ...emptyDsaInterviewReview },
     notes: "",
     whatHelped: "",
     whatWasDifficult: "",

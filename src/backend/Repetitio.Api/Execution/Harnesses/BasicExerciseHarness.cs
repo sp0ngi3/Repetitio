@@ -123,6 +123,29 @@ public static class RepetitioTestHarness
         }
     }
 
+    private static RepetitioTestResult RunMatrix(string name, int[,] expected, Func<int[,]> action)
+    {
+        try
+        {
+            var actual = action();
+            var passed = actual.GetLength(0) == expected.GetLength(0)
+                && actual.GetLength(1) == expected.GetLength(1)
+                && actual.Cast<int>().SequenceEqual(expected.Cast<int>());
+            return new RepetitioTestResult(name, passed, FormatMatrix(expected), FormatMatrix(actual), null);
+        }
+        catch (Exception exception)
+        {
+            return CreateExceptionResult(name, FormatMatrix(expected), exception);
+        }
+    }
+
+    private static string FormatMatrix(int[,] matrix)
+    {
+        var rows = Enumerable.Range(0, matrix.GetLength(0))
+            .Select(row => FormatArray(Enumerable.Range(0, matrix.GetLength(1)).Select(col => matrix[row, col]).ToArray()));
+        return matrix.GetLength(0) + "x" + matrix.GetLength(1) + " [" + string.Join(",", rows) + "]";
+    }
+
     private static RepetitioTestResult RunException<TException>(string name, Action action)
         where TException : Exception
     {

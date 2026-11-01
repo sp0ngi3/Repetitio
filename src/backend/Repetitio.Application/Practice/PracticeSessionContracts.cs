@@ -62,6 +62,9 @@ public sealed record CreatePracticeSessionRequest
     /// </summary>
     public bool CommunicatedTradeoffs { get; init; }
 
+    /// <summary>Optional detailed scorecard for a DSA interview attempt.</summary>
+    public DsaInterviewReview? InterviewReview { get; init; }
+
     /// <summary>
     /// Gets the optional next review date selected for the practiced item.
     /// </summary>
@@ -172,6 +175,9 @@ public sealed record PracticeSessionResponse
     /// Gets a value indicating whether tradeoffs were communicated during the session.
     /// </summary>
     public required bool CommunicatedTradeoffs { get; init; }
+
+    /// <summary>Detailed DSA scorecard, or null for older attempts.</summary>
+    public DsaInterviewReview? InterviewReview { get; init; }
 
     /// <summary>
     /// Gets the approach used during the session.

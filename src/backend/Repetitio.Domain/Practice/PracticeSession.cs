@@ -72,6 +72,9 @@ public sealed class PracticeSession
     /// </summary>
     public bool CommunicatedTradeoffs { get; set; }
 
+    /// <summary>Optional detailed DSA scorecard; absent for legacy attempts.</summary>
+    public DsaInterviewReview? InterviewReview { get; set; }
+
     /// <summary>
     /// Gets or sets the approach used during the attempt.
     /// </summary>

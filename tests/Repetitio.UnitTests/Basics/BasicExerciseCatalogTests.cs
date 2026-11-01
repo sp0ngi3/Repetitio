@@ -44,6 +44,10 @@ public sealed class BasicExerciseCatalogTests
         Assert.Contains("reverse-linked-list", slugs);
         Assert.DoesNotContain("two-pointers-two-sum-sorted", slugs);
         Assert.Contains("kadane-maximum-subarray", slugs);
+        Assert.Contains("matrix-read-and-update", slugs);
+        Assert.Contains("matrix-row-and-column-sums", slugs);
+        Assert.Contains("matrix-swap-rows-and-columns", slugs);
+        Assert.Contains("matrix-staircase-search", slugs);
         Assert.DoesNotContain("kadane-max-subarray-range", slugs);
         Assert.DoesNotContain("prefix-sum-range-query", slugs);
         Assert.DoesNotContain("prefix-sum-pivot-index", slugs);

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using Repetitio.Domain.Dsa;
 using Repetitio.Domain.Flashcards;
 using Repetitio.Domain.LearningItems;
@@ -201,6 +202,9 @@ public sealed class RepetitioDbContext : DbContext
             entity.Property(session => session.WhatHelped).HasMaxLength(2000);
             entity.Property(session => session.WhatWasDifficult).HasMaxLength(2000);
             entity.Property(session => session.ImproveNext).HasMaxLength(2000);
+            entity.Property(session => session.InterviewReview).HasConversion(
+                value => JsonSerializer.Serialize(value, (JsonSerializerOptions?)null),
+                value => JsonSerializer.Deserialize<DsaInterviewReview>(value, (JsonSerializerOptions?)null));
             entity.Property(session => session.StartedAt).IsRequired();
             entity.Property(session => session.CreatedAt).IsRequired();
             entity.HasIndex(session => session.LearningItemId);

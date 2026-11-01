@@ -390,6 +390,7 @@ public static class DsaEndpoints
             ExplainedComplexity = session.ExplainedComplexity,
             TestedSolution = session.TestedSolution,
             CommunicatedTradeoffs = session.CommunicatedTradeoffs,
+            InterviewReview = session.InterviewReview,
             Approach = session.Approach,
             Prompt = session.Prompt,
             Notes = session.Notes,

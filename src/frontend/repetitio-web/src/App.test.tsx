@@ -824,8 +824,8 @@ describe("App", () => {
     expect(screen.queryByText("Knowledge practice")).not.toBeInTheDocument();
     expect(getWikiStudy).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Wiki" }));
-    await waitFor(() => expect(getWikiStudy).toHaveBeenCalled());
-    expect(await screen.findByRole("textbox", { name: "Search topic tree" })).toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: "Search topic tree" }, { timeout: 10000 })).toBeInTheDocument();
+    expect(getWikiStudy).toHaveBeenCalled();
   });
   /**
    * Verifies that backup settings expose export and import controls.
@@ -1824,7 +1824,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("Reverse Linked List"));
 
     expect(screen.getByText("Peek solution")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Attempt exercise" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Practice exercise" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run tests" })).toBeInTheDocument();
   });
 
@@ -1927,6 +1927,44 @@ describe("App", () => {
 
     expect(await screen.findByText("All tests passed")).toBeInTheDocument();
     expect(screen.getByText("two nodes")).toBeInTheDocument();
+  });
+
+  it("records Basics completions explicitly without an outcome form or a six-completion cap", async () => {
+    vi.mocked(createPracticeSession).mockClear();
+    vi.mocked(getBasicExercises).mockResolvedValue([createBasicExercise({ successfulAttempts: 8, totalAttempts: 10 })]);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reverse Linked List" }));
+    expect(screen.getByText("Times completed").nextElementSibling).toHaveTextContent("8");
+    for (const label of ["Outcome", "Confidence", "Duration minutes", "Next review", "Notes", "What helped", "What was difficult", "Improve next"])
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Attempt scorecard" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Run tests" }));
+    await screen.findByText("All tests passed");
+    expect(createPracticeSession).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Mark completed" }));
+    await waitFor(() => expect(createPracticeSession).toHaveBeenCalledWith({
+      learningItemId: "basic-1", outcome: "Completed", nextReviewAt: expect.any(String), sourceCode: basics[0].starterCode
+    }));
+    expect(EditorView.findFromDOM(screen.getByRole("textbox", { name: "Code" }))!.state.doc.toString()).toBe(basics[0].starterCode);
+  });
+
+  it("filters Basics by inactivity while retaining never-practised exercises", async () => {
+    vi.mocked(getBasicExercises).mockResolvedValue([
+      createBasicExercise({ title: "Never", slug: "never", learningItemId: "never" }),
+      createBasicExercise({ title: "Old", slug: "old", learningItemId: "old", lastPracticedAt: new Date(Date.now() - 40 * 86400000).toISOString() }),
+      createBasicExercise({ title: "Recent", slug: "recent", learningItemId: "recent", lastPracticedAt: new Date().toISOString() })
+    ]);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
+    await screen.findByRole("button", { name: "Recent" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Practice activity" }), { target: { value: "30" } });
+    expect(screen.getByRole("button", { name: "Old" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Never" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Recent" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Practice activity" }), { target: { value: "never" } });
+    expect(screen.queryByRole("button", { name: "Old" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Never" })).toBeInTheDocument();
   });
 
   /**

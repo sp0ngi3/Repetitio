@@ -1,0 +1,71 @@
+/* Scope the new practice UI so System Design and legacy scorecards keep their behavior. */
+html[data-style] .basics-completion-stats { margin: 0 0 20px; padding: 16px 20px; border-left: 3px solid var(--accent); background: var(--accent-soft); }
+html[data-style] .basics-completion-stats dt { font-size: 12px; color: var(--muted); }
+html[data-style] .basics-completion-stats dd { margin: 4px 0 0; font-size: 32px; font-weight: 700; line-height: 1.2; }
+html[data-style] .basics-filter-panel { grid-template-columns: minmax(200px, 1fr) repeat(2, minmax(180px, .65fr)); }
+html[data-style] .basics-filter-panel .tag-filter-list { grid-column: 1 / -1; }
+html[data-style] .basics-title-table :is(.record-header, .record-row) { grid-template-columns: minmax(0, 1fr) 100px 180px; }
+html[data-style] .basics-completed-count { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+html[data-style] .basics-completed-count small { display: none; color: var(--muted); }
+html[data-style] .basics-practice-history { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+html[data-style] .basics-practice-history summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+html[data-style] .basics-practice-history .attempt-history { max-height: 460px; overflow-y: auto; overscroll-behavior: contain; }
+
+html[data-style] .interview-scorecard { container-type: inline-size; container-name: interview-review; min-width: 0; border: 1px solid var(--border); background: var(--surface); padding: 22px; margin: 12px 0; }
+html[data-style] .interview-scorecard-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-bottom: 20px; }
+html[data-style] .interview-scorecard-heading h4 { font-size: 20px; margin: 3px 0 8px; }
+html[data-style] .interview-scorecard-heading p, html[data-style] .interview-ratings p { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.6; }
+html[data-style] .interview-completion { flex-shrink: 0; text-align: right; display: grid; font-size: 11px; color: var(--muted); }
+html[data-style] .interview-completion strong { color: var(--text); font-size: 30px; line-height: 1.4; }
+html[data-style] .interview-completion small { color: var(--muted); font-size: 16px; font-weight: 400; }
+html[data-style] .interview-stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+html[data-style] .interview-stage { min-width: 0; margin: 0; padding: 16px 10px 10px; border: 1px solid var(--border); }
+html[data-style] .interview-stage legend { display: flex; align-items: center; gap: 7px; font-weight: 600; padding: 0 5px; font-size: 13px; }
+html[data-style] .interview-stage legend svg { color: var(--accent); flex-shrink: 0; }
+html[data-style] .interview-stage legend small { color: var(--muted); font-size: 11px; }
+html[data-style] .interview-stage progress { display: block; width: 100%; height: 4px; margin: 0 0 10px; accent-color: var(--success); border: 0; background: var(--border); }
+html[data-style] .interview-stage progress::-webkit-progress-bar { background: var(--border); }
+html[data-style] .interview-stage progress::-webkit-progress-value { background: var(--success); }
+html[data-style] .interview-stage progress::-moz-progress-bar { background: var(--success); }
+html[data-style] .interview-check { display: grid; grid-template-columns: 22px minmax(0, 1fr); position: relative; align-items: start; gap: 8px; min-height: 48px; padding: 11px 8px; margin: 4px 0; border: 1px solid transparent; font-size: 13px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+html[data-style] label.interview-check { cursor: pointer; }
+html[data-style] .interview-check.done { border-color: var(--success-border); background: var(--success-soft); }
+html[data-style] .interview-check input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+html[data-style] .interview-check:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+html[data-style] .interview-check-icon { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--border); background: var(--surface); }
+html[data-style] .interview-check-icon svg { opacity: 0; }
+html[data-style] .interview-check.done .interview-check-icon { background: var(--success); border-color: var(--success); color: var(--surface); }
+html[data-style] .interview-check.done .interview-check-icon svg { opacity: 1; }
+html[data-style] .interview-scorecard.readonly .interview-check.done > svg { color: var(--success); }
+html[data-style] .interview-scorecard.readonly .interview-check:not(.done) { color: var(--muted); }
+html[data-style] .interview-ratings { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 18px; }
+html[data-style] .interview-ratings > div > strong small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+html[data-style] .interview-rating-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 20px; margin-top: 18px; }
+html[data-style] .interview-rating { display: grid; gap: 8px; font-size: 12px; min-width: 0; }
+html[data-style] .interview-rating-options { display: flex; gap: 4px; }
+html[data-style] .interview-rating-options button { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: 6px 3px; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+html[data-style] .interview-rating-options button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+html[data-style] .interview-rating-options button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.interview-scorecard .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@container interview-review (max-width: 850px) {
+  html[data-style] .interview-stages { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .interview-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; align-content: start; }
+  html[data-style] .interview-stage progress { grid-column: 1 / -1; }
+}
+@container interview-review (max-width: 500px) {
+  html[data-style] .interview-stage { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  html[data-style] .interview-stages { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .basics-filter-panel { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  html[data-style] .interview-scorecard { padding: 16px 12px; }
+  html[data-style] .interview-scorecard-heading { align-items: start; gap: 12px; }
+  html[data-style] .interview-completion { max-width: 88px; }
+  html[data-style] .interview-scorecard-heading h4 { font-size: 18px; }
+  html[data-style] .interview-rating-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .basics-title-table .record-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+  html[data-style] .basics-title-table .record-row > span:first-child { grid-column: 1 / -1; }
+  html[data-style] .basics-completed-count small { display: inline; }
+}

@@ -2,12 +2,6 @@ import { ActionIcon } from "./ActionIcon";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { createPracticeSession, executeBasicExercise } from "./api";
-import {
-  AttemptScorecard,
-  AttemptScorecardSummary,
-  emptyAttemptScorecard,
-  type AttemptScorecardValue
-} from "./AttemptScorecard";
 import { CodeEditor } from "./CodeEditor";
 import { getPracticeAgeClass } from "./practiceAge";
 import { sortByLastPracticed, type LastPracticedSort } from "./practiceSort";
@@ -15,14 +9,8 @@ import { createDefaultNextReviewDate, toNextReviewTimestamp, type ReviewSchedule
 import type {
   BasicExercise,
   CreatePracticeSessionRequest,
-  ExecuteBasicExerciseResponse,
-  PracticeOutcome
+  ExecuteBasicExerciseResponse
 } from "./types";
-
-/**
- * Practice outcome choices rendered by the Basics attempt form.
- */
-const outcomes: PracticeOutcome[] = ["Completed", "Passed", "Partial", "Failed"];
 
 /**
  * Number of Basics exercises shown on one dashboard page.
@@ -52,23 +40,7 @@ const problemTabs: { key: BasicsProblemTab; label: string }[] = [
 /**
  * Represents the local Basics attempt form state.
  */
-interface BasicsAttemptForm extends AttemptScorecardValue {
-  /** Attempt outcome. */
-  outcome: PracticeOutcome;
-  /** Confidence value as form text. */
-  confidence: string;
-  /** Attempt duration in minutes as form text. */
-  durationMinutes: string;
-  /** Next review date as a date input value. */
-  nextReviewAt: string;
-  /** Attempt notes. */
-  notes: string;
-  /** What helped during the attempt. */
-  whatHelped: string;
-  /** What was difficult during the attempt. */
-  whatWasDifficult: string;
-  /** What should be improved next. */
-  improveNext: string;
+interface BasicsAttemptForm {
   /** Source code drafted during the attempt. */
   codeDraft: string;
 }
@@ -105,12 +77,11 @@ export function BasicsPage(props: BasicsPageProps) {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
+  const [activityFilter, setActivityFilter] = useState("all");
   const [lastPracticedSort, setLastPracticedSort] = useState<LastPracticedSort>("never-first");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeProblemTab, setActiveProblemTab] = useState<BasicsProblemTab>("description");
-  const [attemptForm, setAttemptForm] = useState<BasicsAttemptForm>(() =>
-    createEmptyAttemptForm(props.reviewSchedulePreset)
-  );
+  const [attemptForm, setAttemptForm] = useState<BasicsAttemptForm>({ codeDraft: "" });
   const [executionResult, setExecutionResult] = useState<ExecuteBasicExerciseResponse | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -123,8 +94,13 @@ export function BasicsPage(props: BasicsPageProps) {
 
   const availableTags = useMemo(() => getAllBasicTags(props.basicExercises), [props.basicExercises]);
   const filteredExercises = useMemo(
-    () => filterBasicExercises(props.basicExercises, searchQuery, selectedTag),
-    [props.basicExercises, searchQuery, selectedTag]
+    () => filterBasicExercises(props.basicExercises, searchQuery, selectedTag).filter(exercise => {
+      if (activityFilter === "all") return true;
+      if (activityFilter === "never") return !exercise.lastPracticedAt;
+      if (!exercise.lastPracticedAt) return true;
+      return new Date(exercise.lastPracticedAt).getTime() <= Date.now() - Number(activityFilter) * 86400000;
+    }),
+    [props.basicExercises, searchQuery, selectedTag, activityFilter]
   );
   const sortedExercises = useMemo(
     () => sortByLastPracticed(filteredExercises, lastPracticedSort),
@@ -139,7 +115,7 @@ export function BasicsPage(props: BasicsPageProps) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [lastPracticedSort, searchQuery, selectedTag]);
+  }, [lastPracticedSort, searchQuery, selectedTag, activityFilter]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, pageCount));
@@ -166,7 +142,7 @@ export function BasicsPage(props: BasicsPageProps) {
   function openExercise(exercise: BasicExercise) {
     setSelectedSlug(exercise.slug);
     setActiveProblemTab("description");
-    setAttemptForm(createAttemptForm(exercise, props.reviewSchedulePreset));
+    setAttemptForm({ codeDraft: exercise.starterCode });
     setExecutionResult(null);
     setView("detail");
     setError(null);
@@ -200,7 +176,7 @@ export function BasicsPage(props: BasicsPageProps) {
   async function handleAttemptSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedExercise) {
+    if (!selectedExercise || isSaving) {
       return;
     }
 
@@ -208,8 +184,7 @@ export function BasicsPage(props: BasicsPageProps) {
     setError(null);
 
     try {
-      await createPracticeSession(toPracticeRequest(selectedExercise.learningItemId, attemptForm));
-      setAttemptForm(createAttemptForm(selectedExercise, props.reviewSchedulePreset));
+      await createPracticeSession(toPracticeRequest(selectedExercise.learningItemId, attemptForm, props.reviewSchedulePreset));
       await props.onChanged();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to save Basics attempt.");
@@ -236,10 +211,6 @@ export function BasicsPage(props: BasicsPageProps) {
       });
 
       setExecutionResult(result);
-      setAttemptForm((current) => ({
-        ...current,
-        outcome: result.passed ? "Completed" : "Failed"
-      }));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to run automated tests.");
     } finally {
@@ -308,22 +279,14 @@ export function BasicsPage(props: BasicsPageProps) {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Progress</p>
-                <h3>Attempt exercise</h3>
+                <h3>Practice exercise</h3>
               </div>
             </div>
 
-            <dl className="attempt-stats">
+            <dl className="basics-completion-stats" aria-live="polite">
               <div>
-                <dt>Times solved</dt>
-                <dd>{selectedExercise.successfulAttempts}/6</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd>{formatStatus(selectedExercise.status)}</dd>
-              </div>
-              <div>
-                <dt>Difficulty</dt>
-                <dd>{selectedExercise.difficulty}</dd>
+                <dt>Times completed</dt>
+                <dd>{selectedExercise.successfulAttempts}</dd>
               </div>
             </dl>
 
@@ -348,111 +311,18 @@ export function BasicsPage(props: BasicsPageProps) {
 
               {executionResult ? <ExecutionResultPanel result={executionResult} /> : null}
 
-              <div className="form-grid two-columns">
-                <label>
-                  Outcome
-                  <select
-                    value={attemptForm.outcome}
-                    onChange={(event) => updateAttemptForm("outcome", event.target.value as PracticeOutcome)}
-                  >
-                    {outcomes.map((outcome) => (
-                      <option key={outcome} value={outcome}>
-                        {formatStatus(outcome)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Confidence
-                  <select
-                    value={attemptForm.confidence}
-                    onChange={(event) => updateAttemptForm("confidence", event.target.value)}
-                  >
-                    <option value="">Not set</option>
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <option key={value} value={value}>
-                        {value}/5
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label>
-                Duration minutes
-                <input
-                  inputMode="numeric"
-                  value={attemptForm.durationMinutes}
-                  onChange={(event) => updateAttemptForm("durationMinutes", event.target.value)}
-                  placeholder="15"
-                />
-              </label>
-
-              <label>
-                Next review
-                <input
-                  type="date"
-                  value={attemptForm.nextReviewAt}
-                  onChange={(event) => updateAttemptForm("nextReviewAt", event.target.value)}
-                />
-              </label>
-
-              <AttemptScorecard
-                value={attemptForm}
-                onChange={(key, value) => updateAttemptForm(key, value)}
-              />
-
-              <label>
-                Notes
-                <textarea
-                  value={attemptForm.notes}
-                  onChange={(event) => updateAttemptForm("notes", event.target.value)}
-                  placeholder="What happened during this attempt?"
-                />
-              </label>
-
-              <label>
-                What helped
-                <textarea
-                  value={attemptForm.whatHelped}
-                  onChange={(event) => updateAttemptForm("whatHelped", event.target.value)}
-                  placeholder="Pointer movement, invariant, or pattern that helped."
-                />
-              </label>
-
-              <label>
-                What was difficult
-                <textarea
-                  value={attemptForm.whatWasDifficult}
-                  onChange={(event) => updateAttemptForm("whatWasDifficult", event.target.value)}
-                  placeholder="Where did you hesitate?"
-                />
-              </label>
-
-              <label>
-                Improve next
-                <textarea
-                  value={attemptForm.improveNext}
-                  onChange={(event) => updateAttemptForm("improveNext", event.target.value)}
-                  placeholder="One thing to sharpen next time."
-                />
-              </label>
-
               <button className="primary-button" type="submit" disabled={isSaving}>
-                {isSaving ? "Saving attempt..." : "Save attempt"}
+                <ActionIcon label="Complete" />{isSaving ? "Recording..." : "Mark completed"}
               </button>
             </form>
 
             {selectedExercise.practiceSessions.length ? (
-              <ul className="stack-list attempt-history">
+              <details className="basics-practice-history"><summary>Practice history · {selectedExercise.totalAttempts}</summary><ul className="stack-list attempt-history">
                 {selectedExercise.practiceSessions.map((session) => (
                   <li className="list-row" key={session.id}>
                     <div>
-                      <strong>{formatStatus(session.outcome)}</strong>
+                      <strong>{session.outcome === "Completed" || session.outcome === "Passed" ? "Completed" : "Previous practice"}</strong>
                       <span>{formatDate(session.startedAt)}</span>
-                      <AttemptScorecardSummary value={session} />
-                      {session.notes ? <small>{session.notes}</small> : null}
                       {session.sourceCode ? (
                         <details className="history-code">
                           <summary>View saved code</summary>
@@ -462,10 +332,9 @@ export function BasicsPage(props: BasicsPageProps) {
                         </details>
                       ) : null}
                     </div>
-                    <span className="confidence">{session.confidence ? `${session.confidence}/5` : "No confidence"}</span>
                   </li>
                 ))}
-              </ul>
+              </ul></details>
             ) : (
               <p className="empty-state">No attempts yet.</p>
             )}
@@ -495,6 +364,16 @@ export function BasicsPage(props: BasicsPageProps) {
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="exercise or hashtag..."
                 />
+              </label>
+
+              <label>
+                Practice activity
+                <select value={activityFilter} onChange={event => setActivityFilter(event.target.value)}>
+                  <option value="all">All exercises</option>
+                  <option value="never">Never practiced</option>
+                  <option value="7">Not practiced in 7+ days</option>
+                  <option value="30">Not practiced in 30+ days</option>
+                </select>
               </label>
 
               <label>
@@ -537,6 +416,7 @@ export function BasicsPage(props: BasicsPageProps) {
                 <div className="record-table basics-title-table">
                   <div className="record-header">
                     <span>Exercise</span>
+                    <span>Completed</span>
                     <span>Last practiced</span>
                   </div>
                   {pagedExercises.map((exercise) => (
@@ -550,6 +430,7 @@ export function BasicsPage(props: BasicsPageProps) {
                       <span>
                         <strong>{exercise.title}</strong>
                       </span>
+                      <span className="basics-completed-count"><strong>{exercise.successfulAttempts}</strong><small>completed</small></span>
                       <span className={`date-chip ${getPracticeAgeClass(exercise.lastPracticedAt)}`}>
                         {exercise.lastPracticedAt ? formatDate(exercise.lastPracticedAt) : "Never practiced"}
                       </span>
@@ -744,61 +625,12 @@ function ExecutionResultPanel(props: { result: ExecuteBasicExerciseResponse }) {
  * @param form - Editable attempt form.
  * @returns Practice session creation payload.
  */
-function toPracticeRequest(learningItemId: string, form: BasicsAttemptForm): CreatePracticeSessionRequest {
-  const durationMinutes = Number(form.durationMinutes);
-  const durationMs = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes * 60 * 1000 : undefined;
-
+function toPracticeRequest(learningItemId: string, form: BasicsAttemptForm, preset: ReviewSchedulePreset): CreatePracticeSessionRequest {
   return {
     learningItemId,
-    outcome: form.outcome,
-    confidence: form.confidence ? Number(form.confidence) : null,
-    durationMs,
-    nextReviewAt: toNextReviewTimestamp(form.nextReviewAt),
-    clarifiedRequirements: form.clarifiedRequirements,
-    foundEdgeCases: form.foundEdgeCases,
-    explainedComplexity: form.explainedComplexity,
-    testedSolution: form.testedSolution,
-    communicatedTradeoffs: form.communicatedTradeoffs,
-    notes: form.notes.trim(),
-    sourceCode: form.codeDraft.trim(),
-    whatHelped: form.whatHelped.trim(),
-    whatWasDifficult: form.whatWasDifficult.trim(),
-    improveNext: form.improveNext.trim()
-  };
-}
-
-/**
- * Creates an empty attempt form with the default next review date.
- *
- * @param reviewSchedulePreset - Selected default review interval.
- * @returns Editable attempt form.
- */
-function createEmptyAttemptForm(reviewSchedulePreset: ReviewSchedulePreset): BasicsAttemptForm {
-  return {
     outcome: "Completed",
-    confidence: "",
-    durationMinutes: "",
-    nextReviewAt: createDefaultNextReviewDate(reviewSchedulePreset),
-    ...emptyAttemptScorecard,
-    notes: "",
-    whatHelped: "",
-    whatWasDifficult: "",
-    improveNext: "",
-    codeDraft: ""
-  };
-}
-
-/**
- * Creates the local attempt form for a Basics exercise.
- *
- * @param exercise - Selected Basics exercise.
- * @param reviewSchedulePreset - Selected default review interval.
- * @returns Editable attempt form.
- */
-function createAttemptForm(exercise: BasicExercise, reviewSchedulePreset: ReviewSchedulePreset): BasicsAttemptForm {
-  return {
-    ...createEmptyAttemptForm(reviewSchedulePreset),
-    codeDraft: exercise.starterCode
+    nextReviewAt: toNextReviewTimestamp(createDefaultNextReviewDate(preset)),
+    sourceCode: form.codeDraft.trim()
   };
 }
 
@@ -854,16 +686,6 @@ function filterBasicExercises(exercises: BasicExercise[], searchQuery: string, s
 function paginateBasicExercises(exercises: BasicExercise[], currentPage: number, pageSize: number) {
   const startIndex = (currentPage - 1) * pageSize;
   return exercises.slice(startIndex, startIndex + pageSize);
-}
-
-/**
- * Converts an API status into display text.
- *
- * @param status - Status value.
- * @returns Human-readable status.
- */
-function formatStatus(status: string) {
-  return status.replace(/([A-Z])/g, " $1").trim();
 }
 
 /**

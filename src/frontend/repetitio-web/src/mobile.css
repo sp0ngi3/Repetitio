@@ -1,0 +1,188 @@
+/* Narrow windows and touch tablets only. Desktop rules remain in their original stylesheets. */
+@media (max-width: 1024px), (pointer: coarse) and (max-width: 1400px) {
+  html[data-style] .app-shell { width: calc(100% - max(16px, env(safe-area-inset-left, 0px)) - max(16px, env(safe-area-inset-right, 0px))); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html[data-style] :is(main, section, article, aside, form, fieldset, nav, header, footer, label) { min-width: 0; }
+  html[data-style] :is(input, select, textarea) { min-width: 0; max-width: 100%; font-size: 16px; }
+  html[data-style] :is(button, .primary-button, .secondary-button, .danger-button, .pagination-button, .file-action-button) { min-height: 44px; touch-action: manipulation; }
+  html[data-style] :is(.checkbox-row, .inline-checkbox) { min-height: 44px; }
+  html[data-style] :is(.checkbox-row, .inline-checkbox) input { flex-shrink: 0; }
+  html[data-style] :is(.app-header-main, .section-heading, .panel-heading, .editor-actions, .compact-actions, .pagination-bar, .pagination-row) { flex-wrap: wrap; }
+  html[data-style] :is(.section-heading, .panel-heading) > div { min-width: 0; }
+  html[data-style] .app-nav { display: flex; flex-wrap: wrap; }
+  html[data-style] .app-nav button { flex: 1 0 auto; }
+  html[data-style] :is(.tracker-toolbar, .filter-grid, .flashcard-filter-grid, .session-filter-panel, .card-picker-toolbar, .basics-filter-panel) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-style] :is(.dsa-workspace, .dsa-layout, .system-design-layout, .coding-layout, .leetcode-layout, .notes-layout, .workspace-grid, .flashcards-dashboard-grid) { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  html[data-style] :is(.dsa-sidebar, .notes-sidebar) { position: static; padding-right: 0; border-right: 0; }
+  html[data-style] :is(.problem-list, .notes-sidebar .problem-list) { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; }
+  html[data-style] :is(.problem-tabs, .note-area-tabs, .dashboard-mode-toggle) { display: flex; overflow-x: auto; max-width: 100%; }
+  html[data-style] :is(.problem-tabs, .note-area-tabs, .dashboard-mode-toggle) button { flex: 0 0 auto; white-space: nowrap; }
+  html[data-style] :is(.problem-document, .history-field, .example-block, .solution-box) { min-width: 0; overflow-wrap: anywhere; }
+  html[data-style] :is(pre, .signature) { max-width: 100%; overflow-x: auto; }
+  html[data-style] :is(.editor-actions, .compact-actions, .pagination-controls) { gap: 8px; }
+  html[data-style] .pagination-bar { gap: 12px; }
+  html[data-style] .pagination-bar > span { overflow-wrap: anywhere; }
+  html[data-style] .notes-companion { max-height: calc(100dvh - 100px - env(safe-area-inset-top, 0px)); bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  html[data-style] .notes-companion-textarea { min-height: 180px; height: 32dvh; }
+  html[data-style] .notes-fab { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); min-height: 44px; }
+  html[data-style] .app-footer { flex-wrap: wrap; gap: 16px; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  html[data-style] .footer-meta { flex-wrap: wrap; }
+
+  /* Wiki navigation is a searchable sheet, leaving the article the entire reading width. */
+  html[data-style] .wiki-wikipedia-page { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .wiki-wikipedia-page > * { min-width: 0; }
+  html[data-style] .wiki-wikipedia-page .wiki-reading-layout { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .wiki-wikipedia-page .wiki-document { padding: 20px; }
+  html[data-style] .wiki-wikipedia-page .wiki-article-body-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  html[data-style] .wiki-wikipedia-page .wiki-infobox { grid-column: auto; order: 0; }
+  html[data-style] .wiki-wikipedia-page .wiki-page-contents { position: static; max-height: none; padding: 0; background: transparent; border: 0; }
+  html[data-style] .wiki-wikipedia-page .wiki-page-contents nav { max-height: 40dvh; overflow-y: auto; }
+  html[data-style] .wiki-page-contents nav a { display: block; min-height: 44px; padding: 10px 12px; }
+  html[data-style] .wiki-wikipedia-page .wiki-article-titlebar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  html[data-style] .wiki-wikipedia-page .wiki-article-titlebar h1 { font-size: 26px; }
+  html[data-style] .wiki-wikipedia-page .wiki-article-actions { width: 100%; gap: 8px; padding: 12px; }
+  html[data-style] .wiki-shell-header { flex-wrap: wrap; gap: 12px; }
+  html[data-style] .wiki-page-tabs { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
+  html[data-style] .wiki-page-tabs button { flex: 1 0 auto; padding: 10px 12px; }
+  html[data-style] .wiki-breadcrumbs { gap: 4px; padding: 10px 0; }
+  html[data-style] .wiki-breadcrumbs > span { max-width: 100%; overflow-wrap: anywhere; }
+  .wiki-mobile-tools { display: flex; min-width: 0; align-items: center; gap: 10px; margin: 0 0 14px; }
+  .wiki-mobile-tools > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
+  .wiki-mobile-tools :is(button, a) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; text-decoration: none; }
+  .compact-disclosure { min-width: 0; border: 1px solid var(--border); background: var(--surface-soft); }
+  .compact-disclosure > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 10px 12px; cursor: pointer; color: var(--text); font: 600 14px/1.5 var(--font-ui); list-style: none; }
+  .compact-disclosure > summary::-webkit-details-marker { display: none; }
+  .compact-disclosure[open] > summary svg { transform: rotate(180deg); }
+  .compact-disclosure > strong { display: none; }
+  .compact-disclosure > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  html[data-style] .wiki-wikipedia-page .wiki-study-builder-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  html[data-style] .wiki-study-topic-row { min-width: 0; flex-wrap: wrap; }
+  html[data-style] .wiki-study-topic-row label { min-width: 0; flex: 1; }
+  html[data-style] .wiki-study-tree { max-height: 50dvh; }
+  html[data-style] :is(.wiki-study-topic-children, .wiki-tree ul) { margin-left: 8px; padding-left: 8px; }
+  html[data-style] .wiki-study-segmented { flex-wrap: wrap; }
+  html[data-style] .wiki-study-segmented button { flex: 1 1 auto; }
+  html[data-style] .wiki-study-menu { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+  html[data-style] .wiki-wikipedia-page .wiki-study-mode-card { min-height: 90px; }
+  html[data-style] .wiki-learning-player { display: flex; flex-direction: column; height: min(780px, calc(100dvh - 24px)); min-height: 280px; max-height: none; scroll-margin-top: 12px; }
+  html[data-style] .wiki-player-header { flex: 0 0 auto; flex-wrap: wrap; padding: 12px; gap: 8px; }
+  html[data-style] .wiki-player-header > div { min-width: 0; }
+  html[data-style] .wiki-player-management { justify-content: space-between; flex: 1 0 auto; }
+  html[data-style] .wiki-player-header h3 { overflow-wrap: anywhere; }
+  html[data-style] .wiki-player-body { flex: 1; max-height: none; min-height: 0; padding: 16px; overflow-wrap: anywhere; }
+  html[data-style] .wiki-player-body .wiki-study-flashcard { min-height: 200px; height: auto; padding: 18px; }
+  html[data-style] .wiki-player-body .wiki-study-flashcard strong { font-size: 17px; line-height: 1.7; }
+  html[data-style] .wiki-player-footer { flex: 0 0 auto; margin: 0; padding: 10px 12px; gap: 8px; }
+  html[data-style] .wiki-player-footer button[aria-label] { width: 44px; min-height: 44px; }
+  html[data-style] .wiki-learning-player progress { flex: 0 0 5px; margin: 0; }
+  html[data-style] .wiki-player-notice { flex: 0 0 auto; font-size: 12px; }
+  html[data-style] .wiki-quiz-options button { min-height: 52px; padding: 14px; }
+  html[data-style] .wiki-review-list-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+  html[data-style] .wiki-settings-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-style] .wiki-review-preference { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  html[data-style] .wiki-review-preference > div { grid-column: 1 / -1; }
+  html[data-style] .wiki-json-workspace { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .wiki-import-layout { grid-template-columns: minmax(0, 1fr); }
+
+  .mobile-editor-tabs { display: flex; margin: 0 0 12px; border: 1px solid var(--border); }
+  .mobile-editor-tabs button { flex: 1; background: var(--surface); color: var(--muted); border: 0; border-radius: 0; }
+  .mobile-editor-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
+  html[data-style] .wiki-editor-workspace[data-mobile-pane] { position: relative; }
+  html[data-style] .wiki-editor-workspace:is([data-mobile-pane="source"], [data-mobile-pane="preview"]) { display: block; }
+  /* Offscreen panes retain real width/geometry so source/preview scroll mapping stays accurate. */
+  html[data-style] .wiki-editor-workspace[data-mobile-pane="source"] .wiki-editor-preview,
+  html[data-style] .wiki-editor-workspace[data-mobile-pane="preview"] .wiki-source-panel { position: absolute; left: 0; top: 0; width: 100%; visibility: hidden; pointer-events: none; }
+  html[data-style] .wiki-wikipedia-page .wiki-editor-workspace[data-mobile-pane="split"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  html[data-style] .wiki-wikipedia-page :is(.wiki-source-textarea, .wiki-preview-scroll) { height: 60dvh; min-height: 260px; }
+  html[data-style] .wiki-wikipedia-page .wiki-markdown-toolbar { gap: 4px; }
+  html[data-style] .wiki-wikipedia-page .wiki-markdown-toolbar button { min-height: 44px; padding: 8px; }
+  html[data-style] .wiki-wikipedia-page .wiki-infobox dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* A single scrollable face avoids iOS 3-D backface hit-testing issues on long cards. */
+  html[data-style] .flashcard-card { height: clamp(280px, 48dvh, 620px); min-height: 0; width: 100%; perspective: none; }
+  html[data-style] .flashcard-card-inner { min-height: 0; transform: none; transition: none; }
+  html[data-style] .flashcard-card.is-flipped .flashcard-card-inner { transform: none; }
+  html[data-style] .flashcard-card-face { min-width: 0; padding: 22px; transform: none; backface-visibility: visible; -webkit-backface-visibility: visible; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  html[data-style] .flashcard-card-face strong { font-size: 17px; line-height: 1.7; }
+  html[data-style] .flashcard-card:not(.is-flipped) .flashcard-card-back,
+  html[data-style] .flashcard-card.is-flipped .flashcard-card-front { display: none; }
+  html[data-style] .flashcard-study-actions { position: sticky; bottom: 0; z-index: 5; padding: 10px 0 max(10px, env(safe-area-inset-bottom, 0px)); background: var(--canvas); grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); }
+  html[data-style] .flashcard-study-actions > button:first-child { grid-column: auto; }
+  html[data-style] .flashcard-study-topbar { position: static; }
+  html[data-style] .flashcard-study-meta { gap: 12px; flex-wrap: wrap; }
+  html[data-style] .flashcard-study-meta h3 { overflow-wrap: anywhere; }
+  html[data-style] .flashcard-record { grid-template-columns: minmax(0, 1fr) auto; }
+  html[data-style] .flashcard-session-actions { align-items: stretch; flex-wrap: wrap; }
+  html[data-style] .flashcard-session-actions .compact-actions { flex-wrap: wrap; }
+  html[data-style] .session-membership-row { flex-wrap: wrap; }
+  .code-workbench-expanded { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+}
+
+/* Sheets only exist in the compact layout and are outside animated page ancestors. */
+.mobile-sheet { width: min(480px, calc(100vw - 20px)); max-width: none; height: calc(100dvh - 24px); max-height: none; margin: auto; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+.mobile-sheet::backdrop { background: #0008; }
+.mobile-sheet-content { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.mobile-sheet-content > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px; border-bottom: 1px solid var(--border); }
+.mobile-sheet-content > header h2 { margin: 0; font-size: 18px; }
+.mobile-sheet-content > header button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
+.mobile-sheet-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px max(16px, env(safe-area-inset-bottom, 0px)); }
+html[data-style] .mobile-sheet .wiki-left-rail { position: static; border: 0; padding: 0; background: transparent; max-height: none; overflow: visible; }
+.mobile-sheet .wiki-tree-search input { font-size: 16px; min-height: 44px; }
+.mobile-sheet .tree-node-button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+.mobile-sheet .tree-toggle { min-width: 44px; min-height: 44px; }
+.mobile-sheet .wiki-tree-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); }
+.mobile-sheet .wiki-tree ul { padding-left: 8px; margin-left: 8px; }
+
+@media (max-width: 700px) {
+  html[data-style] .app-shell { width: calc(100% - max(12px, env(safe-area-inset-left, 0px)) - max(12px, env(safe-area-inset-right, 0px))); padding-top: env(safe-area-inset-top, 0px); }
+  html[data-style] .app-nav { display: flex; flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+  html[data-style] .app-nav button { flex: 0 0 84px; flex-direction: column; min-width: 0; min-height: 56px; padding: 8px 2px; white-space: normal; scroll-snap-align: start; }
+  html[data-style] :is(.section-heading, .panel-heading) { align-items: flex-start; }
+  html[data-style] :is(.tracker-toolbar, .filter-grid, .flashcard-filter-grid, .session-filter-panel, .card-picker-toolbar, .basics-filter-panel, .two-columns, .three-columns, .backup-grid, .reflection-grid, .wiki-settings-controls, .wiki-search-strip) { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] :is(.record-header, .dsa-table .record-header, .system-design-table .record-header, .basics-title-table .record-header) { display: none; }
+  html[data-style] :is(.record-row, .dsa-table .record-row, .system-design-table .record-row, .basics-title-table .record-row) { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  html[data-style] :is(.today-plan-row, .weakness-row) { flex-wrap: wrap; gap: 12px; }
+  html[data-style] .overview-row-actions { margin-left: auto; flex-wrap: wrap; }
+  html[data-style] .flashcards-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-style] .flashcards-metric:nth-child(2n) { border-right: 0; }
+  html[data-style] .flashcards-metric { padding: 14px; border-bottom: 1px solid var(--border); }
+  html[data-style] .flashcard-record { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .flashcard-record-side { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  html[data-style] .flashcard-study-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-style] .flashcard-study-actions > button:first-child { grid-column: 1 / -1; }
+  html[data-style] .flashcard-study-meta { flex-direction: column; align-items: flex-start; }
+  html[data-style] .flashcard-study-topbar .section-heading { align-items: flex-start; }
+  html[data-style] .flashcard-card-face { padding: 18px; }
+  html[data-style] .flashcard-session-actions .compact-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  html[data-style] .flashcard-session-actions .compact-actions button:first-child { grid-column: 1 / -1; }
+  html[data-style] .wiki-wikipedia-page .wiki-document { padding: 16px 12px; }
+  html[data-style] .wiki-wikipedia-page .wiki-article-titlebar h1 { font-size: 24px; }
+  html[data-style] .wiki-breadcrumbs { font-size: 12px; }
+  html[data-style] .wiki-page-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-style] .wiki-page-tabs button { padding: 8px 4px; font-size: 12px; }
+  html[data-style] .wiki-wikipedia-page .wiki-article-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-style] .wiki-article-actions :is(button, label) { white-space: normal; }
+  html[data-style] .wiki-wikipedia-page .wiki-player-header h3 { font-size: 16px; }
+  html[data-style] .wiki-player-footer { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  html[data-style] .wiki-player-footer > span { text-align: center; }
+  html[data-style] .wiki-player-footer > .primary-button { grid-column: 1 / 3; margin: 0; }
+  html[data-style] .wiki-player-footer > .text-button { grid-column: 3; }
+  html[data-style] .wiki-wikipedia-page .wiki-player-footer > button { width: 100%; }
+  html[data-style] .wiki-grade-actions { flex-wrap: wrap; }
+  html[data-style] .wiki-grade-actions button { flex: 1; }
+  html[data-style] .wiki-wikipedia-page .wiki-study-topic-row small { max-width: 100%; }
+  html[data-style] .wiki-review-preference { grid-template-columns: minmax(0, 1fr); }
+  html[data-style] .wiki-special-header { flex-direction: column; }
+  html[data-style] :is(.wiki-practice-editor-dialog, .wiki-table-dialog) { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  html[data-style] .wiki-practice-editor-dialog form { max-height: calc(100dvh - 20px); }
+  html[data-style] .wiki-practice-editor-heading { flex: 0 0 auto; }
+  html[data-style] .wiki-practice-editor-footer { flex: 0 0 auto; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+  html[data-style] .notes-companion { right: 8px; width: calc(100vw - 16px); padding: 12px; }
+  html[data-style] .notes-fab { font-size: 0; gap: 0; width: 44px; height: 44px; padding: 10px; }
+  html[data-style] .backup-entry { overflow-wrap: anywhere; }
+}
+
+@media (max-height: 500px) and (pointer: coarse) {
+  html[data-style] .flashcard-card { height: 65dvh; min-height: 180px; }
+  html[data-style] .wiki-learning-player { height: 92dvh; min-height: 260px; }
+  html[data-style] .wiki-player-header small { display: none; }
+}

@@ -77,6 +77,12 @@ public static class PracticeSessionEndpoints
             return Results.BadRequest("Learning item does not exist.");
         }
 
+        if (request.InterviewReview is { } review &&
+            (learningItem.Type != LearningItemType.Dsa || !review.HasValidRatings()))
+        {
+            return Results.BadRequest("Interview reviews apply to DSA attempts only; ratings must be between 1 and 5 or unset.");
+        }
+
         var now = DateTime.UtcNow;
         var startedAt = request.StartedAt ?? now;
         var completedAt = request.CompletedAt ?? now;
@@ -92,11 +98,12 @@ public static class PracticeSessionEndpoints
             DurationMs = durationMs,
             Outcome = request.Outcome,
             Confidence = request.Confidence,
-            ClarifiedRequirements = request.ClarifiedRequirements,
-            FoundEdgeCases = request.FoundEdgeCases,
-            ExplainedComplexity = request.ExplainedComplexity,
-            TestedSolution = request.TestedSolution,
-            CommunicatedTradeoffs = request.CommunicatedTradeoffs,
+            ClarifiedRequirements = request.InterviewReview?.AskedConstraints ?? request.ClarifiedRequirements,
+            FoundEdgeCases = request.InterviewReview is { } edges ? edges.AskedConstraints || edges.HandledEdgeCases : request.FoundEdgeCases,
+            ExplainedComplexity = request.InterviewReview?.StatedComplexity ?? request.ExplainedComplexity,
+            TestedSolution = request.InterviewReview?.TestedEdgeCases ?? request.TestedSolution,
+            CommunicatedTradeoffs = request.InterviewReview is { } tradeoffs ? tradeoffs.DiscussedApproaches || tradeoffs.DiscussedOptimizations : request.CommunicatedTradeoffs,
+            InterviewReview = request.InterviewReview,
             Approach = request.Approach?.Trim(),
             Prompt = request.Prompt?.Trim(),
             Notes = request.Notes?.Trim(),

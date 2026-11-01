@@ -23,6 +23,28 @@ export type LearningDifficulty = "Unknown" | "Easy" | "Medium" | "Hard";
  */
 export type PracticeOutcome = "Failed" | "Partial" | "Completed" | "Passed";
 
+/** Detailed review of one DSA interview; missing on legacy attempts. */
+export interface DsaInterviewReview {
+  restatedProblem: boolean;
+  askedConstraints: boolean;
+  discussedApproaches: boolean;
+  statedComplexity: boolean;
+  receivedGoAhead: boolean;
+  talkedThroughCode: boolean;
+  meaningfulNames: boolean;
+  cleanModularCode: boolean;
+  handledEdgeCases: boolean;
+  walkedThroughExample: boolean;
+  testedEdgeCases: boolean;
+  fixedBugs: boolean;
+  discussedOptimizations: boolean;
+  problemSolving: number | null;
+  communication: number | null;
+  speed: number | null;
+  dsa: number | null;
+  coding: number | null;
+}
+
 /**
  * Represents the lightweight API health response.
  */
@@ -109,6 +131,7 @@ export interface CreatePracticeSessionRequest {
   testedSolution?: boolean;
   /** Whether tradeoffs were communicated during the attempt. */
   communicatedTradeoffs?: boolean;
+  interviewReview?: DsaInterviewReview | null;
   /** Optional next review date selected for the practiced item. */
   nextReviewAt?: string;
   /** Approach used during the attempt. */
@@ -273,6 +296,7 @@ export interface PracticeSession {
   testedSolution: boolean;
   /** Whether tradeoffs were communicated during the attempt. */
   communicatedTradeoffs: boolean;
+  interviewReview?: DsaInterviewReview | null;
   /** Approach used during the attempt. */
   approach?: string | null;
   /** Prompt used during the attempt. */
