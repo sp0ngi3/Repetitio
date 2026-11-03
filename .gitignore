@@ -15,6 +15,7 @@ node_modules/
 # Local runtime data
 data/
 backups/
+.env.hosted
 
 # User and IDE files
 .vs/

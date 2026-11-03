@@ -12,4 +12,7 @@ tools/Repetitio.Desktop/.stage
 **/dist
 data
 backups
+.env*
+**/.env*
+**/credentials.json
 *.log

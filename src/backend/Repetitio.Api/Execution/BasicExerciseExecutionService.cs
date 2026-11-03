@@ -20,7 +20,7 @@ public sealed class BasicExerciseExecutionService
     /// <summary>
     /// Maximum accepted source code length.
     /// </summary>
-    private const int MaximumSourceCodeLength = 20_000;
+    internal const int MaximumSourceCodeLength = 20_000;
 
     /// <summary>
     /// Minimum execution timeout in milliseconds.
@@ -270,23 +270,23 @@ public sealed class BasicExerciseExecutionService
 
         process.Start();
 
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var outputTask = ReadOutputAsync(process.StandardOutput, cancellationToken);
+        var errorTask = ReadOutputAsync(process.StandardError, cancellationToken);
 
         try
         {
-            await process.WaitForExitAsync(cancellationToken).WaitAsync(timeout, cancellationToken);
+            await Task.WhenAll(process.WaitForExitAsync(cancellationToken), outputTask, errorTask)
+                .WaitAsync(timeout, cancellationToken);
         }
         catch (TimeoutException)
         {
             TryKillProcess(process);
-            await process.WaitForExitAsync(CancellationToken.None);
-
-            return new ExecutionProcessResult(
-                -1,
-                true,
-                await outputTask,
-                await errorTask);
+            return new ExecutionProcessResult(-1, true, "", "");
+        }
+        catch (OperationCanceledException)
+        {
+            TryKillProcess(process);
+            throw;
         }
 
         return new ExecutionProcessResult(
@@ -294,6 +294,17 @@ public sealed class BasicExerciseExecutionService
             false,
             await outputTask,
             await errorTask);
+    }
+
+    private static async Task<string> ReadOutputAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        const int limit = 24_000;
+        var output = new StringBuilder();
+        var buffer = new char[4096];
+        int count;
+        while ((count = await reader.ReadAsync(buffer, cancellationToken)) > 0)
+            output.Append(buffer, 0, Math.Min(count, limit - output.Length));
+        return output.ToString();
     }
 
     /// <summary>
@@ -328,7 +339,15 @@ public sealed class BasicExerciseExecutionService
             json = json[..lineBreakIndex];
         }
 
-        return JsonSerializer.Deserialize<IReadOnlyCollection<BasicExerciseTestResultResponse>>(json) ?? [];
+        try
+        {
+            var results = JsonSerializer.Deserialize<IReadOnlyCollection<BasicExerciseTestResultResponse>>(json);
+            return results is not null && results.All(result => result is not null) ? results : [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     /// <summary>

@@ -9,6 +9,12 @@ using Repetitio.Infrastructure;
 using Repetitio.Infrastructure.Persistence;
 using Repetitio.Api.Desktop;
 
+if (args is ["--basics-sandbox"])
+{
+    Environment.ExitCode = await HostedBasicsRunner.RunSubmissionAsync();
+    return;
+}
+
 var desktopCommand = await DesktopRuntime.RunDataCommandAsync(args);
 if (desktopCommand is not null) { Environment.ExitCode = desktopCommand.Value; return; }
 
@@ -40,6 +46,8 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<BasicExerciseExecutionService>();
+builder.Services.AddHttpClient<HostedBasicsRunner>(client => client.Timeout = TimeSpan.FromSeconds(25))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseProxy = false });
 builder.Services.AddHostedService<DesktopParentMonitor>();
 builder.Services.AddSingleton<IBasicExerciseHarness, ReverseLinkedListHarness>();
 
@@ -49,6 +57,7 @@ foreach (var harness in BasicExerciseHarnessCatalog.GetAll())
 }
 
 var app = builder.Build();
+HostedBasicsRunner.Configure(app);
 app.Use((context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/api/backup"))
@@ -59,11 +68,11 @@ app.Use((context, next) =>
     return next(context);
 });
 DesktopRuntime.Configure(app);
-if (builder.Configuration.GetValue<bool>("Desktop:Enabled"))
+if (builder.Configuration.GetValue<bool>("Desktop:Enabled") || builder.Configuration.GetValue<bool>("Hosted:Enabled"))
 {
     var databasePath = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(builder.Configuration.GetConnectionString("Repetitio")).DataSource;
     if (File.Exists(databasePath + ".restore-pending.json"))
-        throw new InvalidOperationException("A previous backup recovery was interrupted. Original files were retained under backups. Choose Restore backup to finish recovery; a new empty database will not be created.");
+        throw new InvalidOperationException("A previous backup recovery was interrupted. Original files were retained under backups. Complete recovery before starting Repetitio.");
     if (File.Exists(databasePath)) await DesktopRuntime.ValidateDatabaseAsync(databasePath);
 }
 

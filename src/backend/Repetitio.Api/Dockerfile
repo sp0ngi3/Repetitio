@@ -19,3 +19,12 @@ EXPOSE 8080
 COPY --from=build /app/publish .
 
 ENTRYPOINT ["dotnet", "Repetitio.Api.dll"]
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS sandbox
+WORKDIR /app
+RUN command -v timeout
+COPY --from=build /app/publish .
+USER 1654:1654
+ENTRYPOINT ["timeout", "--kill-after=1s", "12s", "dotnet", "Repetitio.Api.dll", "--basics-sandbox"]
+
+FROM runtime AS app

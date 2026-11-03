@@ -85,6 +85,7 @@ public static class BasicExerciseEndpoints
         string slug,
         ExecuteBasicExerciseRequest request,
         BasicExerciseExecutionService executionService,
+        HostedBasicsRunner hostedRunner,
         CancellationToken cancellationToken)
     {
         var exercise = BasicExerciseCatalog.GetBySlug(slug);
@@ -93,6 +94,9 @@ public static class BasicExerciseEndpoints
         {
             return Results.NotFound();
         }
+
+        if (hostedRunner.Enabled)
+            return await hostedRunner.ExecuteAsync(exercise.Slug, request, cancellationToken);
 
         var result = await executionService.ExecuteAsync(exercise, request, cancellationToken);
         return Results.Ok(result);

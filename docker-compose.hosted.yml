@@ -1,0 +1,144 @@
+name: repetitio-hosted
+
+# Edit these values and the Cloudflare ingress block at the bottom.
+x-hosted-settings:
+  public-origin: &public-origin https://study.example.com
+  runner-user: &runner-user "1001:1001"
+  runner-socket: &runner-socket /run/user/1001/docker.sock
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/backend/Repetitio.Api/Dockerfile
+      target: app
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      Hosted__Enabled: "true"
+      Hosted__Origin: *public-origin
+      Hosted__RunnerUrl: http://runner:8090/execute
+      ConnectionStrings__Repetitio: Data Source=/data/repetitio.db
+      Backup__Directory: /backups
+    volumes:
+      - type: bind
+        source: /srv/repetitio/data
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/repetitio/backups
+        target: /backups
+        bind:
+          create_host_path: false
+    networks: [backend, execution, api_outbound]
+    healthcheck:
+      test: ["CMD", "dotnet", "Repetitio.Api.dll", "--health-check"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 60
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./src/frontend/repetitio-web
+      args:
+        VITE_API_BASE_URL: ""
+    configs:
+      - source: nginx
+        target: /etc/nginx/conf.d/default.conf
+    networks: [edge, backend]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  runner:
+    build:
+      context: ./deploy/hosted
+      dockerfile: Dockerfile.runner
+    user: *runner-user
+    environment:
+      HOME: /tmp
+    volumes:
+      - type: bind
+        source: *runner-socket
+        target: /run/runner-docker.sock
+        bind:
+          create_host_path: false
+    networks: [execution]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "run"]
+    configs:
+      - source: cloudflared
+        target: /etc/cloudflared/config.yml
+    volumes:
+      - type: bind
+        source: /etc/repetitio/credentials.json
+        target: /etc/cloudflared/credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [edge, outbound]
+    depends_on: [web]
+    restart: unless-stopped
+
+networks:
+  edge:
+    internal: true
+  backend:
+    internal: true
+  execution:
+    internal: true
+  outbound: {}
+  api_outbound: {}
+
+configs:
+  nginx:
+    content: |
+      server {
+          listen 80;
+          server_name _;
+          root /usr/share/nginx/html;
+          index index.html;
+          add_header Cache-Control "no-store" always;
+
+          location /api/ {
+              resolver 127.0.0.11 valid=10s ipv6=off;
+              set $$api http://api:8080;
+              client_max_body_size 0;
+              proxy_http_version 1.1;
+              proxy_request_buffering off;
+              proxy_buffering off;
+              proxy_read_timeout 300s;
+              proxy_hide_header Cache-Control;
+              proxy_pass $$api;
+          }
+
+          location / {
+              try_files $$uri $$uri/ /index.html;
+          }
+      }
+
+  # Set your tunnel UUID, hostname, team name and Access application audience here.
+  cloudflared:
+    content: |
+      tunnel: YOUR_TUNNEL_UUID
+      credentials-file: /etc/cloudflared/credentials.json
+      ingress:
+        - hostname: study.example.com
+          service: http://web:80
+          originRequest:
+            access:
+              required: true
+              teamName: YOUR_TEAM_NAME
+              audTag:
+                - YOUR_ACCESS_APPLICATION_AUD
+        - service: http_status:404

@@ -396,7 +396,7 @@ Runtime:
 
 User-provided code should not execute inside the ASP.NET API process.
 
-Even though Repetitio is a personal localhost application, separated execution prevents code such as infinite loops or process exits from breaking the main application.
+Repetitio supports both local practice and private hosting. The hosted profile compiles and runs Basics submissions in disposable gVisor sandboxes via a private broker. Cloudflare Access controls access to the shared application and SQLite database. See [hosted deployment](hosted-deployment.md) for the implemented network layout, isolation requirements and backup procedures.
 
 Recommended flow:
 
