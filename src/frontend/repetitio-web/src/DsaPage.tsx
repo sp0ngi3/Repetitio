@@ -1,5 +1,5 @@
 import { ActionIcon } from "./ActionIcon";
-import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   AttemptScorecardSummary,
 } from "./AttemptScorecard";
@@ -232,11 +232,15 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
   /**
    * Loads DSA problems with the current filters.
    */
+  const latestLoad = useRef(0);
+
   async function loadProblems() {
+    const load = ++latestLoad.current;
     setError(null);
 
     try {
       const nextProblems = await getDsaProblems(filters);
+      if (load !== latestLoad.current) return;
       setProblems(nextProblems);
 
       if (selectedProblemId && !nextProblems.some((problem) => problem.id === selectedProblemId)) {
@@ -244,9 +248,10 @@ export function DsaPage({ focusItemId, focusNonce, reviewSchedulePreset, onChang
         setView("dashboard");
       }
     } catch (requestError) {
+      if (load !== latestLoad.current) return;
       setError(requestError instanceof Error ? requestError.message : "Unable to load DSA problems.");
     } finally {
-      setIsLoading(false);
+      if (load === latestLoad.current) setIsLoading(false);
     }
   }
 
@@ -658,7 +663,7 @@ function DsaDashboard(props: DsaDashboardProps) {
           <input
             value={props.filters.search}
             onChange={(event) => props.onFiltersChange({ ...props.filters, search: event.target.value })}
-            placeholder="problem, source, tag..."
+            placeholder="Part of a title, source or tag…"
           />
         </label>
 

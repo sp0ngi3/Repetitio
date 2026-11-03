@@ -66,12 +66,12 @@ public static class DsaEndpoints
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var normalizedSearch = search.Trim();
+            var normalizedSearch = search.Trim().ToLowerInvariant();
             query = query.Where(problem =>
-                problem.LearningItem.Title.Contains(normalizedSearch)
-                || (problem.Source != null && problem.Source.Contains(normalizedSearch))
-                || (problem.ProblemStatement != null && problem.ProblemStatement.Contains(normalizedSearch))
-                || problem.LearningItem.Tags.Any(itemTag => itemTag.Tag.Name.Contains(normalizedSearch)));
+                problem.LearningItem.Title.ToLower().Contains(normalizedSearch)
+                || (problem.Source != null && problem.Source.ToLower().Contains(normalizedSearch))
+                || (problem.ProblemStatement != null && problem.ProblemStatement.ToLower().Contains(normalizedSearch))
+                || problem.LearningItem.Tags.Any(itemTag => itemTag.Tag.Name.ToLower().Contains(normalizedSearch)));
         }
 
         var problems = await query

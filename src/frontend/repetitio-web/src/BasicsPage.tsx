@@ -362,7 +362,7 @@ export function BasicsPage(props: BasicsPageProps) {
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="exercise or hashtag..."
+                  placeholder="Part of an exercise title or tag…"
                 />
               </label>
 
