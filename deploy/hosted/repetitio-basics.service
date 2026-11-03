@@ -1,0 +1,21 @@
+[Unit]
+Description=Repetitio Basics sandbox broker
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/rm -f /var/lib/repetitio-basics/execute.sock
+ExecStart=/usr/bin/python3 -u /usr/local/lib/repetitio/runner.py --host-service
+StateDirectory=repetitio-basics
+StateDirectoryMode=0700
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

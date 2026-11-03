@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.Features;
 using Repetitio.Api.Execution.Harnesses;
@@ -13,6 +14,31 @@ public sealed class HostedBasicsRunner(HttpClient client, IConfiguration configu
     private static readonly SemaphoreSlim JobSlot = new(1, 1);
     private const int MaxResponseBytes = 256 * 1024;
     public bool Enabled => configuration.GetValue<bool>("Hosted:Enabled");
+
+    internal static SocketsHttpHandler CreateTransport(IConfiguration configuration)
+    {
+        var handler = new SocketsHttpHandler { AllowAutoRedirect = false, UseProxy = false };
+        if (!configuration.GetValue<bool>("Hosted:Enabled") ||
+            configuration["Hosted:RunnerSocket"] is not { Length: > 0 } path)
+            return handler;
+
+        var endpoint = new UnixDomainSocketEndPoint(path);
+        handler.ConnectCallback = async (_, cancellationToken) =>
+        {
+            var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            try
+            {
+                await socket.ConnectAsync(endpoint, cancellationToken);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        };
+        return handler;
+    }
 
     public static void Configure(WebApplication app)
     {

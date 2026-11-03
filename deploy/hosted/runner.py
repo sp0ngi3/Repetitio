@@ -4,6 +4,8 @@ import json
 import os
 import re
 import selectors
+import socketserver
+import sys
 import subprocess
 import time
 import uuid
@@ -78,6 +80,9 @@ def exchange(process, body):
 class RunnerHandler(BaseHTTPRequestHandler):
     image_id: str
 
+    def address_string(self):
+        return super().address_string() if isinstance(self.client_address, tuple) else "local"
+
     def setup(self):
         self.request.settimeout(3)
         super().setup()
@@ -129,17 +134,23 @@ class RunnerHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    if os.getuid() == 0:
+    host_service = sys.argv[1:] == ["--host-service"]
+    if sys.argv[1:] and not host_service:
+        raise SystemExit("Unknown runner arguments")
+    if host_service:
+        DOCKER = ["docker", "--host", "unix:///var/run/docker.sock"]
+    elif os.getuid() == 0:
         raise SystemExit("Run the broker as the dedicated socket owner, not root")
     info = json.loads(subprocess.check_output(DOCKER + ["info", "--format", "{{json .}}"], timeout=10))
+    rootless = any("name=rootless" in option for option in info.get("SecurityOptions") or [])
     if (
-        not any("name=rootless" in option for option in info.get("SecurityOptions") or [])
+        rootless == host_service
         or info.get("CgroupDriver") != "systemd"
         or str(info.get("CgroupVersion")) != "2"
         or "runsc" not in info.get("Runtimes", {})
         or not all(info.get(key) for key in ("MemoryLimit", "SwapLimit", "CPUCfsQuota", "PidsLimit"))
     ):
-        raise SystemExit("Runner requires a dedicated rootless engine with runsc and delegated cgroup v2 limits")
+        raise SystemExit("Runner requires the configured Docker engine with runsc and systemd cgroup v2 limits")
     image_id = subprocess.check_output(
         DOCKER + ["image", "inspect", "--format", "{{.Id}}", IMAGE_TAG], timeout=10, text=True
     ).strip()
@@ -147,4 +158,9 @@ if __name__ == "__main__":
         raise SystemExit("Expected a local sandbox image ID")
     RunnerHandler.image_id = image_id
     # One job at a time. The public API rejects additional concurrent submissions.
-    HTTPServer(("0.0.0.0", 8090), RunnerHandler).serve_forever()
+    if host_service:
+        os.umask(0o077)
+        with socketserver.UnixStreamServer("/var/lib/repetitio-basics/execute.sock", RunnerHandler) as server:
+            server.serve_forever()
+    else:
+        HTTPServer(("0.0.0.0", 8090), RunnerHandler).serve_forever()

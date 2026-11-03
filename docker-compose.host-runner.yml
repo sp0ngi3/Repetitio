@@ -1,0 +1,12 @@
+services:
+  api:
+    environment:
+      Hosted__RunnerUrl: http://localhost/execute
+      Hosted__RunnerSocket: /run/repetitio-basics/execute.sock
+    volumes:
+      - type: bind
+        source: /var/lib/repetitio-basics
+        target: /run/repetitio-basics
+        read_only: true
+        bind:
+          create_host_path: false

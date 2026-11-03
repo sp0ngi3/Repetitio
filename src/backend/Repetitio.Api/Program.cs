@@ -47,7 +47,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<BasicExerciseExecutionService>();
 builder.Services.AddHttpClient<HostedBasicsRunner>(client => client.Timeout = TimeSpan.FromSeconds(25))
-    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseProxy = false });
+    .ConfigurePrimaryHttpMessageHandler(() => HostedBasicsRunner.CreateTransport(builder.Configuration));
 builder.Services.AddHostedService<DesktopParentMonitor>();
 builder.Services.AddSingleton<IBasicExerciseHarness, ReverseLinkedListHarness>();
 

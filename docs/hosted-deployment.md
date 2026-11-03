@@ -41,6 +41,27 @@ After the smoke test, restore a copy of your backup as described below. Then sta
 dc up -d tunnel
 ```
 
+## Use the host broker when rootless gVisor cannot start
+
+Use this mode only after testing gVisor and verifying CPU, memory, swap, and PID limits on the primary engine. The broker runs as a privileged systemd service and accepts only execution requests through a private Unix socket. Treat the installed broker script as privileged code. The API receives the broker socket, and the sandbox receives neither socket. The rootless broker is still available through the original Compose file.
+
+Run from the deployment checkout as root. Repeat these steps when updating the API and sandbox image.
+
+```sh
+d() { docker --host unix:///var/run/docker.sock "$@"; }
+dc() { d compose -f docker-compose.hosted.yml -f docker-compose.host-runner.yml "$@"; }
+
+d build --target sandbox -f src/backend/Repetitio.Api/Dockerfile -t repetitio-basics-sandbox . &&
+install -D -m 0644 deploy/hosted/runner.py /usr/local/lib/repetitio/runner.py &&
+install -m 0644 deploy/hosted/repetitio-basics.service /etc/systemd/system/repetitio-basics.service &&
+systemctl daemon-reload &&
+systemctl enable repetitio-basics.service &&
+systemctl restart repetitio-basics.service &&
+dc up -d --build --wait api
+```
+
+Check `journalctl -u repetitio-basics.service -n 40 --no-pager` and run a Basics exercise through Cloudflare Access. Use both Compose files for subsequent deployment and recovery commands in this mode.
+
 ## Move data, export and restore
 
 Keep your original ZIP separately. The hosted server uses the existing ZIP format, including the database and the wiki images stored in it. The restore procedure replaces the target database. Choose a fresh hosted data directory for your first migration, and check a few existing Wiki pages, images, and practice attempts after restore.
