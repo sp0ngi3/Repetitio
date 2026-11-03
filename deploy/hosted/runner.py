@@ -148,7 +148,7 @@ if __name__ == "__main__":
         or info.get("CgroupDriver") != "systemd"
         or str(info.get("CgroupVersion")) != "2"
         or "runsc" not in info.get("Runtimes", {})
-        or not all(info.get(key) for key in ("MemoryLimit", "SwapLimit", "CPUCfsQuota", "PidsLimit"))
+        or not all(info.get(key) for key in ("MemoryLimit", "SwapLimit", "CpuCfsQuota", "PidsLimit"))
     ):
         raise SystemExit("Runner requires the configured Docker engine with runsc and systemd cgroup v2 limits")
     image_id = subprocess.check_output(
