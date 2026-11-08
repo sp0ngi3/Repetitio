@@ -36,6 +36,28 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+it("opens a topic from the tree while the article list and review progress are still loading", async () => {
+  let finishList!: (value: Awaited<ReturnType<typeof getWikiPages>>) => void;
+  let finishStudy!: (value: Awaited<ReturnType<typeof getWikiStudy>>) => void;
+  vi.mocked(getWikiPages).mockReturnValueOnce(new Promise(resolve => { finishList = resolve; }));
+  vi.mocked(getWikiStudy).mockReturnValueOnce(new Promise(resolve => { finishStudy = resolve; }));
+
+  render(<WikiPage />);
+  expect(screen.getByRole("status")).toHaveTextContent("Loading topics");
+  const tree = within(screen.getByRole("complementary", { name: "Wiki topic tree" }));
+  fireEvent.click(await tree.findByRole("button", { name: "Other" }));
+  expect(await screen.findByRole("heading", { name: "Other" })).toBeInTheDocument();
+
+  await act(async () => finishList({ items: pages, totalCount: 3, page: 1, pageSize: 15 }));
+  expect(screen.getByRole("heading", { name: "Other" })).toBeInTheDocument();
+  expect(getWikiPage).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(screen.getByRole("button", { name: "Reviews" }));
+  expect(screen.getByRole("status")).toHaveTextContent("Loading review progress");
+  await act(async () => finishStudy({ intervalDays: 30, pages: [], history: [] }));
+  expect(screen.getByRole("heading", { name: "Wiki reviews" })).toBeInTheDocument();
+});
+
 it("keeps studied markers in the portalled phone tree with an SVG check in a fixed status slot", async () => {
   pages[0].isStudied = true;
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === compactLayoutQuery, addEventListener: vi.fn(), removeEventListener: vi.fn() }));

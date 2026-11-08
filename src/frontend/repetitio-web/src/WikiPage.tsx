@@ -290,6 +290,8 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
   useEffect(() => { if (!compact || tabletLandscape) setTopicsOpen(false); }, [compact, tabletLandscape]);
   const [focusedPractice, setFocusedPractice] = useState(!!focusPageId && !!focusStudyKind);
   const [studyOverview, setStudyOverview] = useState<WikiStudyOverview | null>(null);
+  const [studyRevision, setStudyRevision] = useState(0);
+  const [studyError, setStudyError] = useState(false);
   const [treeSearch, setTreeSearch] = useState("");
   const [treeNodes, setTreeNodes] = useState<WikiTreeNode[]>([]);
   const [pages, setPages] = useState<WikiPageRecord[]>([]);
@@ -311,8 +313,13 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
   const [showImportStructure, setShowImportStructure] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savingStudiedId, setSavingStudiedId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [treeStatus, setTreeStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [isListLoading, setIsListLoading] = useState(true);
+  const [isArticleLoading, setIsArticleLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const treeLoad = useRef<{ includeArchived: boolean; task: Promise<WikiTreeNode[]> } | null>(null);
+  const listRequest = useRef(0);
+  const articleRequest = useRef(0);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / wikiPageSize));
   const nestedTree = useMemo(() => buildNestedTree(treeNodes), [treeNodes]);
@@ -330,48 +337,81 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
     [selectedPage, treeNodes]
   );
 
-  async function loadWiki(preferredPageId = selectedPage?.id ?? focusPageId ?? null) {
-    setError(null);
-    setIsLoading(true);
+  function loadTree(refresh: boolean) {
+    if (!refresh && treeLoad.current?.includeArchived === includeArchived)
+      return treeLoad.current.task;
 
-    try {
-      const [nextTree, nextPages, nextStudy] = await Promise.all([
-        getWikiTree(includeArchived),
-        getWikiPages({ search, includeArchived, sort, page, pageSize: wikiPageSize }),
-        getWikiStudy()
-      ]);
-      setStudyOverview(nextStudy);
-      setTreeNodes(nextTree);
-      setPages(nextPages.items);
-      setTotalCount(nextPages.totalCount);
-      autoExpandTopLevels(nextTree);
-
-      const idToOpen = preferredPageId
-        ?? nextPages.items[0]?.id
-        ?? nextTree[0]?.id
-        ?? null;
-
-      if (idToOpen) {
-        const pageRecord = await getWikiPage(idToOpen);
-        setSelectedPage(pageRecord);
-        setForm(createWikiForm(pageRecord));
-        expandAncestors(pageRecord, nextTree);
-      } else {
-        setSelectedPage(null);
+    setTreeStatus("loading");
+    const task = getWikiTree(includeArchived).then(nextTree => {
+      if (treeLoad.current?.task === task) {
+        setTreeNodes(nextTree);
+        setTreeStatus("ready");
       }
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load wiki pages.");
-    } finally {
-      setIsLoading(false);
+      return nextTree;
+    }, () => {
+      if (treeLoad.current?.task === task) {
+        treeLoad.current = null;
+        setTreeStatus("error");
+      }
+      return [];
+    });
+    treeLoad.current = { includeArchived, task };
+    return task;
+  }
+
+  async function loadWiki(preferredPageId = selectedPage?.id ?? focusPageId ?? null, refresh = true) {
+    const request = ++listRequest.current;
+    const initialArticleRequest = articleRequest.current;
+    const shouldOpenArticle = refresh || (!selectedPage && initialArticleRequest === 0);
+    setError(null);
+    setIsListLoading(true);
+    if (refresh) setStudyRevision(current => current + 1);
+
+    const nextTree = loadTree(refresh);
+    const preferredArticle = shouldOpenArticle && preferredPageId ? loadArticle(preferredPageId) : null;
+    const nextPages = await getWikiPages({ search, includeArchived, sort, page, pageSize: wikiPageSize }).catch(requestError => {
+      if (request === listRequest.current)
+        setError(requestError instanceof Error ? requestError.message : "Unable to load wiki pages.");
+      return null;
+    });
+
+    if (request === listRequest.current) {
+      if (nextPages) {
+        setPages(nextPages.items);
+        setTotalCount(nextPages.totalCount);
+      }
+      setIsListLoading(false);
     }
+
+    if (shouldOpenArticle && !preferredArticle) {
+      const id = nextPages?.items[0]?.id ?? (await nextTree)[0]?.id;
+      if (request === listRequest.current && initialArticleRequest === articleRequest.current) {
+        if (id) await loadArticle(id);
+        else setIsArticleLoading(false);
+      }
+    }
+    await preferredArticle;
   }
 
   useEffect(() => {
-    void loadWiki();
+    void loadWiki(undefined, false);
   }, [includeArchived, page, search, sort]);
 
+  const shouldLoadStudy = selectedPage !== null || view === "reviews" || view === "study";
   useEffect(() => {
-    const refresh = () => { void getWikiStudy().then(setStudyOverview).catch(() => setError("Unable to refresh Wiki review progress.")); };
+    if (!shouldLoadStudy) return;
+    let active = true;
+    setStudyError(false);
+    void getWikiStudy().then(overview => {
+      if (active) setStudyOverview(overview);
+    }, () => {
+      if (active) setStudyError(true);
+    });
+    return () => { active = false; };
+  }, [shouldLoadStudy, studyRevision]);
+
+  useEffect(() => {
+    const refresh = () => setStudyRevision(current => current + 1);
     window.addEventListener("wiki-study-updated", refresh);
     return () => window.removeEventListener("wiki-study-updated", refresh);
   }, []);
@@ -382,20 +422,33 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
     setTreeNodes(current => current.map(node => node.id === updated.id ? { ...node, updatedAt: updated.updatedAt } : node));
   }
 
+  async function loadArticle(id: string, navigate = false) {
+    const request = ++articleRequest.current;
+    setIsArticleLoading(true);
+    try {
+      const pageRecord = await getWikiPage(id);
+      if (request !== articleRequest.current) return;
+      setSelectedPage(pageRecord);
+      setForm(createWikiForm(pageRecord));
+      if (navigate) {
+        setEditingPageId(null);
+        setView("article");
+      }
+      void treeLoad.current?.task.then(nodes => {
+        if (request === articleRequest.current) expandAncestors(pageRecord, nodes);
+      });
+    } catch (requestError) {
+      if (request === articleRequest.current)
+        setError(requestError instanceof Error ? requestError.message : "Unable to load wiki page.");
+    } finally {
+      if (request === articleRequest.current) setIsArticleLoading(false);
+    }
+  }
+
   async function selectPage(id: string) {
     setError(null);
     setFocusedPractice(false);
-
-    try {
-      const pageRecord = await getWikiPage(id);
-      setSelectedPage(pageRecord);
-      setForm(createWikiForm(pageRecord));
-      setEditingPageId(null);
-      setView("article");
-      expandAncestors(pageRecord, treeNodes);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load wiki page.");
-    }
+    await loadArticle(id, true);
   }
 
   async function toggleStudied() {
@@ -408,6 +461,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
       setSelectedPage(current => current?.id === id ? { ...current, ...status } : current);
       setTreeNodes(current => current.map(node => node.id === id ? { ...node, ...status } : node));
       setPages(current => current.map(page => page.id === id ? { ...page, ...status } : page));
+      if (treeStatus === "loading") void loadTree(true);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to save studied status.");
     } finally {
@@ -416,12 +470,16 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
   }
 
   function startNewRootPage() {
+    articleRequest.current++;
+    setIsArticleLoading(false);
     setEditingPageId(null);
     setForm(emptyWikiForm);
     setView("edit");
   }
 
   function startNewChildPage(parentId = selectedPage?.id ?? "") {
+    articleRequest.current++;
+    setIsArticleLoading(false);
     setEditingPageId(null);
     setForm({ ...emptyWikiForm, parentId });
     setView("edit");
@@ -433,6 +491,8 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
       return;
     }
 
+    articleRequest.current++;
+    setIsArticleLoading(false);
     setEditingPageId(selectedPage.id);
     setForm(createWikiForm(selectedPage));
     setView("edit");
@@ -572,25 +632,17 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
     });
   }
 
-  function autoExpandTopLevels(nodes: WikiTreeNode[]) {
-    setExpandedIds((current) => {
-      const next = new Set(current);
-      nodes.filter((node) => node.depth <= 1).forEach((node) => next.add(node.id));
-      return next;
-    });
-  }
-
   function expandAncestors(wikiPage: WikiPageRecord, nodes: WikiTreeNode[]) {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const nextExpanded = new Set(expandedIds);
-    let parentId = wikiPage.parentId ?? null;
-
-    while (parentId) {
-      nextExpanded.add(parentId);
-      parentId = nodeById.get(parentId)?.parentId ?? null;
-    }
-
-    setExpandedIds(nextExpanded);
+    setExpandedIds(current => {
+      const next = new Set(current);
+      let parentId = wikiPage.parentId;
+      while (parentId) {
+        next.add(parentId);
+        parentId = nodeById.get(parentId)?.parentId ?? null;
+      }
+      return next;
+    });
   }
 
   const topicLibrary = <>
@@ -601,10 +653,12 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
       </button>
     </div>
     <label className="wiki-tree-search">Find a topic<input aria-label="Search topic tree" autoFocus={compact && !inlineTree} value={treeSearch} onChange={event => setTreeSearch(event.target.value)} placeholder="Topic or path..." /></label>
+    {treeStatus === "error" ? <p className="empty-state" role="alert">Unable to load topics. <button className="text-button" type="button" onClick={() => void loadTree(true)}>Retry</button></p> : null}
     {nestedTree.length ? <ul className="wiki-tree wiki-topic-tree">{visibleTree.map(node => <WikiTreeNodeView
       expandedIds={treeSearch ? new Set(treeNodes.map(n => n.id)) : expandedIds} key={node.id} node={node}
       selectedPageId={selectedPage?.id ?? null} onSelect={id => { setTopicsOpen(false); void selectPage(id); }} onToggle={toggleExpanded} />)}</ul>
-      : <p className="empty-state">No pages yet.</p>}
+      : treeStatus === "loading" ? <p className="empty-state" role="status">Loading topics...</p>
+      : treeStatus === "ready" ? <p className="empty-state">No pages yet.</p> : null}
   </>;
 
   return (
@@ -666,7 +720,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
             branchProgress={studyOverview?.pages ?? []}
             onStudy={() => setView("study")}
             childNodes={articleChildren}
-            isLoading={isLoading}
+            isLoading={isArticleLoading}
             page={selectedPage}
             renderedMarkdown={renderedMarkdown}
             treeNodes={treeNodes}
@@ -687,7 +741,7 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
           <WikiExplore
             progress={studyOverview?.pages ?? []}
             includeArchived={includeArchived}
-            isLoading={isLoading}
+            isLoading={isListLoading}
             page={page}
             pages={pages}
             search={search}
@@ -723,7 +777,11 @@ export function WikiPage({ focusPageId, focusStudyKind }: {
           </details> : null}
         </main> : null}
 
-        {view === "reviews" ? <main className="wiki-document"><WikiReviewDashboard overview={studyOverview} onSelect={id => void selectPage(id)} /></main> : null}
+        {view === "reviews" ? <main className="wiki-document">
+          {studyError ? <p className="empty-state" role="alert">Unable to load review progress. <button className="text-button" type="button" onClick={() => setStudyRevision(current => current + 1)}>Retry</button></p> : null}
+          {!studyOverview && !studyError ? <p className="empty-state" role="status">Loading review progress...</p> : null}
+          {studyOverview ? <WikiReviewDashboard overview={studyOverview} onSelect={id => void selectPage(id)} /> : null}
+        </main> : null}
 
         {view === "json" && selectedPage ? <WikiJsonEditor key={selectedPage.id} pageId={selectedPage.id}
           onCancel={() => setView("article")} onSaved={async id => { await loadWiki(id); setView("article"); }} /> : null}

@@ -3,10 +3,41 @@ services:
     environment:
       Hosted__RunnerUrl: http://localhost/execute
       Hosted__RunnerSocket: /run/repetitio-basics/execute.sock
+    depends_on:
+      - basics
     volumes:
-      - type: bind
-        source: /var/lib/repetitio-basics
+      - type: volume
+        source: basics-socket
         target: /run/repetitio-basics
         read_only: true
-        bind:
-          create_host_path: false
+        volume:
+          nocopy: true
+
+  basics:
+    build:
+      context: .
+      dockerfile: src/backend/Repetitio.Api/Dockerfile
+      target: basics-worker
+    environment:
+      HOME: /tmp
+      DOTNET_EnableDiagnostics: "0"
+    volumes:
+      - basics-socket:/run/repetitio-basics
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 1
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 96
+    init: true
+    restart: unless-stopped
+
+  runner:
+    profiles: [legacy-runner]
+
+volumes:
+  basics-socket:

@@ -8,10 +8,17 @@ using Repetitio.Domain.Practice;
 using Repetitio.Infrastructure;
 using Repetitio.Infrastructure.Persistence;
 using Repetitio.Api.Desktop;
+using Repetitio.Api.Backup;
 
 if (args is ["--basics-sandbox"])
 {
     Environment.ExitCode = await HostedBasicsRunner.RunSubmissionAsync();
+    return;
+}
+
+if (args is ["--basics-worker", var socketPath])
+{
+    await HostedBasicsRunner.RunWorkerAsync(socketPath);
     return;
 }
 
@@ -45,6 +52,10 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod());
 });
 builder.Services.AddInfrastructure(builder.Configuration);
+if (builder.Configuration.GetValue<bool>("Backup:DailyEnabled"))
+{
+    builder.Services.AddHostedService<DailyBackupWorker>();
+}
 builder.Services.AddSingleton<BasicExerciseExecutionService>();
 builder.Services.AddHttpClient<HostedBasicsRunner>(client => client.Timeout = TimeSpan.FromSeconds(25))
     .ConfigurePrimaryHttpMessageHandler(() => HostedBasicsRunner.CreateTransport(builder.Configuration));

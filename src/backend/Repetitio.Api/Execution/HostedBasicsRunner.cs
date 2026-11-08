@@ -112,6 +112,41 @@ public sealed class HostedBasicsRunner(HttpClient client, IConfiguration configu
         return Results.Text("The isolated Basics runner is unavailable. Try again shortly.", statusCode: 503);
     }
 
+    internal static async Task RunWorkerAsync(string socketPath)
+    {
+        // The worker owns the socket directory. Remove a stale socket after a container restart.
+        File.Delete(socketPath);
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.ConfigureKestrel(options =>
+        {
+            options.ListenUnixSocket(socketPath);
+            options.Limits.MaxRequestBodySize = 128 * 1024;
+        });
+        var app = builder.Build();
+        var executor = CreateExecutor();
+
+        app.MapPost("/execute", async (Submission submission, CancellationToken cancellationToken) =>
+        {
+            if (submission.Request is null || string.IsNullOrWhiteSpace(submission.Slug))
+                return Results.BadRequest();
+            if (BasicExerciseCatalog.GetBySlug(submission.Slug) is not { } exercise)
+                return Results.NotFound();
+            if (!await JobSlot.WaitAsync(0, cancellationToken))
+                return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+
+            try
+            {
+                return Results.Ok(await executor.ExecuteAsync(exercise, submission.Request, cancellationToken));
+            }
+            finally
+            {
+                JobSlot.Release();
+            }
+        });
+
+        await app.RunAsync();
+    }
+
     public static async Task<int> RunSubmissionAsync()
     {
         var line = await Console.In.ReadLineAsync();
@@ -120,11 +155,14 @@ public sealed class HostedBasicsRunner(HttpClient client, IConfiguration configu
         if (submission is null || BasicExerciseCatalog.GetBySlug(submission.Slug) is not { } exercise)
             return 2;
 
-        var executor = new BasicExerciseExecutionService([new ReverseLinkedListHarness(), .. BasicExerciseHarnessCatalog.GetAll()]);
+        var executor = CreateExecutor();
         var result = await executor.ExecuteAsync(exercise, submission.Request, CancellationToken.None);
         await JsonSerializer.SerializeAsync(Console.OpenStandardOutput(), result, JsonOptions);
         return 0;
     }
+
+    private static BasicExerciseExecutionService CreateExecutor() =>
+        new([new ReverseLinkedListHarness(), .. BasicExerciseHarnessCatalog.GetAll()]);
 
     private sealed record Submission(string Slug, ExecuteBasicExerciseRequest Request);
 }

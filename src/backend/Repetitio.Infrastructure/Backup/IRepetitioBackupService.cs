@@ -29,6 +29,10 @@ public interface IRepetitioBackupService
     /// <returns>The automatic backup result.</returns>
     Task<AutomaticBackupResult> CreateAutomaticShutdownBackupAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Creates the backup for a UTC day if it does not already exist, then retains the three newest daily copies.</summary>
+    /// <returns>Whether a new backup was published.</returns>
+    Task<bool> EnsureDailyBackupAsync(DateOnly utcDay, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Validates a backup archive without importing it.
     /// </summary>

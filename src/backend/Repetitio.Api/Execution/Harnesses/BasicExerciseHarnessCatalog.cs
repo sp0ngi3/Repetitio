@@ -14,6 +14,35 @@ public static class BasicExerciseHarnessCatalog
         return
         [
             .. MatrixExerciseHarnesses.GetAll(),
+            new BasicExerciseHarness("sliding-window-maximum-sum", """
+        results.Add(RunInt("best window in the middle", 9, () => Solution.MaxWindowSum([2, 1, 5, 1, 3, 2], 3)));
+        results.Add(RunInt("all negative", -6, () => Solution.MaxWindowSum([-4, -2, -7], 2)));
+        results.Add(RunInt("single-element window", 8, () => Solution.MaxWindowSum([3, -2, 8], 1)));
+        results.Add(RunInt("whole array", 9, () => Solution.MaxWindowSum([3, -2, 8], 3)));
+        results.Add(RunInt("all zeroes", 0, () => Solution.MaxWindowSum([0, 0, 0], 2)));
+        results.Add(RunInt("single value", 7, () => Solution.MaxWindowSum([7], 1)));
+"""),
+            new BasicExerciseHarness("two-pointers-move-zeroes", """
+        int[] MoveInPlace(int[] nums)
+        {
+            Solution.MoveZeroes(nums);
+            return nums;
+        }
+
+        results.Add(RunArray("interleaved zeroes", [1, 3, 12, 0, 0], () => MoveInPlace([0, 1, 0, 3, 12])));
+        results.Add(RunArray("negative duplicates", [-2, -2, 0, 0], () => MoveInPlace([0, -2, 0, -2])));
+        results.Add(RunArray("no zeroes", [1, 2, 3], () => MoveInPlace([1, 2, 3])));
+        results.Add(RunArray("only zeroes", [0, 0], () => MoveInPlace([0, 0])));
+        results.Add(RunArray("one zero", [0], () => MoveInPlace([0])));
+        results.Add(RunArray("preserve nonzero order", [5, 4, 3, 0, 0], () => MoveInPlace([5, 0, 4, 0, 3])));
+"""),
+            new BasicExerciseHarness("prefix-sums-batch-range-queries", """
+        results.Add(RunArray("overlapping ranges", [5, 6, 4], () => Solution.SumRanges([2, -1, 4, 3], [[0, 2], [1, 3], [2, 2]])));
+        results.Add(RunArray("negative sums", [-4, -3], () => Solution.SumRanges([-3, 1, -2], [[0, 2], [0, 0]])));
+        results.Add(RunArray("repeated singleton", [7, 7], () => Solution.SumRanges([7], [[0, 0], [0, 0]])));
+        results.Add(RunArray("no queries", [], () => Solution.SumRanges([1, 2, 3], [])));
+        results.Add(RunArray("preserve query order", [3, 6, 3], () => Solution.SumRanges([1, 2, 3], [[2, 2], [0, 2], [0, 1]])));
+"""),
             new BasicExerciseHarness("kadane-maximum-subarray", """
         results.Add(RunInt("example mixed", 8, () => Solution.MaxSubArray([2, -3, 4, -2, 2, 1, -1, 4])));
         results.Add(RunInt("single negative", -1, () => Solution.MaxSubArray([-1])));

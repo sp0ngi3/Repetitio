@@ -92,6 +92,182 @@ public static class Solution
 }
 """);
 
+    public static BasicExerciseResponse MaximumWindowSum { get; } = BasicExerciseFactory.Create(
+        "sliding-window-maximum-sum",
+        "Sliding Window: Maximum Sum of K Elements",
+        LearningDifficulty.Easy,
+        "Find the largest sum of exactly k consecutive elements.",
+        "Given an integer array nums and a positive integer k, return the maximum sum of any contiguous subarray of length k.",
+        """
+Input: nums = [2, 1, 5, 1, 3, 2], k = 3
+Output: 9
+Explanation: The window [5, 1, 3] has the largest sum.
+
+Input: nums = [-4, -2, -7], k = 2
+Output: -6
+""",
+        """
+- 1 <= k <= nums.Length <= 100000.
+- -10000 <= nums[i] <= 10000.
+- Aim for O(n) time and O(1) extra space.
+""",
+        """
+MaxWindowSum([2, 1, 5, 1, 3, 2], 3) => 9
+MaxWindowSum([-4, -2, -7], 2) => -6
+MaxWindowSum([3, -2, 8], 1) => 8
+MaxWindowSum([3, -2, 8], 3) => 9
+MaxWindowSum([0, 0, 0], 2) => 0
+MaxWindowSum([7], 1) => 7
+""",
+        "Sum the first k values. Slide one position at a time, subtracting the value that leaves and adding the value that enters. Start the best sum at the first window so negative windows work too.",
+        "public static int MaxWindowSum(int[] nums, int k)",
+        ["array", "sliding-window"],
+        """
+public static class Solution
+{
+    public static int MaxWindowSum(int[] nums, int k)
+    {
+        return 0;
+    }
+}
+""",
+        """
+public static class Solution
+{
+    public static int MaxWindowSum(int[] nums, int k)
+    {
+        int windowSum = 0;
+        for (int i = 0; i < k; i++)
+            windowSum += nums[i];
+
+        int best = windowSum;
+        for (int right = k; right < nums.Length; right++)
+        {
+            windowSum += nums[right] - nums[right - k];
+            best = Math.Max(best, windowSum);
+        }
+
+        return best;
+    }
+}
+""");
+
+    public static BasicExerciseResponse MoveZeroes { get; } = BasicExerciseFactory.Create(
+        "two-pointers-move-zeroes",
+        "Two Pointers: Move Zeroes",
+        LearningDifficulty.Easy,
+        "Move all zeroes to the end of the same array.",
+        "Modify nums in place so all zeroes appear at the end and the nonzero values keep their original relative order.",
+        """
+Input: nums = [0, 1, 0, 3, 12]
+Output: nums = [1, 3, 12, 0, 0]
+
+Input: nums = [0, -2, 0, -2]
+Output: nums = [-2, -2, 0, 0]
+""",
+        """
+- 1 <= nums.Length <= 100000.
+- nums can contain any 32-bit integer.
+- Modify the given array in place.
+- Aim for O(n) time and O(1) extra space.
+""",
+        """
+[0, 1, 0, 3, 12] => [1, 3, 12, 0, 0]
+[0, -2, 0, -2] => [-2, -2, 0, 0]
+[1, 2, 3] => [1, 2, 3]
+[0, 0] => [0, 0]
+[0] => [0]
+[5, 0, 4, 0, 3] => [5, 4, 3, 0, 0]
+""",
+        "Use a read pointer to scan the array and a write pointer to mark the next free slot. Copy each nonzero value to that slot, then fill the remaining slots with zeroes.",
+        "public static void MoveZeroes(int[] nums)",
+        ["array", "two-pointers", "in-place"],
+        """
+public static class Solution
+{
+    public static void MoveZeroes(int[] nums)
+    {
+    }
+}
+""",
+        """
+public static class Solution
+{
+    public static void MoveZeroes(int[] nums)
+    {
+        int write = 0;
+        for (int read = 0; read < nums.Length; read++)
+        {
+            if (nums[read] != 0)
+                nums[write++] = nums[read];
+        }
+
+        while (write < nums.Length)
+            nums[write++] = 0;
+    }
+}
+""");
+
+    public static BasicExerciseResponse RangeSumQueries { get; } = BasicExerciseFactory.Create(
+        "prefix-sums-batch-range-queries",
+        "Prefix Sums: Range Sum Queries",
+        LearningDifficulty.Easy,
+        "Answer multiple inclusive sum queries over the same array.",
+        "Given an integer array nums and a list of queries, return one sum per query in the original query order. Each query is a pair [left, right] of zero-based indices, and both endpoints are included.",
+        """
+Input: nums = [2, -1, 4, 3], queries = [[0, 2], [1, 3], [2, 2]]
+Output: [5, 6, 4]
+
+Input: nums = [-3, 1, -2], queries = [[0, 2], [0, 0]]
+Output: [-4, -3]
+""",
+        """
+- 1 <= nums.Length <= 100000 and -10000 <= nums[i] <= 10000.
+- 0 <= queries.Length <= 100000.
+- 0 <= left <= right < nums.Length for every query.
+- Aim for O(n + q) time and O(n) extra space excluding the result.
+""",
+        """
+SumRanges([2, -1, 4, 3], [[0, 2], [1, 3], [2, 2]]) => [5, 6, 4]
+SumRanges([-3, 1, -2], [[0, 2], [0, 0]]) => [-4, -3]
+SumRanges([7], [[0, 0], [0, 0]]) => [7, 7]
+SumRanges([1, 2, 3], []) => []
+SumRanges([1, 2, 3], [[2, 2], [0, 2], [0, 1]]) => [3, 6, 3]
+""",
+        "Build prefix with an initial zero. prefix[i] is the sum of the first i elements. An inclusive query [left, right] is prefix[right + 1] minus prefix[left].",
+        "public static int[] SumRanges(int[] nums, int[][] queries)",
+        ["array", "prefix-sum"],
+        """
+public static class Solution
+{
+    public static int[] SumRanges(int[] nums, int[][] queries)
+    {
+        return [];
+    }
+}
+""",
+        """
+public static class Solution
+{
+    public static int[] SumRanges(int[] nums, int[][] queries)
+    {
+        var prefix = new int[nums.Length + 1];
+        for (int i = 0; i < nums.Length; i++)
+            prefix[i + 1] = prefix[i] + nums[i];
+
+        var sums = new int[queries.Length];
+        for (int i = 0; i < queries.Length; i++)
+        {
+            int left = queries[i][0];
+            int right = queries[i][1];
+            sums[i] = prefix[right + 1] - prefix[left];
+        }
+
+        return sums;
+    }
+}
+""");
+
     /// <summary>
     /// Gets the two-pointer two-sum exercise for sorted arrays.
     /// </summary>

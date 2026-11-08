@@ -27,4 +27,10 @@ COPY --from=build /app/publish .
 USER 1654:1654
 ENTRYPOINT ["timeout", "--kill-after=1s", "12s", "dotnet", "Repetitio.Api.dll", "--basics-sandbox"]
 
+FROM sandbox AS basics-worker
+USER root
+RUN install -d -o 1654 -g 1654 -m 0700 /run/repetitio-basics
+USER 1654:1654
+ENTRYPOINT ["dotnet", "Repetitio.Api.dll", "--basics-worker", "/run/repetitio-basics/execute.sock"]
+
 FROM runtime AS app

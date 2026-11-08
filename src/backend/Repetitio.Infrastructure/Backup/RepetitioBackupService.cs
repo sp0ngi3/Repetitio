@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
@@ -14,6 +15,7 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
 {
     private const string AutomaticShutdownBackupPrefix = "repetitio-auto-shutdown";
     private const int AutomaticBackupRetentionCount = 3;
+    private const int DailyBackupRetentionCount = 3;
     private static readonly TimeSpan AutomaticBackupRetentionWindow = TimeSpan.FromDays(3);
 
     private static readonly JsonSerializerOptions ManifestJsonOptions = new()
@@ -118,6 +120,42 @@ public sealed class RepetitioBackupService : IRepetitioBackupService
             FilePath = filePath,
             RetainedAutomaticBackupCount = retainedCount
         };
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> EnsureDailyBackupAsync(DateOnly utcDay, CancellationToken cancellationToken = default)
+    {
+        var directory = Path.Combine(GetBackupDirectoryPath(), "daily");
+        Directory.CreateDirectory(directory);
+        var fileName = utcDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ".zip";
+        var destination = Path.Combine(directory, fileName);
+        var published = false;
+
+        if (!File.Exists(destination))
+        {
+            await using var backup = await ExportFileAsync(cancellationToken);
+            try
+            {
+                await PersistArchiveAsync(backup.Contents, destination, cancellationToken);
+                published = true;
+            }
+            catch (IOException) when (File.Exists(destination))
+            {
+                // Another instance already published this day's archive.
+            }
+        }
+
+        // Run after publication so a failed export cannot remove the previous backups.
+        foreach (var oldBackup in Directory.EnumerateFiles(directory, "*.zip")
+            .Where(path => DateOnly.TryParseExact(Path.GetFileNameWithoutExtension(path), "yyyy-MM-dd",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            .OrderByDescending(path => Path.GetFileName(path), StringComparer.Ordinal)
+            .Skip(DailyBackupRetentionCount))
+        {
+            File.Delete(oldBackup);
+        }
+
+        return published;
     }
 
     /// <inheritdoc />

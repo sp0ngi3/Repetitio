@@ -20,6 +20,7 @@ services:
       Hosted__RunnerUrl: http://runner:8090/execute
       ConnectionStrings__Repetitio: Data Source=/data/repetitio.db
       Backup__Directory: /backups
+      Backup__DailyEnabled: "true"
     volumes:
       - type: bind
         source: /srv/repetitio/data

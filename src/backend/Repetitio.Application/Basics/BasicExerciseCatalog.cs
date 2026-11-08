@@ -32,6 +32,9 @@ public static class BasicExerciseCatalog
     private static readonly BasicExerciseResponse[] Exercises =
     [
         ArrayTechniqueExercises.KadaneMaximumSubarray,
+        ArrayTechniqueExercises.MaximumWindowSum,
+        ArrayTechniqueExercises.MoveZeroes,
+        ArrayTechniqueExercises.RangeSumQueries,
         MatrixExercises.ReadAndUpdate,
         MatrixExercises.RowAndColumnSums,
         MatrixExercises.SwapRowsAndColumns,

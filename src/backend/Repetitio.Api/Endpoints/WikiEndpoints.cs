@@ -146,13 +146,24 @@ public static partial class WikiEndpoints
             query = query.Where(wikiPage => !wikiPage.IsArchived);
         }
 
-        var pages = await query
+        var nodes = await query
             .OrderBy(wikiPage => wikiPage.Path)
             .ThenBy(wikiPage => wikiPage.SortOrder)
             .ThenBy(wikiPage => wikiPage.Title)
-            .ToListAsync();
+            .Select(wikiPage => new WikiTreeNodeResponse
+            {
+                Id = wikiPage.Id,
+                ParentId = wikiPage.ParentId,
+                Title = wikiPage.Title,
+                Path = wikiPage.Path,
+                Depth = wikiPage.Depth,
+                SortOrder = wikiPage.SortOrder,
+                UpdatedAt = wikiPage.UpdatedAt,
+                IsStudied = wikiPage.IsStudied
+            })
+            .ToArrayAsync();
 
-        return Results.Ok(pages.Select(ToTreeNodeResponse).ToArray());
+        return Results.Ok(nodes);
     }
 
     /// <summary>
@@ -1114,26 +1125,6 @@ public static partial class WikiEndpoints
             Front = flashcard.Front,
             Back = flashcard.Back,
             SortOrder = flashcard.SortOrder
-        };
-    }
-
-    /// <summary>
-    /// Converts a wiki page into a tree node response.
-    /// </summary>
-    /// <param name="wikiPage">The wiki page.</param>
-    /// <returns>The wiki tree node response.</returns>
-    private static WikiTreeNodeResponse ToTreeNodeResponse(WikiPage wikiPage)
-    {
-        return new WikiTreeNodeResponse
-        {
-            Id = wikiPage.Id,
-            ParentId = wikiPage.ParentId,
-            Title = wikiPage.Title,
-            Path = wikiPage.Path,
-            Depth = wikiPage.Depth,
-            SortOrder = wikiPage.SortOrder,
-            UpdatedAt = wikiPage.UpdatedAt,
-            IsStudied = wikiPage.IsStudied
         };
     }
 

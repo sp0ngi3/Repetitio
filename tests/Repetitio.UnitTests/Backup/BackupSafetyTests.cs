@@ -108,6 +108,53 @@ public sealed class BackupSafetyTests
         Assert.Empty(Directory.GetFiles(fixture.Root, "*.pending-*"));
     }
 
+    [Fact]
+    public async Task DailyBackupsRetainThreeSuccessfulDaysAndPreserveOtherArchives()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var daily = Directory.CreateDirectory(Path.Combine(fixture.Backups, "daily")).FullName;
+        var previousDays = new[] { "2026-10-29.zip", "2026-11-01.zip", "2026-11-03.zip" };
+        foreach (var file in previousDays)
+            await File.WriteAllTextAsync(Path.Combine(daily, file), "previous daily backup");
+
+        var manual = Path.Combine(daily, "manual.zip");
+        var safety = Path.Combine(fixture.Backups, "repetitio-pre-import.zip");
+        await File.WriteAllTextAsync(manual, "manual backup");
+        await File.WriteAllTextAsync(safety, "pre-import backup");
+
+        var today = new DateOnly(2026, 11, 8);
+        Assert.True(await fixture.Service.EnsureDailyBackupAsync(today));
+        Assert.False(File.Exists(Path.Combine(daily, previousDays[0])));
+        Assert.All(previousDays.Skip(1), file => Assert.True(File.Exists(Path.Combine(daily, file))));
+        Assert.True(File.Exists(manual));
+        Assert.True(File.Exists(safety));
+
+        var published = Path.Combine(daily, "2026-11-08.zip");
+        var original = await File.ReadAllBytesAsync(published);
+        Assert.False(await fixture.Service.EnsureDailyBackupAsync(today));
+        Assert.Equal(original, await File.ReadAllBytesAsync(published));
+        await using var archive = File.OpenRead(published);
+        var validation = await fixture.Service.ValidateAsync(archive);
+        Assert.True(validation.IsValid, validation.Message);
+    }
+
+    [Fact]
+    public async Task FailedDailyPublicationDoesNotPrunePreviousBackups()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var daily = Directory.CreateDirectory(Path.Combine(fixture.Backups, "daily")).FullName;
+        var previousDays = new[] { "2026-11-05.zip", "2026-11-06.zip", "2026-11-07.zip" };
+        foreach (var file in previousDays)
+            await File.WriteAllTextAsync(Path.Combine(daily, file), "previous daily backup");
+        Directory.CreateDirectory(Path.Combine(daily, "2026-11-08.zip"));
+
+        var error = await Record.ExceptionAsync(() => fixture.Service.EnsureDailyBackupAsync(new DateOnly(2026, 11, 8)));
+
+        Assert.True(error is IOException or UnauthorizedAccessException, error?.ToString());
+        Assert.All(previousDays, file => Assert.True(File.Exists(Path.Combine(daily, file))));
+        Assert.Empty(Directory.GetFiles(daily, "*.pending-*"));
+    }
+
     private static async Task<byte[]> ReadSentinel(RepetitioDbContext db)
     {
         await using var connection = new SqliteConnection(db.Database.GetConnectionString());

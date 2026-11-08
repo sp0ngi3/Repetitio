@@ -825,7 +825,9 @@ describe("App", () => {
     expect(getWikiStudy).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Wiki" }));
     expect(await screen.findByRole("textbox", { name: "Search topic tree" }, { timeout: 10000 })).toBeInTheDocument();
-    expect(getWikiStudy).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Reviews" }));
+    expect(await screen.findByRole("heading", { name: "Wiki reviews" })).toBeInTheDocument();
+    expect(getWikiStudy).toHaveBeenCalledTimes(1);
   });
   /**
    * Verifies that backup settings expose export and import controls.
