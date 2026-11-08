@@ -8,6 +8,7 @@ import { NotesCompanion, NotesPage } from "./NotesPage";
 import { SystemDesignPage } from "./SystemDesignPage";
 import { WikiReviewSettings } from "./WikiLearning";
 import { AppFooter, AppHeader, appPages, type AppPage } from "./AppChrome";
+import { PwaUpdateNotice } from "./PwaUpdateNotice";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { applyAppearance, readColorMode, readMotionPreference, readVisualStyle, type ColorMode, type MotionPreference, type VisualStyle } from "./appearance";
 import { Activity, CalendarDays, CircleDashed, History, ArrowUpRight, Target } from "lucide-react";
@@ -190,6 +191,7 @@ export function App() {
         connection={<DatabaseConnectionIndicator checkedAt={databaseCheckedAt} state={databaseConnection} />}
         onToggleMode={() => setTheme(value => value === "dark" ? "light" : "dark")}
         onNavigate={page => { if (page === "wiki") setFocusedWikiTarget(null); setActivePage(page); }} />
+      <PwaUpdateNotice />
       <main id="workspace" className="app-workspace" data-page={activePage} tabIndex={-1}>
       <div className="workspace-location"><span>Workspace</span><span aria-hidden="true">/</span><strong>{appPages.find(page => page.id === activePage)?.label}</strong><time dateTime={new Date().toISOString().slice(0, 10)}>{new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</time></div>
 
