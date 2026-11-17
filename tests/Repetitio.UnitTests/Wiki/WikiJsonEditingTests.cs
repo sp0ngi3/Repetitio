@@ -253,6 +253,146 @@ public sealed class WikiJsonEditingTests
         Assert.Equal(sourceId, fixture.Root.Sources.Single().Id);
     }
 
+    [Fact]
+    public async Task SplittingArticleMovesImagesToNewChaptersAndPreservesExistingPagesAndHistory()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var db = fixture.Db;
+        var root = fixture.Root;
+        var imageBytes = fixture.Image.Data.ToArray();
+        var before = Current(root);
+        var card = root.Flashcards.Single();
+        Assert.Null(await new WikiStudyService(db).SaveAsync(new(Guid.NewGuid(), [new(root.Id, card.Id, "flashcard", null, true)])));
+        var chapterId = Guid.NewGuid();
+        var nestedId = Guid.NewGuid();
+        var request = new WikiJsonUpdateRequest([
+            new(nestedId, null, new() { ParentId = chapterId, Title = "Nested chapter", ContentMarkdown = "Nested body" }, IsNew: true),
+            Update(root, before with { ContentMarkdown = "Overview" }),
+            new(chapterId, null, new() { ParentId = root.Id, Title = "Chapter", ContentMarkdown = root.ContentMarkdown,
+                Sources = [new() { Title = "Chapter source" }], Flashcards = [new() { Front = "New front", Back = "New back" }] }, IsNew: true)
+        ]);
+
+        var result = await Invoke("UpdateWikiJsonAsync", db, root.Id, request);
+
+        Assert.Equal(200, ((IStatusCodeHttpResult)result).StatusCode);
+        db.ChangeTracker.Clear();
+        Assert.Equal(5, await db.WikiPages.CountAsync());
+        var chapter = await db.WikiPages.SingleAsync(page => page.Id == chapterId);
+        Assert.Equal(root.Id, chapter.ParentId);
+        Assert.Equal("root/chapter", chapter.Path);
+        Assert.Equal(before.ContentMarkdown, chapter.ContentMarkdown);
+        Assert.Equal("root/chapter/nested-chapter", (await db.WikiPages.SingleAsync(page => page.Id == nestedId)).Path);
+        Assert.Equal("Child body", (await db.WikiPages.SingleAsync(page => page.Id == fixture.Child.Id)).ContentMarkdown);
+        Assert.Equal(imageBytes, (await db.WikiImages.SingleAsync()).Data);
+        Assert.True((await new WikiStudyService(db).GetOverviewAsync()).History.Single().Answered == 1);
+        Assert.Contains(await db.WikiFlashcards.ToListAsync(), saved => saved.Id == card.Id);
+        Assert.Equal("Overview", (await db.WikiPages.SingleAsync(page => page.Id == root.Id)).ContentMarkdown);
+    }
+
+    [Fact]
+    public async Task ExistingSubpageCanReceiveImagesRemovedFromItsParent()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var content = fixture.Root.ContentMarkdown;
+        var result = await Invoke("UpdateWikiJsonAsync", fixture.Db, fixture.Root.Id, new WikiJsonUpdateRequest([
+            Update(fixture.Root, Current(fixture.Root) with { ContentMarkdown = "Overview" }),
+            Update(fixture.Child, Current(fixture.Child) with { ContentMarkdown = content })
+        ]));
+        Assert.Equal(200, ((IStatusCodeHttpResult)result).StatusCode);
+        fixture.Db.ChangeTracker.Clear();
+        Assert.Equal(content, (await fixture.Db.WikiPages.SingleAsync(page => page.Id == fixture.Child.Id)).ContentMarkdown);
+        Assert.Equal(fixture.Image.Data, (await fixture.Db.WikiImages.SingleAsync()).Data);
+    }
+
+    [Theory]
+    [InlineData("missing image")]
+    [InlineData("unknown image")]
+    [InlineData("stale root")]
+    [InlineData("missing parent")]
+    [InlineData("cycle")]
+    [InlineData("existing id")]
+    [InlineData("invalid quiz")]
+    public async Task InvalidSplitCannotPartiallyChangeRootOrCreateChapters(string failure)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var root = fixture.Root;
+        var chapterId = Guid.NewGuid();
+        var rootUpdate = Update(root, Current(root) with { ContentMarkdown = "Overview" });
+        var chapter = new WikiJsonPageUpdate(chapterId, null,
+            new() { ParentId = root.Id, Title = "Chapter", ContentMarkdown = root.ContentMarkdown }, IsNew: true);
+        chapter = failure switch
+        {
+            "missing image" => chapter with { Page = chapter.Page with { ContentMarkdown = "Lost references" } },
+            "unknown image" => chapter with { Page = chapter.Page with { ContentMarkdown = root.ContentMarkdown + $"\\n![Unknown](wiki-image:{Guid.NewGuid()})" } },
+            "missing parent" => chapter with { Page = chapter.Page with { ParentId = Guid.NewGuid() } },
+            "cycle" => chapter with { Page = chapter.Page with { ParentId = chapterId } },
+            "existing id" => chapter with { Id = fixture.Child.Id },
+            "invalid quiz" => chapter with { Page = chapter.Page with { QuizQuestions = [new() { Prompt = "Broken", Options = [] }] } },
+            _ => chapter
+        };
+        if (failure == "stale root") rootUpdate = rootUpdate with { ExpectedUpdatedAt = root.UpdatedAt.AddSeconds(-1) };
+        var result = await Invoke("UpdateWikiJsonAsync", fixture.Db, root.Id, new WikiJsonUpdateRequest([rootUpdate, chapter]));
+        Assert.Contains(((IStatusCodeHttpResult)result).StatusCode, new int?[] { 400, 409 });
+        fixture.Db.ChangeTracker.Clear();
+        Assert.Equal(3, await fixture.Db.WikiPages.CountAsync());
+        Assert.Equal(root.ContentMarkdown, (await fixture.Db.WikiPages.SingleAsync(page => page.Id == root.Id)).ContentMarkdown);
+        Assert.Equal(fixture.Image.Data, (await fixture.Db.WikiImages.SingleAsync()).Data);
+    }
+
+    [Fact]
+    public async Task FailedChapterInsertRollsBackTheRootAndAnEarlierSuccessfulInsert()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var original = fixture.Root.ContentMarkdown;
+        await fixture.Db.Database.ExecuteSqlRawAsync("""
+            CREATE TRIGGER reject_test_chapter BEFORE INSERT ON WikiPages
+            WHEN NEW.Title = 'Rejected chapter'
+            BEGIN SELECT RAISE(ABORT, 'Test insert failure'); END;
+            """);
+        var first = Guid.NewGuid();
+        var result = await Invoke("UpdateWikiJsonAsync", fixture.Db, fixture.Root.Id, new WikiJsonUpdateRequest([
+            Update(fixture.Root, Current(fixture.Root) with { ContentMarkdown = "Overview" }),
+            new(first, null, new() { ParentId = fixture.Root.Id, Title = "First chapter", ContentMarkdown = original }, IsNew: true),
+            new(Guid.NewGuid(), null, new() { ParentId = first, Title = "Rejected chapter", ContentMarkdown = "Body" }, IsNew: true)
+        ]));
+        Assert.Equal(409, ((IStatusCodeHttpResult)result).StatusCode);
+        fixture.Db.ChangeTracker.Clear();
+        Assert.Equal(original, (await fixture.Db.WikiPages.SingleAsync(page => page.Id == fixture.Root.Id)).ContentMarkdown);
+        Assert.Equal(3, await fixture.Db.WikiPages.CountAsync());
+        Assert.Equal(fixture.Image.Data, (await fixture.Db.WikiImages.SingleAsync()).Data);
+    }
+
+    [Fact]
+    public async Task RetryingAnAlreadySavedSplitCannotDuplicateOrOverwriteItsChapters()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var request = new WikiJsonUpdateRequest([
+            Update(fixture.Root, Current(fixture.Root)),
+            new(Guid.NewGuid(), null, new() { ParentId = fixture.Root.Id, Title = "New chapter", ContentMarkdown = "Body" }, IsNew: true)
+        ]);
+        Assert.Equal(200, ((IStatusCodeHttpResult)await Invoke("UpdateWikiJsonAsync", fixture.Db, fixture.Root.Id, request)).StatusCode);
+        Assert.Equal(409, ((IStatusCodeHttpResult)await Invoke("UpdateWikiJsonAsync", fixture.Db, fixture.Root.Id, request)).StatusCode);
+        Assert.Equal(4, await fixture.Db.WikiPages.CountAsync());
+    }
+
+    [Fact]
+    public async Task LegacyRequestWithoutNewPageFlagStillUpdatesAnExistingArticle()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var payload = JsonSerializer.SerializeToNode(new WikiJsonUpdateRequest([
+            Update(fixture.Root, Current(fixture.Root) with { Title = "Updated with the original format" })
+        ]), options)!;
+        payload["updates"]![0]!.AsObject().Remove("isNew");
+        var request = payload.Deserialize<WikiJsonUpdateRequest>(options)!;
+        Assert.False(request.Updates.Single().IsNew);
+        var result = await Invoke("UpdateWikiJsonAsync", fixture.Db, fixture.Root.Id, request);
+        Assert.Equal(200, ((IStatusCodeHttpResult)result).StatusCode);
+        fixture.Db.ChangeTracker.Clear();
+        Assert.Equal("Updated with the original format", (await fixture.Db.WikiPages.SingleAsync(page => page.Id == fixture.Root.Id)).Title);
+        Assert.Equal(fixture.Image.Data, (await fixture.Db.WikiImages.SingleAsync()).Data);
+    }
+
     private static WikiJsonPageUpdate Update(WikiPage page, UpdateWikiPageRequest update) => new(page.Id, page.UpdatedAt, update);
     private static UpdateWikiPageRequest Current(WikiPage page) => (UpdateWikiPageRequest)typeof(WikiEndpoints)
         .GetMethod("WikiJsonCurrentPage", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [page])!;

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Repetitio.Application.Wiki;
+using Repetitio.Domain.Wiki;
 using Repetitio.Infrastructure.Persistence;
 
 namespace Repetitio.Api.Endpoints;
@@ -61,9 +62,10 @@ public static partial class WikiEndpoints
     private static async Task<IResult> UpdateWikiJsonAsync(RepetitioDbContext dbContext, Guid id, WikiJsonUpdateRequest request)
     {
         if (request.Updates is null || request.Updates.Count is 0 or > MaxBatchImportPageCount
+            || request.Updates.Any(update => update is null || update.Id == Guid.Empty || update.Page is null)
             || request.Updates.Select(update => update.Id).Distinct().Count() != request.Updates.Count
-            || !request.Updates.Any(update => update.Id == id))
-            return Results.BadRequest("Provide the selected page and up to 500 unique page updates.");
+            || !request.Updates.Any(update => update.Id == id && !update.IsNew))
+            return Results.BadRequest("Provide the selected page and up to 500 unique page updates or new subpages.");
         try
         {
             await using var transaction = await dbContext.Database.BeginTransactionAsync();
@@ -71,33 +73,62 @@ public static partial class WikiEndpoints
             if (root is null) return Results.NotFound();
             var ids = request.Updates.Select(update => update.Id).ToArray();
             var pages = await WikiPageDetailsQuery(dbContext).Where(page => ids.Contains(page.Id)).ToListAsync();
-            if (pages.Count != ids.Length) return Results.Conflict("An edited page was deleted. Reload the JSON before saving.");
+            var pagesById = pages.ToDictionary(page => page.Id);
             var updates = request.Updates.ToDictionary(update => update.Id);
-            foreach (var page in pages)
+
+            foreach (var update in request.Updates)
             {
-                var update = updates[page.Id];
+                if (!EndpointValidation.HasText(update.Page.Title)) return Results.BadRequest("Each page needs a title.");
+                var error = ValidateWikiSources(update.Page.Sources) ?? ValidateWikiPracticeInserts(update.Page.QuizQuestions, update.Page.Flashcards);
+                if (error is not null) return Results.BadRequest(error);
+
+                if (update.IsNew)
+                {
+                    if (pagesById.ContainsKey(update.Id))
+                        return Results.Conflict("A new page ID already exists. Reload with Include subpages before saving again.");
+                    continue;
+                }
+                if (!pagesById.TryGetValue(update.Id, out var page))
+                    return Results.Conflict("An edited page was deleted. Reload the JSON before saving.");
                 if (page.Id != id && !page.Path.StartsWith(root.Path + "/", StringComparison.Ordinal))
                     return Results.BadRequest("JSON edits may only update the selected page and its existing descendants.");
                 if (page.UpdatedAt != update.ExpectedUpdatedAt)
                     return Results.Conflict($"'{page.Title}' changed since the JSON was copied. Reload before saving; no changes were applied.");
-                if (update.Page is null || !EndpointValidation.HasText(update.Page.Title)) return Results.BadRequest("Each page needs a title.");
                 if (update.Page.ParentId != page.ParentId)
-                    return Results.BadRequest("JSON editing cannot move pages. Keep parentId and children in their original positions.");
-                var error = ValidateWikiSources(update.Page.Sources) ?? ValidateWikiPracticeInserts(update.Page.QuizQuestions, update.Page.Flashcards);
-                if (error is not null) return Results.BadRequest(error);
-                if (!request.AllowImageRemoval)
+                    return Results.BadRequest("Keep the original parentId of existing pages. New subpages can be added underneath them.");
+            }
+
+            // Resolve new parents before writing anything, rejecting cycles and references outside this edit.
+            var newPages = new List<WikiJsonPageUpdate>();
+            var pending = request.Updates.Where(update => update.IsNew).ToList();
+            var availableParents = pagesById.Keys.ToHashSet();
+            while (pending.Count > 0)
+            {
+                var ready = pending.Where(update => update.Page.ParentId is Guid parentId && availableParents.Contains(parentId)).ToArray();
+                if (ready.Length == 0)
+                    return Results.BadRequest("Every new subpage must connect to the selected article. Check parentId values for missing parents or cycles.");
+                foreach (var update in ready)
                 {
-                    var next = ImageCounts(update.Page.ContentMarkdown ?? page.ContentMarkdown);
-                    if (ImageCounts(page.ContentMarkdown).Any(image => next.GetValueOrDefault(image.Key) < image.Value))
-                        return Results.BadRequest($"'{page.Title}' lost an image reference. Restore it or explicitly allow unlinking images.");
+                    pending.Remove(update);
+                    newPages.Add(update);
+                    availableParents.Add(update.Id);
                 }
+            }
+
+            if (!request.AllowImageRemoval)
+            {
+                var previousImages = CountEditImages(pages.Select(page => page.ContentMarkdown));
+                var nextImages = CountEditImages(request.Updates.Select(update =>
+                    update.Page.ContentMarkdown ?? pagesById.GetValueOrDefault(update.Id)?.ContentMarkdown ?? ""));
+                if (previousImages.Any(image => nextImages.GetValueOrDefault(image.Key) < image.Value))
+                    return Results.BadRequest("This edit lost an image reference. Keep it in the article or one of its edited subpages, or explicitly allow unlinking images.");
             }
             var imageIds = request.Updates.SelectMany(update => ImageCounts(update.Page.ContentMarkdown ?? "").Keys).Distinct().ToArray();
             if (await dbContext.WikiImages.CountAsync(image => imageIds.Contains(image.Id)) != imageIds.Length)
                 return Results.BadRequest("A local image reference does not exist in this database. Keep the original wiki-image IDs.");
+
             var now = DateTime.UtcNow;
             var updatedCount = 0;
-            // Parent paths are saved first; the encompassing transaction keeps the whole edit atomic.
             foreach (var page in pages.OrderBy(page => page.Depth))
             {
                 var update = updates[page.Id].Page;
@@ -121,11 +152,45 @@ public static partial class WikiEndpoints
                 await dbContext.SaveChangesAsync();
                 updatedCount++;
             }
+            foreach (var addition in newPages)
+            {
+                var update = addition.Page;
+                var parent = pagesById[update.ParentId!.Value];
+                var slug = await CreateUniqueSlugAsync(dbContext, update.Slug, update.Title, parent.Id, null);
+                var page = new WikiPage
+                {
+                    Id = addition.Id, ParentId = parent.Id, Parent = parent,
+                    Title = update.Title.Trim(), Slug = slug, Path = BuildPath(parent, slug), Depth = parent.Depth + 1,
+                    SortOrder = Math.Clamp(update.SortOrder, 0, MaximumSortOrder), IsArchived = update.IsArchived,
+                    Summary = TrimOptional(update.Summary), ContentMarkdown = TrimContent(update.ContentMarkdown),
+                    CreatedAt = now, UpdatedAt = now
+                };
+                ApplyWikiSources(page, update.Sources, now);
+                ApplyWikiPracticeInserts(page, update.QuizQuestions, update.Flashcards, now);
+                dbContext.WikiPages.Add(page);
+                await dbContext.SaveChangesAsync();
+                pagesById.Add(page.Id, page);
+            }
             await transaction.CommitAsync();
-            return Results.Ok(new { updatedCount });
+            return Results.Ok(new { updatedCount, createdCount = newPages.Count });
         }
+        catch (DbUpdateConcurrencyException)
+        { return Results.Conflict("A page changed while saving. Reload the JSON; this edit was not applied."); }
         catch (SqliteException error) when (error.SqliteErrorCode is 5 or 6)
         { return Results.Conflict("The Wiki is being updated elsewhere. Retry or reload your JSON; this edit was not applied."); }
+        catch (DbUpdateException error) when (error.InnerException is SqliteException { SqliteErrorCode: 19 })
+        { return Results.Conflict("A page ID or path was created elsewhere. Reload the JSON; this edit was not applied."); }
+    }
+
+    private static Dictionary<Guid, int> CountEditImages(IEnumerable<string> contents)
+    {
+        var counts = new Dictionary<Guid, int>();
+        foreach (var content in contents)
+        {
+            foreach (var image in ImageCounts(content))
+                counts[image.Key] = counts.GetValueOrDefault(image.Key) + image.Value;
+        }
+        return counts;
     }
 
     private static UpdateWikiPageRequest WikiJsonCurrentPage(Repetitio.Domain.Wiki.WikiPage page)

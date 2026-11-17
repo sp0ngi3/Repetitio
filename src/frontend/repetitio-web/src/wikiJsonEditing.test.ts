@@ -100,3 +100,88 @@ describe("Wiki JSON editing", () => {
     expect(() => planWikiJsonEdit(JSON.stringify(edited), baseline)).toThrow(message);
   });
 });
+
+describe("Wiki article splitting", () => {
+  const newId = "11111111-2222-4333-8444-555555555555";
+  const grandchildId = "22222222-3333-4444-8555-666666666666";
+
+  it("creates a flat list of subpages, orders parents first, and preserves images moved to a chapter", () => {
+    const baseline = fixture();
+    const root = baseline.pages[0];
+    const draft = { pages: [
+      { id: grandchildId, parentId: newId, title: "Nested chapter", contentMarkdown: "Nested body" },
+      { id: root.id, updatedAt: root.updatedAt, contentMarkdown: "Chapter overview" },
+      { id: newId, parentId: root.id, title: "Chapter", contentMarkdown: root.contentMarkdown }
+    ] };
+    const plan = planWikiJsonEdit(JSON.stringify(draft), baseline);
+    expect(plan.createdPages).toBe(2);
+    expect(plan.missingImages).toBe(0);
+    expect(plan.untouchedPages).toBe(1);
+    expect(plan.updates.map(update => update.id)).toEqual([root.id, newId, grandchildId]);
+    expect(plan.updates[1]).toMatchObject({ isNew: true, expectedUpdatedAt: null, page: { parentId: root.id, title: "Chapter" } });
+    expect(root.contentMarkdown).toContain("wiki-image:");
+  });
+
+  it("accepts new nested chapters without IDs and keeps images attached to the chapter", () => {
+    const baseline = fixture();
+    const root = baseline.pages[0];
+    const plan = planWikiJsonEdit(JSON.stringify({ pages: [{
+      id: root.id, updatedAt: root.updatedAt, contentMarkdown: "Overview",
+      children: [{ title: "Chapter", contentMarkdown: root.contentMarkdown }]
+    }] }), baseline);
+    expect(plan.createdPages).toBe(1);
+    expect(plan.missingImages).toBe(0);
+    expect(plan.updates[1].id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(plan.updates[1].page.parentId).toBe(root.id);
+  });
+
+  it("uses the current baseline timestamp only after explicit permission", () => {
+    const baseline = fixture();
+    const source = JSON.stringify({ pages: [{ ...baseline.pages[0], updatedAt: "2025-01-01", children: [] }] });
+    expect(() => planWikiJsonEdit(source, baseline)).toThrow(/updatedAt/);
+    const plan = planWikiJsonEdit(source, baseline, true);
+    expect(plan.rebasedPages).toBe(1);
+    expect(plan.updates[0].expectedUpdatedAt).toBe(baseline.pages[0].updatedAt);
+    expect(plan.summaries[0].changed).toBe(false);
+  });
+
+  it("continues to count genuinely removed references when other images move", () => {
+    const baseline = fixture();
+    const root = baseline.pages[0];
+    root.contentMarkdown += "\\n\\n![Another copy](wiki-image:" + imageId + ")";
+    const plan = planWikiJsonEdit(JSON.stringify({ pages: [
+      { ...root, children: [], contentMarkdown: "Overview" },
+      { id: newId, parentId: root.id, title: "Chapter", contentMarkdown: "![Kept](wiki-image:" + imageId + ")" }
+    ] }), baseline);
+    expect(plan.missingImages).toBe(1);
+  });
+
+  it("rejects orphaned flat pages and cyclic new parent links", () => {
+    const baseline = fixture();
+    const root = { ...baseline.pages[0], children: [] };
+    expect(() => planWikiJsonEdit(JSON.stringify({ pages: [root,
+      { id: newId, parentId: "outside", title: "Orphan" }
+    ] }), baseline)).toThrow(/connect/);
+    expect(() => planWikiJsonEdit(JSON.stringify({ pages: [root,
+      { id: newId, parentId: grandchildId, title: "First" },
+      { id: grandchildId, parentId: newId, title: "Second" }
+    ] }), baseline)).toThrow(/cycle/);
+  });
+
+  it("supports flat existing subpages without treating them as new pages", () => {
+    const baseline = fixture();
+    const child = baseline.pages[0].children[0];
+    const plan = planWikiJsonEdit(JSON.stringify({ pages: [
+      { ...child, title: "Edited child" },
+      { ...baseline.pages[0], children: [] }
+    ] }), baseline);
+    expect(plan.createdPages).toBe(0);
+    expect(plan.updates[1]).toMatchObject({ id: child.id, isNew: false, expectedUpdatedAt: child.updatedAt });
+  });
+
+  it("rejects ambiguous duplicates between flat entries and nested children", () => {
+    const baseline = fixture();
+    expect(() => planWikiJsonEdit(JSON.stringify({ pages: [baseline.pages[0], baseline.pages[0].children[0]] }), baseline))
+      .toThrow(/unique id/);
+  });
+});

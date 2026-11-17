@@ -15,6 +15,7 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
   const [plan, setPlan] = useState<ReturnType<typeof planWikiJsonEdit> | null>(null);
   const [previewId, setPreviewId] = useState(pageId);
   const [allowImages, setAllowImages] = useState(false);
+  const [useCurrentVersions, setUseCurrentVersions] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -31,7 +32,7 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
       const document = await getWikiJson(pageId, children);
       if (!active.current || version !== requestId.current) return;
       setBaseline(document); setSource(JSON.stringify(document, null, 2)); setIncludeChildren(children);
-      setPlan(null); setAllowImages(false); setPreviewId(pageId);
+      setPlan(null); setAllowImages(false); setUseCurrentVersions(false); setPreviewId(pageId);
     } catch (failure) {
       if (active.current && version === requestId.current) {
         setIncludeChildren(previousScope);
@@ -57,7 +58,7 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
   }
   function review() {
     if (!baseline) return;
-    try { const next = planWikiJsonEdit(source, baseline); setPlan(next); setError(null); setPreviewId(next.updates[0].id); }
+    try { const next = planWikiJsonEdit(source, baseline, useCurrentVersions); setPlan(next); setError(null); setPreviewId(next.updates[0].id); }
     catch (failure) { setPlan(null); setError(failure instanceof Error ? failure.message : "Invalid JSON."); }
   }
   async function copy() {
@@ -76,7 +77,7 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
   async function save() {
     if (!plan || busy || plan.missingImages && !allowImages) return;
     const removals = plan.summaries.some(item => item.removedChecks || item.removedSources || item.clearedContent || item.missingImages);
-    if (removals && !window.confirm("Save these JSON changes? Removed checks, sources and article content will be replaced. Unlinked image files remain stored. Pages omitted from this JSON will not be deleted.")) return;
+    if ((removals || plan.createdPages || plan.rebasedPages) && !window.confirm("Save these changes and create " + plan.createdPages + " subpages? This replaces the content shown in the preview. Image references are checked across the entire edit. Omitted pages are retained.")) return;
     setBusy(true); setError(null);
     try {
       await updateWikiJson(pageId, { updates: plan.updates, allowImageRemoval: allowImages });
@@ -93,6 +94,15 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
       <div className="wiki-json-actions">
         <button className="secondary-button wiki-icon-button" type="button" title="Reload JSON" aria-label="Reload JSON" disabled={loading || busy} onClick={() => { if (confirmDiscard()) void load(includeChildren); }}><RefreshCw size={18} /></button>
         <button className="secondary-button wiki-icon-button" type="button" title="Download JSON" aria-label="Download JSON" disabled={!baseline || loading || busy} onClick={download}><Download size={18} /></button>
+        <label className="secondary-button file-action-button">Choose JSON
+          <input type="file" accept=".json,application/json" disabled={!baseline || loading || busy} onChange={event => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = "";
+            if (file) void file.text().then(text => {
+              if (active.current && confirmDiscard()) { change(text); setError(null); }
+            }, () => setError("Unable to read the JSON file."));
+          }} />
+        </label>
         <button className="secondary-button" type="button" disabled={!baseline || loading || busy} onClick={review}><Eye size={16} /> Review changes</button>
         <button className="primary-button" type="button" disabled={!plan || !changed || busy || !!plan.missingImages && !allowImages} onClick={() => void save()}><Save size={16} />{busy ? "Saving..." : "Save changes"}</button>
         <button className="secondary-button" type="button" disabled={busy} onClick={() => { if (confirmDiscard()) onCancel(); }}>Cancel</button>
@@ -105,6 +115,12 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
         onChange={event => { if (confirmDiscard()) void load(event.target.checked); }} />Include subpages</label>
       {baseline ? <span>{flattenWikiJson(baseline).length} pages · {flattenWikiJson(baseline).reduce((sum, page) => sum + page.images.reduce((count, image) => count + image.occurrences, 0), 0)} image references</span> : null}
     </div>
+    <p className="muted-copy">Paste or choose a JSON file with nested children or a flat pages list linked by parentId. Existing pages keep their IDs. New subpages can omit id. Keep each wiki-image reference in the article or its subpages.</p>
+    <label className="inline-checkbox"><input type="checkbox" checked={useCurrentVersions} disabled={loading || busy}
+      onChange={event => { setUseCurrentVersions(event.target.checked); setPlan(null); setError(null); }} />
+      Review against current page versions if the pasted updatedAt values differ
+    </label>
+    {useCurrentVersions ? <p className="muted-copy">This can replace edits made before this editor was loaded. Review the preview before saving. Changes made after loading still block the save.</p> : null}
     {loading ? <p role="status">Loading article JSON...</p> : baseline ? <>
       <div className="wiki-json-workspace">
         <section aria-label="Editable article JSON">
@@ -114,11 +130,11 @@ export function WikiJsonEditor({ pageId, onSaved, onCancel }: {
         </section>
         <section className="wiki-json-preview" aria-label="JSON change preview">
           {plan ? <>
-            <div className="wiki-json-review-summary"><strong>{changed} pages changed</strong><span>{plan.untouchedPages} omitted pages kept</span>
+            <div className="wiki-json-review-summary"><strong>{changed} pages changed</strong><span>{plan.createdPages} new subpages · {plan.untouchedPages} omitted pages kept</span>
               {plan.missingImages ? <label className="inline-checkbox"><input type="checkbox" checked={allowImages} onChange={event => setAllowImages(event.target.checked)} />Allow unlinking {plan.missingImages} image references</label> : null}
             </div>
             <label>Preview page<select value={previewId} onChange={event => setPreviewId(event.target.value)}>
-              {plan.summaries.map(item => <option key={item.id} value={item.id}>{item.path}{item.changed ? " · changed" : " · unchanged"}</option>)}
+              {plan.summaries.map(item => <option key={item.id} value={item.id}>{item.path}{item.isNew ? " - new subpage" : item.changed ? " - changed" : " - unchanged"}</option>)}
             </select></label>
             {preview ? <>
               <h2>{preview.page.title}</h2>

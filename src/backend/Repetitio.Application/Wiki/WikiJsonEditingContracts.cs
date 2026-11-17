@@ -4,4 +4,4 @@ public sealed record WikiJsonUpdateRequest(
     IReadOnlyCollection<WikiJsonPageUpdate> Updates,
     bool AllowImageRemoval = false);
 
-public sealed record WikiJsonPageUpdate(Guid Id, DateTime ExpectedUpdatedAt, UpdateWikiPageRequest Page);
+public sealed record WikiJsonPageUpdate(Guid Id, DateTime? ExpectedUpdatedAt, UpdateWikiPageRequest Page, bool IsNew = false);

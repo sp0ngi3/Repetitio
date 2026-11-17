@@ -1193,7 +1193,7 @@ export interface WikiJsonPage extends WikiPage {
 }
 
 export interface WikiJsonDocument { pages: WikiJsonPage[]; }
-export interface WikiJsonPageUpdate { id: string; expectedUpdatedAt: string; page: UpdateWikiPageRequest; }
+export interface WikiJsonPageUpdate { id: string; expectedUpdatedAt: string | null; page: UpdateWikiPageRequest; isNew?: boolean; }
 export interface WikiJsonUpdateRequest { updates: WikiJsonPageUpdate[]; allowImageRemoval: boolean; }
 
 export interface UpdateWikiPracticeRequest {
